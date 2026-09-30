@@ -10,6 +10,6 @@ run() {
 }
 
 status=0
-run $C/common/Utils.brs tests/utils_test.brs
+run $C/common/Utils.brs $C/common/Tracks.brs tests/utils_test.brs
 run $C/common/Utils.brs tests/fake_registry.brs $C/common/Progress.brs $C/tasks/XtreamParse.brs tests/parse_test.brs
 exit $status

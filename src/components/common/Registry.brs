@@ -36,3 +36,18 @@ sub ClearAccount()
     RegDelete("account", "creds")
     RegDelete("progress", "items")
 end sub
+
+' Player preferences, e.g. { audio: "hin", subtitles: "eng" } (language codes, or "off").
+function LoadPrefs() as Object
+    raw = RegRead("prefs", "player")
+    prefs = invalid
+    if raw <> invalid then prefs = ParseJson(raw)
+    if not IsAA(prefs) then prefs = {}
+    return prefs
+end function
+
+sub SavePref(key as String, value as String)
+    prefs = LoadPrefs()
+    prefs[key] = value
+    RegWrite("prefs", "player", FormatJson(prefs))
+end sub

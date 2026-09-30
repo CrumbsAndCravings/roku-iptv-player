@@ -18,6 +18,8 @@
 
     <Poster translation="[48, 30]" uri="pkg:/images/wordmark.png" width="147" height="34" />
     <Group id="tabs" translation="[232, 26]" />
+    <!-- Takes focus while the tab bar is active; its keys bubble up to this screen. -->
+    <Group id="navKeys" />
 
     <LayoutGroup id="hero" translation="[48, 112]" layoutDirection="vert" itemSpacings="[8, 12]">
       <Label id="heroTitle" width="600" wrap="true" maxLines="2" color="0xF5F5F7FF" />

@@ -5,6 +5,7 @@ sub init()
     m.heroMeta = m.top.FindNode("heroMeta")
     m.heroPlot = m.top.FindNode("heroPlot")
     m.status = m.top.FindNode("status")
+    m.navKeys = m.top.FindNode("navKeys")
     m.heroTimer = m.top.FindNode("heroTimer")
 
     m.heroTitle.font = MakeFont("Outfit-Bold", 38)
@@ -298,6 +299,7 @@ sub onRowItemSelected()
     item = row.GetChild(selected[1])
     if item = invalid then return
     if item.placeholder then return
+    if m.navFocused then return
     m.top.action = { name: "openDetails", item: item }
 end sub
 
@@ -342,11 +344,23 @@ sub focusRows()
     styleTabs()
 end sub
 
+' Focus goes to navKeys, an empty sibling of the rows, rather than to this screen.
+' Focusing an ancestor of the RowList could leave the RowList still taking keys, so
+' OK on a tab opened the poster underneath instead.
 sub focusNav()
     m.navFocused = true
     m.tabCursor = m.tab
-    m.top.SetFocus(true)
+    m.navKeys.SetFocus(true)
     styleTabs()
+end sub
+
+sub activateTab()
+    if m.failed then
+        loadCategories()
+        return
+    end if
+    if m.tabCursor <> m.tab then showTab(m.tabCursor)
+    focusRows()
 end sub
 
 sub styleTabs()
@@ -369,34 +383,10 @@ sub styleTabs()
 end sub
 
 function onKeyEvent(key as String, press as Boolean) as Boolean
+    if m.navFocused then return onNavKey(key, press)
     if not press then return false
     if key = "options" then
         showAccountMenu()
-        return true
-    end if
-
-    if m.navFocused then
-        if key = "left" then
-            if m.tabCursor > 0 then m.tabCursor = m.tabCursor - 1
-            styleTabs()
-            return true
-        else if key = "right" then
-            if m.tabCursor < m.tabNames.Count() - 1 then m.tabCursor = m.tabCursor + 1
-            styleTabs()
-            return true
-        else if key = "down" or key = "OK" then
-            if m.failed and key = "OK" then
-                loadCategories()
-            else if m.tabCursor <> m.tab then
-                showTab(m.tabCursor)
-                focusRows()
-            else
-                focusRows()
-            end if
-            return true
-        else if key = "back" then
-            return false
-        end if
         return true
     end if
 
@@ -414,6 +404,29 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
         return true
     end if
     return false
+end function
+
+function onNavKey(key as String, press as Boolean) as Boolean
+    ' OK acts on release, so the release can't land on the rows once they have focus.
+    if key = "OK" then
+        if not press then activateTab()
+        return true
+    end if
+    if not press then return key <> "back"
+    if key = "left" then
+        if m.tabCursor > 0 then m.tabCursor = m.tabCursor - 1
+        styleTabs()
+    else if key = "right" then
+        if m.tabCursor < m.tabNames.Count() - 1 then m.tabCursor = m.tabCursor + 1
+        styleTabs()
+    else if key = "down" then
+        activateTab()
+    else if key = "options" then
+        showAccountMenu()
+    else if key = "back" then
+        return false
+    end if
+    return true
 end function
 
 ' --- Account -----------------------------------------------------------------

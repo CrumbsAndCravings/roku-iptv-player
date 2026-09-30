@@ -14,6 +14,7 @@ sub init()
     m.scroll = m.top.FindNode("scroll")
     m.scrollBody = m.top.FindNode("scrollBody")
     m.scrollDim = m.top.FindNode("scrollDim")
+    m.keys = m.top.FindNode("keys")
 
     m.title.font = MakeFont("Outfit-Bold", 40)
     m.meta.font = MakeFont("Outfit-SemiBold", 18)
@@ -308,10 +309,10 @@ sub enterZone(zone as String)
     m.zone = zone
     if zone = "buttons" then
         setScrolled(false)
-        m.top.SetFocus(true)
+        m.keys.SetFocus(true)
     else if zone = "seasons" then
         setScrolled(true)
-        m.top.SetFocus(true)
+        m.keys.SetFocus(true)
     else if zone = "episodes" then
         setScrolled(true)
         m.episodes.SetFocus(true)

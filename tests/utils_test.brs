@@ -78,6 +78,28 @@ sub Main()
         end if
     end for
 
+    ' Audio and subtitle tracks, shaped like the Video node's availableAudioTracks / availableSubtitleTracks
+    check("Language 3-letter", LanguageName("hin"), "Hindi")
+    check("Language 2-letter", LanguageName("EN"), "English")
+    check("Language unknown code", LanguageName("xyz"), "XYZ")
+    check("Language undefined", LanguageName("und"), "")
+    audio = AudioOptions([{ Track: "1", Language: "hin", Name: "" }, { Track: "2", Language: "eng", Name: "Commentary" }, { Track: "3", Language: "und", Name: "" }, { Language: "eng" }])
+    checkInt("audio count skips missing ids", audio.Count(), 3)
+    check("audio plain", audio[0].label, "Hindi")
+    check("audio with name", audio[1].label, "English · Commentary")
+    check("audio fallback", audio[2].label, "Track 3")
+    check("audio language kept", audio[0].language, "hin")
+    subs = SubtitleOptions([{ TrackName: "mkv/3", Language: "eng", Description: "English" }, { TrackName: "mkv/4", Language: "eng", Description: "SDH" }, { TrackName: "mkv/5", Language: "", Description: "" }])
+    checkInt("subs count with off", subs.Count(), 4)
+    check("subs off first", subs[0].label, "Off")
+    check("subs repeated description", subs[1].label, "English")
+    check("subs with description", subs[2].label, "English · SDH")
+    check("subs fallback", subs[3].label, "Subtitles 3")
+    checkInt("subs by language", OptionIndex(subs, "language", "eng"), 1)
+    checkInt("subs by id", OptionIndex(subs, "id", "mkv/4"), 2)
+    checkInt("subs missing", OptionIndex(subs, "language", "fre"), -1)
+    checkInt("no tracks", SubtitleOptions(invalid).Count(), 1)
+
     ' Episode title cleanup (same pattern as XtreamTask)
     prefix = CreateObject("roRegex", "^.*?S\d+\s*E\d+\s*[-:.]*\s*", "i")
     check("Episode prefix", prefix.Replace("Breaking Bad - S01E02 - Cat's in the Bag", ""), "Cat's in the Bag")

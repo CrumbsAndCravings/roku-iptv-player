@@ -40,6 +40,9 @@
       </Group>
     </Group>
 
+    <!-- Takes focus for the buttons and season bar; its keys bubble up to this screen. -->
+    <Group id="keys" />
+
     <Animation id="scroll" duration="0.3" easeFunction="outCubic">
       <Vector2DFieldInterpolator id="scrollBody" key="[0.0, 1.0]" fieldToInterp="body.translation" />
       <FloatFieldInterpolator id="scrollDim" key="[0.0, 1.0]" fieldToInterp="dim.opacity" />

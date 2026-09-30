@@ -6,6 +6,13 @@ sub init()
     m.errorBox = m.top.FindNode("errorBox")
     m.errorDetail = m.top.FindNode("errorDetail")
     m.countdown = m.top.FindNode("countdown")
+    m.keys = m.top.FindNode("keys")
+    m.hint = m.top.FindNode("hint")
+    m.hintTimer = m.top.FindNode("hintTimer")
+    m.tracks = m.top.FindNode("tracks")
+    m.audioList = m.top.FindNode("audioList")
+    m.subsList = m.top.FindNode("subsList")
+    m.tracksNote = m.top.FindNode("tracksNote")
 
     m.top.FindNode("upNextEyebrow").font = MakeFont("Outfit-SemiBold", 14)
     m.upNextTitle.font = MakeFont("Outfit-SemiBold", 22)
@@ -13,6 +20,11 @@ sub init()
     m.top.FindNode("errorTitle").font = MakeFont("Outfit-Bold", 28)
     m.errorDetail.font = MakeFont("Outfit-Regular", 18)
     m.top.FindNode("errorHint").font = MakeFont("Outfit-SemiBold", 18)
+    m.top.FindNode("hintLabel").font = MakeFont("Outfit-SemiBold", 18)
+    m.top.FindNode("tracksTitle").font = MakeFont("Outfit-Bold", 34)
+    m.top.FindNode("audioHeading").font = MakeFont("Outfit-SemiBold", 15)
+    m.top.FindNode("subsHeading").font = MakeFont("Outfit-SemiBold", 15)
+    m.tracksNote.font = MakeFont("Outfit-Regular", 18)
 
     for each barName in ["trickPlayBar", "bufferingBar", "retrievingBar"]
         bar = m.video.GetField(barName)
@@ -22,6 +34,9 @@ sub init()
     m.video.ObserveField("state", "onState")
     m.video.ObserveField("position", "onPosition")
     m.countdown.ObserveField("fire", "onCountdown")
+    m.hintTimer.ObserveField("fire", "onHintTimer")
+    m.video.ObserveField("availableAudioTracks", "onTracksChanged")
+    m.video.ObserveField("availableSubtitleTracks", "onTracksChanged")
 
     m.playback = invalid
     m.index = 0
@@ -33,6 +48,14 @@ sub init()
     m.started = false
     m.failed = false
     m.errors = []
+    m.audioOptions = []
+    m.subOptions = []
+    m.trackColumn = 1
+    m.audioCursor = 0
+    m.subCursor = 0
+    m.audioPrefDone = false
+    m.subPrefDone = false
+    m.hintShown = false
 end sub
 
 sub onPlayback()
@@ -43,8 +66,8 @@ sub onPlayback()
 end sub
 
 sub onTakeFocus()
-    if m.upNext.visible or m.errorBox.visible then
-        m.top.SetFocus(true)
+    if m.upNext.visible or m.errorBox.visible or m.tracks.visible then
+        m.keys.SetFocus(true)
     else
         m.video.SetFocus(true)
     end if
@@ -103,6 +126,11 @@ sub loadStream()
     if m.startAt > 10 then content.playStart = m.startAt - 5
 
     m.lastSaved = m.startAt
+    m.audioPrefDone = false
+    m.subPrefDone = false
+    m.hintShown = false
+    m.hint.visible = false
+    m.tracks.visible = false
     m.video.visible = true
     m.video.content = content
     m.video.control = "play"
@@ -175,6 +203,12 @@ sub onState()
     state = m.video.state
     if state = "playing" then
         m.started = true
+        onTracksChanged()
+        if not m.hintShown then
+            m.hintShown = true
+            m.hint.visible = true
+            m.hintTimer.control = "start"
+        end if
     else if state = "error" then
         onPlaybackError()
     else if state = "finished" then
@@ -207,8 +241,10 @@ sub onPlaybackError()
     m.video.control = "stop"
     m.video.visible = false
     m.errorDetail.text = diagnosis()
+    m.hint.visible = false
+    m.tracks.visible = false
     m.errorBox.visible = true
-    m.top.SetFocus(true)
+    m.keys.SetFocus(true)
 end sub
 
 function describeRokuError() as String
@@ -290,8 +326,9 @@ sub showUpNext()
     m.secondsLeft = 8
     updateCountdown()
     m.upNext.visible = true
+    m.tracks.visible = false
     m.countdown.control = "start"
-    m.top.SetFocus(true)
+    m.keys.SetFocus(true)
 end sub
 
 sub onCountdown()
@@ -322,6 +359,7 @@ end sub
 
 function onKeyEvent(key as String, press as Boolean) as Boolean
     if not press then return false
+    if m.tracks.visible then return onTrackKey(key)
     if m.errorBox.visible then
         if key = "OK" then
             startItem(m.startAt)
@@ -343,5 +381,172 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
         close()
         return true
     end if
+    ' Keys the video didn't use open the audio and subtitle panel.
+    if (key = "down" or key = "up" or key = "options") and m.started then
+        openTracks()
+        return true
+    end if
     return false
+end function
+
+' --- Audio & subtitles -----------------------------------------------------------
+
+sub onHintTimer()
+    m.hint.visible = false
+end sub
+
+' Applies the audio and subtitle languages chosen earlier, once per stream, as soon as
+' Roku has listed the tracks.
+sub onTracksChanged()
+    if not m.started then return
+    prefs = LoadPrefs()
+    if not m.audioPrefDone then
+        options = AudioOptions(m.video.availableAudioTracks)
+        if options.Count() > 0 then
+            m.audioPrefDone = true
+            index = OptionIndex(options, "language", FieldStr(prefs, "audio"))
+            if index >= 0 and options[index].id <> ToStr(m.video.audioTrack) then m.video.audioTrack = options[index].id
+        end if
+    end if
+    if not m.subPrefDone then
+        options = SubtitleOptions(m.video.availableSubtitleTracks)
+        if options.Count() > 1 then
+            m.subPrefDone = true
+            wanted = FieldStr(prefs, "subtitles")
+            index = OptionIndex(options, "language", wanted)
+            if wanted <> "" and wanted <> "off" and index > 0 then
+                m.video.subtitleTrack = options[index].id
+                m.video.globalCaptionMode = "On"
+            end if
+        end if
+    end if
+end sub
+
+sub openTracks()
+    m.audioOptions = AudioOptions(m.video.availableAudioTracks)
+    m.subOptions = SubtitleOptions(m.video.availableSubtitleTracks)
+    m.audioCursor = activeAudioIndex()
+    if m.audioCursor < 0 then m.audioCursor = 0
+    m.subCursor = activeSubtitleIndex()
+    if m.subCursor < 0 then m.subCursor = 0
+    m.trackColumn = 1
+    notes = []
+    if m.subOptions.Count() = 1 then notes.Push("This file has no built-in subtitles.")
+    if m.audioOptions.Count() <= 1 then notes.Push("It has one audio track.")
+    m.tracksNote.text = notes.Join(" ")
+    m.hint.visible = false
+    m.tracks.visible = true
+    m.keys.SetFocus(true)
+    renderTracks()
+end sub
+
+sub closeTracks()
+    m.tracks.visible = false
+    m.video.SetFocus(true)
+end sub
+
+function activeAudioIndex() as Integer
+    return OptionIndex(m.audioOptions, "id", ToStr(m.video.audioTrack))
+end function
+
+function activeSubtitleIndex() as Integer
+    if ToStr(m.video.globalCaptionMode) <> "On" then return 0
+    return OptionIndex(m.subOptions, "id", ToStr(m.video.subtitleTrack))
+end function
+
+sub renderTracks()
+    renderOptions(m.audioList, m.audioOptions, activeAudioIndex(), m.audioCursor, m.trackColumn = 0)
+    renderOptions(m.subsList, m.subOptions, activeSubtitleIndex(), m.subCursor, m.trackColumn = 1)
+end sub
+
+' Draws up to eight options around the cursor. The active one gets an amber dot.
+sub renderOptions(group as Object, options as Object, activeIndex as Integer, cursor as Integer, focused as Boolean)
+    group.RemoveChildrenIndex(group.GetChildCount(), 0)
+    if options.Count() = 0 then
+        empty = group.CreateChild("Label")
+        empty.font = MakeFont("Outfit-Regular", 20)
+        empty.color = "0x7C7C8CFF"
+        empty.text = "Default"
+        return
+    end if
+    visibleCount = 8
+    first = cursor - 3
+    if first > options.Count() - visibleCount then first = options.Count() - visibleCount
+    if first < 0 then first = 0
+    last = first + visibleCount - 1
+    if last > options.Count() - 1 then last = options.Count() - 1
+    y = 0
+    for i = first to last
+        row = group.CreateChild("Group")
+        row.translation = [0, y]
+        bg = row.CreateChild("Poster")
+        bg.uri = "pkg:/images/pill.9.png"
+        bg.width = 440
+        bg.height = 44
+        dot = row.CreateChild("Rectangle")
+        dot.translation = [20, 18]
+        dot.width = 8
+        dot.height = 8
+        dot.visible = (i = activeIndex)
+        label = row.CreateChild("Label")
+        label.translation = [44, 0]
+        label.width = 380
+        label.height = 44
+        label.vertAlign = "center"
+        label.font = MakeFont("Outfit-SemiBold", 20)
+        label.text = options[i].label
+        if focused and i = cursor then
+            bg.blendColor = "0xF5F5F7FF"
+            bg.opacity = 1.0
+            label.color = "0x0B0B0FFF"
+            dot.color = "0x0B0B0FFF"
+        else
+            bg.opacity = 0.0
+            dot.color = "0xF5B83DFF"
+            label.color = "0x9A9AAAFF"
+            if i = activeIndex then label.color = "0xF5F5F7FF"
+        end if
+        y = y + 50
+    end for
+end sub
+
+sub chooseTrack()
+    if m.trackColumn = 0 then
+        if m.audioOptions.Count() = 0 then return
+        option = m.audioOptions[m.audioCursor]
+        m.video.audioTrack = option.id
+        if option.language <> "" then SavePref("audio", option.language)
+    else
+        option = m.subOptions[m.subCursor]
+        if option.id = "" then
+            m.video.globalCaptionMode = "Off"
+            SavePref("subtitles", "off")
+        else
+            m.video.subtitleTrack = option.id
+            m.video.globalCaptionMode = "On"
+            if option.language <> "" then SavePref("subtitles", option.language)
+        end if
+    end if
+    renderTracks()
+end sub
+
+function onTrackKey(key as String) as Boolean
+    if key = "back" or key = "options" then
+        closeTracks()
+    else if key = "left" and m.audioOptions.Count() > 0 then
+        m.trackColumn = 0
+    else if key = "right" then
+        m.trackColumn = 1
+    else if key = "up" then
+        if m.trackColumn = 0 and m.audioCursor > 0 then m.audioCursor = m.audioCursor - 1
+        if m.trackColumn = 1 and m.subCursor > 0 then m.subCursor = m.subCursor - 1
+    else if key = "down" then
+        if m.trackColumn = 0 and m.audioCursor < m.audioOptions.Count() - 1 then m.audioCursor = m.audioCursor + 1
+        if m.trackColumn = 1 and m.subCursor < m.subOptions.Count() - 1 then m.subCursor = m.subCursor + 1
+    else if key = "OK" then
+        chooseTrack()
+        return true
+    end if
+    if m.tracks.visible then renderTracks()
+    return true
 end function

@@ -26,10 +26,30 @@
       <Label id="errorHint" translation="[44, 368]" width="912" color="0xF5B83DFF" text="OK to try again   ·   Back to return" />
     </Group>
 
+    <!-- Takes focus for overlays; its keys bubble up to this screen instead of the video. -->
+    <Group id="keys" />
+
+    <Group id="hint" translation="[48, 632]" visible="false">
+      <Poster uri="pkg:/images/pill.9.png" width="300" height="42" blendColor="0x0B0B0FDD" />
+      <Label id="hintLabel" width="300" height="42" horizAlign="center" vertAlign="center" color="0xF5F5F7FF" text="↓   Audio &amp; subtitles" />
+    </Group>
+
+    <Group id="tracks" visible="false">
+      <Rectangle width="1280" height="720" color="0x000000CC" />
+      <Label id="tracksTitle" translation="[120, 80]" width="1040" color="0xF5F5F7FF" text="Audio &amp; subtitles" />
+      <Label id="audioHeading" translation="[120, 160]" width="440" color="0xF5B83DFF" text="AUDIO" />
+      <Group id="audioList" translation="[120, 196]" />
+      <Label id="subsHeading" translation="[640, 160]" width="440" color="0xF5B83DFF" text="SUBTITLES" />
+      <Group id="subsList" translation="[640, 196]" />
+      <Label id="tracksNote" translation="[120, 610]" width="1040" wrap="true" maxLines="2" color="0x9A9AAAFF" />
+    </Group>
+
     <Timer id="countdown" duration="1" repeat="true" />
+    <Timer id="hintTimer" duration="5" repeat="false" />
   </children>
   <script type="text/brightscript" uri="pkg:/components/common/Utils.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Registry.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Progress.brs" />
+  <script type="text/brightscript" uri="pkg:/components/common/Tracks.brs" />
   <script type="text/brightscript" uri="pkg:/components/screens/PlayerScreen.brs" />
 </component>
