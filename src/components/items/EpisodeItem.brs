@@ -15,7 +15,7 @@ sub onContentChange()
     item = m.top.itemContent
     if item = invalid then return
     m.still.uri = item.HDPosterUrl
-    m.title.text = item.episodeNumber.ToStr() + ".  " + item.title
+    m.title.text = ToStr(item.episodeNo) + ".  " + item.title
     m.runtime.text = ""
     if item.durationSecs > 0 then m.runtime.text = FormatRuntime(item.durationSecs)
     m.plot.text = item.description

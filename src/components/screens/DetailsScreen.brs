@@ -64,8 +64,8 @@ sub showInfo()
     m.meta.text = MetaLine(item)
     m.plot.text = item.description
     credits = []
-    if item.cast <> "" then credits.Push("Starring " + item.cast)
-    if item.director <> "" then credits.Push("Directed by " + item.director)
+    if item.starring <> "" then credits.Push("Starring " + item.starring)
+    if item.directedBy <> "" then credits.Push("Directed by " + item.directedBy)
     m.credits.text = credits.Join("   ·   ")
     ShowBackdrop(m.backdrop, item.backdrop, item.HDPosterUrl)
 end sub
@@ -102,6 +102,9 @@ sub playMovie(startAt as Integer)
             id: item.itemId
             ext: ext
             startAt: startAt
+            videoCodec: item.videoCodec
+            videoProfile: item.videoProfile
+            audioCodec: item.audioCodec
             entry: { k: "m:" + item.itemId, kind: "movie", id: item.itemId, name: item.title, poster: item.HDPosterUrl, bd: item.backdrop, ext: ext }
         }
     }
@@ -132,7 +135,17 @@ sub onSeriesInfo(event as Object)
         season = series.GetChild(s)
         for e = 0 to season.GetChildCount() - 1
             ep = season.GetChild(e)
-            m.queue.Push({ id: ep.itemId, ext: ep.ext, season: ep.seasonNumber, episode: ep.episodeNumber, title: ep.title })
+            m.queue.Push({
+                id: ep.itemId
+                ext: ep.ext
+                season: ToInt(ep.seasonNo)
+                episode: ToInt(ep.episodeNo)
+                code: EpisodeCode(ep.seasonNo, ep.episodeNo)
+                title: ep.title
+                videoCodec: ep.videoCodec
+                videoProfile: ep.videoProfile
+                audioCodec: ep.audioCodec
+            })
         end for
     end for
 
@@ -173,16 +186,13 @@ sub refreshSeriesProgress(pickSeason as Boolean)
     end if
 
     if entrySeason >= 0 then
-        code = "S" + FieldStr(m.entry, "season") + ":E" + FieldStr(m.entry, "episode")
+        code = EpisodeCode(Field(m.entry, "season"), Field(m.entry, "episode"))
         ' After an episode finishes, the entry points at the next one with no progress yet.
         verb = "Play "
         if ToInt(m.entry.pos) > 0 then verb = "Resume "
         setButtons([verb + code, "Episodes"], ["resumeEpisode", "episodes"])
     else
-        first = m.queue[0]
-        seasonNumber = first.season
-        episodeNumber = first.episode
-        setButtons(["Play S" + seasonNumber.ToStr() + ":E" + episodeNumber.ToStr(), "Episodes"], ["playFirst", "episodes"])
+        setButtons(["Play " + m.queue[0].code, "Episodes"], ["playFirst", "episodes"])
     end if
 end sub
 

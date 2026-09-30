@@ -1,4 +1,5 @@
-' Continue Watching, stored in the Roku registry (about 16KB per app).
+' Continue Watching, stored in the Roku registry (about 16KB per app) under
+' section "progress". (v0.1 used "watch", which held a bogus entry from a failed play.)
 ' One entry per movie ("m:<streamId>") or per series ("s:<seriesId>"), newest first.
 '
 ' Entry fields:
@@ -13,7 +14,7 @@ function ProgressMax() as Integer
 end function
 
 function ProgressList() as Object
-    raw = RegRead("watch", "items")
+    raw = RegRead("progress", "items")
     if raw = invalid then return []
     list = ParseJson(raw)
     if not IsArr(list) then return []
@@ -37,7 +38,7 @@ sub ProgressPut(entry as Object)
     for each item in ProgressList()
         if FieldStr(item, "k") <> entry.k and list.Count() < ProgressMax() then list.Push(item)
     end for
-    RegWrite("watch", "items", FormatJson(list))
+    RegWrite("progress", "items", FormatJson(list))
 end sub
 
 sub ProgressRemove(key as String)
@@ -45,7 +46,7 @@ sub ProgressRemove(key as String)
     for each item in ProgressList()
         if FieldStr(item, "k") <> key then list.Push(item)
     end for
-    RegWrite("watch", "items", FormatJson(list))
+    RegWrite("progress", "items", FormatJson(list))
 end sub
 
 function ProgressFraction(entry as Dynamic) as Float
@@ -72,7 +73,7 @@ function ContinueWatchingRow() as Dynamic
         if kind = "episode" then
             itemKind = "series"
             seriesId = FieldStr(entry, "sid")
-            caption = "S" + FieldStr(entry, "season") + ":E" + FieldStr(entry, "episode")
+            caption = EpisodeCode(Field(entry, "season"), Field(entry, "episode"))
         end if
         itemId = FieldStr(entry, "id")
         if itemKind = "series" then itemId = seriesId

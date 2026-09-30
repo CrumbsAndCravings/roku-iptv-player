@@ -122,7 +122,7 @@ function MetaLine(item as Object) as String
         if genres.Count() > 1 then text = text + ", " + genres[1].Trim()
         parts.Push(text)
     end if
-    tenths = Int(item.rating.ToFloat() * 10 + 0.5)
+    tenths = Int(item.score.ToFloat() * 10 + 0.5)
     if tenths > 0 then
         whole = tenths \ 10
         fraction = tenths MOD 10
@@ -195,10 +195,12 @@ end function
 
 ' --- Content nodes -------------------------------------------------------------
 
-' Every item node gets the full set of custom fields, so screens never read a
-' missing field (which would come back invalid and crash string comparisons).
-function MakeItem(parent as Object, values as Object) as Object
-    fields = {
+' Custom fields every item node gets, so screens never read a missing field (which
+' would come back invalid and crash string comparisons).
+' Names must not match ContentNode's built-in metadata fields: a built-in keeps its own
+' type and silently drops our value (EpisodeNumber, for one, is a string).
+function ItemDefaults() as Object
+    return {
         kind: ""
         itemId: ""
         seriesId: ""
@@ -206,17 +208,24 @@ function MakeItem(parent as Object, values as Object) as Object
         backdrop: ""
         year: ""
         genre: ""
-        rating: ""
-        cast: ""
-        director: ""
+        score: ""
+        starring: ""
+        directedBy: ""
         durationSecs: 0
-        seasonNumber: 0
-        episodeNumber: 0
+        seasonNo: 0
+        episodeNo: 0
+        videoCodec: ""
+        videoProfile: ""
+        audioCodec: ""
         hasInfo: false
         placeholder: false
         progress: 0.0
         caption: ""
     }
+end function
+
+function MakeItem(parent as Object, values as Object) as Object
+    fields = ItemDefaults()
     fields.Append(values)
     node = parent.CreateChild("ContentNode")
     node.Update(fields, true)
@@ -226,7 +235,7 @@ end function
 ' Copies details fetched from get_vod_info / get_series_info onto an item node.
 sub ApplyInfo(item as Object, info as Dynamic)
     if not IsAA(info) then return
-    for each key in ["description", "year", "genre", "rating", "cast", "director", "backdrop", "ext"]
+    for each key in ["description", "year", "genre", "score", "starring", "directedBy", "backdrop", "ext", "videoCodec", "videoProfile", "audioCodec"]
         value = FieldStr(info, key)
         if value <> "" then item.SetField(key, value)
     end for
@@ -234,6 +243,38 @@ sub ApplyInfo(item as Object, info as Dynamic)
     if duration > 0 then item.durationSecs = duration
     item.hasInfo = true
 end sub
+
+' "S1:E2"
+function EpisodeCode(seasonNo as Dynamic, episodeNo as Dynamic) as String
+    return "S" + ToInt(seasonNo).ToStr() + ":E" + ToInt(episodeNo).ToStr()
+end function
+
+' Provider codec names (ffprobe style) -> "HEVC Main 10 video, E-AC-3 audio"
+function DescribeCodecs(videoCodec as String, videoProfile as String, audioCodec as String) as String
+    names = { h264: "H.264", hevc: "HEVC", mpeg4: "MPEG-4 (DivX/Xvid)", mpeg2video: "MPEG-2", vp9: "VP9", av1: "AV1", aac: "AAC", ac3: "Dolby AC-3", eac3: "Dolby E-AC-3", dts: "DTS", mp3: "MP3", truehd: "Dolby TrueHD", opus: "Opus", flac: "FLAC", vorbis: "Vorbis" }
+    parts = []
+    if videoCodec <> "" then
+        label = names[LCase(videoCodec)]
+        if label = invalid then label = UCase(videoCodec)
+        if videoProfile <> "" then label = label + " " + videoProfile
+        parts.Push(label + " video")
+    end if
+    if audioCodec <> "" then
+        label = names[LCase(audioCodec)]
+        if label = invalid then label = UCase(audioCodec)
+        parts.Push(label + " audio")
+    end if
+    return parts.Join(", ")
+end function
+
+' Maps provider codec names to the names roDeviceInfo.CanDecodeVideo/Audio expects.
+function RokuVideoCodec(videoCodec as String) as String
+    c = LCase(videoCodec)
+    if c = "h264" or c = "avc" then return "mpeg4 avc"
+    if c = "mpeg2video" then return "mpeg2"
+    if c = "mpeg4" then return "mpeg4 2"
+    return c
+end function
 
 ' Shows a backdrop when there is one, otherwise a dimmed, zoomed poster.
 sub ShowBackdrop(target as Object, backdrop as String, poster as String)

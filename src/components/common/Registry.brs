@@ -34,5 +34,5 @@ end sub
 
 sub ClearAccount()
     RegDelete("account", "creds")
-    RegDelete("watch", "items")
+    RegDelete("progress", "items")
 end sub

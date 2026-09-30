@@ -14,7 +14,11 @@ Built for a 720p Roku TV (TCL 32S357, Roku OS 15), so the UI is laid out at 1280
 - **Player** that resumes a few seconds before where you stopped, saves progress every 15 seconds, and counts down to the next episode ("Up next", OK to skip the wait).
 - Adult categories and titles are hidden.
 
-Remote shortcuts: **Up** from the rows reaches the tabs, **Back** jumps to the top and then exits, **\*** (options) opens the account menu with Sign out, **Play** on a details page starts the main button.
+Remote shortcuts: **Left** from a row's first poster (or **Up** from the first row) reaches the tabs, **Back** jumps to the top row, then the tabs, then exits, **\*** (options) opens the account menu with Sign out, **Play** on a details page starts the main button.
+
+## When a video won't play
+
+The player retries once without a format hint, then shows what went wrong: Roku's own error, the file's container and codecs (as reported by your provider), whether this TV can decode them, and the stream address with the password hidden. A title only counts as watched once it has actually played.
 
 ## Install on your Roku
 

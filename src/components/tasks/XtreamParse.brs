@@ -66,7 +66,7 @@ sub addMovieItem(row as Object, raw as Object)
         kind: "movie"
         itemId: FieldStr(raw, "stream_id")
         ext: FieldStr(raw, "container_extension")
-        rating: FieldStr(raw, "rating")
+        score: FieldStr(raw, "rating")
         year: YearOf(FirstText([Field(raw, "year"), Field(raw, "releaseDate")]))
         description: FieldStr(raw, "plot")
         genre: FieldStr(raw, "genre")
@@ -84,9 +84,9 @@ sub addSeriesItem(row as Object, raw as Object)
         description: FieldStr(raw, "plot")
         year: YearOf(FirstText([Field(raw, "releaseDate"), Field(raw, "release_date"), Field(raw, "year")]))
         genre: FieldStr(raw, "genre")
-        rating: FieldStr(raw, "rating")
-        cast: FieldStr(raw, "cast")
-        director: FieldStr(raw, "director")
+        score: FieldStr(raw, "rating")
+        starring: FieldStr(raw, "cast")
+        directedBy: FieldStr(raw, "director")
         hasInfo: true
     })
 end sub
@@ -98,17 +98,30 @@ function ParseVodInfo(data as Dynamic) as Object
     movie = Field(data, "movie_data")
     duration = ToInt(info.duration_secs)
     if duration = 0 then duration = ClockToSeconds(FieldStr(info, "duration"))
-    return {
+    result = {
         description: FirstText([info.plot, info.description])
         year: YearOf(FirstText([info.releasedate, info.release_date, info.year]))
         genre: FieldStr(info, "genre")
-        rating: FieldStr(info, "rating")
-        cast: FirstText([info.cast, info.actors])
-        director: FieldStr(info, "director")
+        score: FieldStr(info, "rating")
+        starring: FirstText([info.cast, info.actors])
+        directedBy: FieldStr(info, "director")
         durationSecs: duration
         backdrop: SizedImage(FirstUrl(info.backdrop_path), "w780")
         poster: FirstText([info.movie_image, info.cover_big])
         ext: FieldStr(movie, "container_extension")
+    }
+    result.Append(CodecFields(info))
+    return result
+end function
+
+' The provider's ffprobe summary of the file, when it has one.
+function CodecFields(info as Dynamic) as Object
+    video = Field(info, "video")
+    audio = Field(info, "audio")
+    return {
+        videoCodec: FieldStr(video, "codec_name")
+        videoProfile: FieldStr(video, "profile")
+        audioCodec: FieldStr(audio, "codec_name")
     }
 end function
 
@@ -176,7 +189,7 @@ function ParseSeriesInfo(data as Dynamic) as Object
             if title = invalid then title = "Season " + key
             if number = 0 then title = "Specials"
             season.title = title
-            season.AddFields({ seasonNumber: number })
+            season.AddFields({ seasonNo: number })
             for each ep in sorted
                 addEpisode(season, ep, number, seriesName, prefix)
             end for
@@ -190,16 +203,16 @@ function ParseSeriesInfo(data as Dynamic) as Object
             description: FieldStr(info, "plot")
             year: YearOf(FirstText([info.releaseDate, info.release_date, info.year]))
             genre: FieldStr(info, "genre")
-            rating: FieldStr(info, "rating")
-            cast: FieldStr(info, "cast")
-            director: FieldStr(info, "director")
+            score: FieldStr(info, "rating")
+            starring: FieldStr(info, "cast")
+            directedBy: FieldStr(info, "director")
             backdrop: SizedImage(FirstUrl(info.backdrop_path), "w780")
             poster: FieldStr(info, "cover")
         }
     }
 end function
 
-sub addEpisode(season as Object, ep as Object, seasonNumber as Integer, seriesName as String, prefix as Object)
+sub addEpisode(season as Object, ep as Object, seasonNo as Integer, seriesName as String, prefix as Object)
     info = Field(ep, "info")
     if not IsAA(info) then info = {}
     number = ToInt(ep.episode_num)
@@ -207,17 +220,19 @@ sub addEpisode(season as Object, ep as Object, seasonNumber as Integer, seriesNa
     if title = "" then title = "Episode " + number.ToStr()
     duration = ToInt(info.duration_secs)
     if duration = 0 then duration = ClockToSeconds(FieldStr(info, "duration"))
-    MakeItem(season, {
+    values = {
         title: title
         description: FieldStr(info, "plot")
         HDPosterUrl: SizedImage(FieldStr(info, "movie_image"), "w300")
         kind: "episode"
         itemId: FieldStr(ep, "id")
         ext: FieldStr(ep, "container_extension")
-        seasonNumber: seasonNumber
-        episodeNumber: number
+        seasonNo: seasonNo
+        episodeNo: number
         durationSecs: duration
-    })
+    }
+    values.Append(CodecFields(info))
+    MakeItem(season, values)
 end sub
 
 ' "Show Name - S01E02 - The Title" -> "The Title". Returns "" when nothing is left.

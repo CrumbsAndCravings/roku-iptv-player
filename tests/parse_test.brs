@@ -33,7 +33,7 @@ sub Main()
     check("row item id", first.itemId, "102")
     check("row kind", first.kind, "movie")
     check("row ext", first.ext, "mp4")
-    check("row rating number", first.rating, "7.4")
+    check("row rating number", first.score, "7.4")
     check("row poster sized", first.HDPosterUrl, "https://image.tmdb.org/t/p/w185/new.jpg")
     check("row second", row.GetChild(1).title, "Older")
     check("row placeholder flag", boolText(first.placeholder), "false")
@@ -50,18 +50,22 @@ sub Main()
     check("series meta", MetaLine(show), "2008   ·   Drama, Crime   ·   Rated 9.5")
 
     ' --- VOD info, including the "info": [] quirk
-    vod = ParseVodInfo(ParseJson("{""info"":{""plot"":""Heist."",""releasedate"":""2019-05-24"",""duration"":""01:30:00"",""genre"":""Thriller"",""rating"":""7.04"",""backdrop_path"":[""https://image.tmdb.org/t/p/w1280/h.jpg""],""cast"":""A, B""},""movie_data"":{""stream_id"":9,""container_extension"":""mkv""}}"))
+    vod = ParseVodInfo(ParseJson("{""info"":{""plot"":""Heist."",""releasedate"":""2019-05-24"",""duration"":""01:30:00"",""genre"":""Thriller"",""rating"":""7.04"",""backdrop_path"":[""https://image.tmdb.org/t/p/w1280/h.jpg""],""cast"":""A, B"",""video"":{""codec_name"":""h264"",""profile"":""High""},""audio"":{""codec_name"":""aac""}},""movie_data"":{""stream_id"":9,""container_extension"":""mkv""}}"))
     check("vod plot", vod.description, "Heist.")
     check("vod year", vod.year, "2019")
     checkInt("vod duration from clock", vod.durationSecs, 5400)
     check("vod backdrop", vod.backdrop, "https://image.tmdb.org/t/p/w780/h.jpg")
     check("vod ext", vod.ext, "mkv")
+    check("vod video codec", vod.videoCodec, "h264")
+    check("vod starring", vod.starring, "A, B")
     empty = ParseVodInfo(ParseJson("{""info"":[],""movie_data"":[]}"))
     check("vod empty info", empty.description, "")
     item = MakeItem(CreateObject("roSGNode", "ContentNode"), { title: "Heist", kind: "movie" })
     ApplyInfo(item, vod)
     check("applied meta", MetaLine(item), "2019   ·   1h 30m   ·   Thriller   ·   Rated 7.0")
     check("applied has info", boolText(item.hasInfo), "true")
+    check("applied codec", item.videoCodec, "h264")
+    check("applied starring", item.starring, "A, B")
 
     ' --- Series info: seasons keyed by number, unsorted episodes, messy titles
     json = "{"
@@ -69,7 +73,7 @@ sub Main()
     json = json + """info"":{""name"":""Breaking Bad"",""plot"":""Chemistry."",""backdrop_path"":[""https://image.tmdb.org/t/p/original/s.jpg""]},"
     json = json + """episodes"":{"
     json = json + """2"":[{""id"":""902"",""episode_num"":1,""title"":""Breaking Bad - S02E01 - Seven Thirty-Seven"",""container_extension"":""mkv"",""info"":[]}],"
-    json = json + """1"":[{""id"":""802"",""episode_num"":""2"",""title"":""Breaking Bad - S01E02 - Cat's in the Bag"",""container_extension"":""mp4"",""info"":{""duration_secs"":2880,""movie_image"":""https://image.tmdb.org/t/p/w500/e2.jpg""}},"
+    json = json + """1"":[{""id"":""802"",""episode_num"":""2"",""title"":""Breaking Bad - S01E02 - Cat's in the Bag"",""container_extension"":""mp4"",""info"":{""duration_secs"":2880,""movie_image"":""https://image.tmdb.org/t/p/w500/e2.jpg"",""video"":{""codec_name"":""hevc"",""profile"":""Main 10""},""audio"":{""codec_name"":""eac3""}}},"
     json = json + "{""id"":801,""episode_num"":1,""title"":""Breaking Bad - S01E01"",""container_extension"":""mp4"",""info"":{""name"":""Pilot""}}],"
     json = json + """0"":[{""id"":""700"",""episode_num"":1,""title"":""Behind the scenes""}]"
     json = json + "}}"
@@ -82,12 +86,18 @@ sub Main()
     check("season name from meta", series.GetChild(1).title, "Season 1")
     check("custom season name", series.GetChild(2).title, "The Final Season")
     s1 = series.GetChild(1)
-    checkInt("season number field", s1.seasonNumber, 1)
+    checkInt("season number field", s1.seasonNo, 1)
     checkInt("episodes in season 1", s1.GetChildCount(), 2)
     check("episodes sorted", s1.GetChild(0).itemId, "801")
     check("episode name from info", s1.GetChild(0).title, "Pilot")
     check("episode title cleaned", s1.GetChild(1).title, "Cat's in the Bag")
     checkInt("episode duration", s1.GetChild(1).durationSecs, 2880)
+    checkInt("episode number field", s1.GetChild(1).episodeNo, 2)
+    checkInt("episode season field", s1.GetChild(1).seasonNo, 1)
+    check("episode video codec", s1.GetChild(1).videoCodec, "hevc")
+    check("episode video profile", s1.GetChild(1).videoProfile, "Main 10")
+    check("episode audio codec", s1.GetChild(1).audioCodec, "eac3")
+    check("episode no codecs", s1.GetChild(0).videoCodec, "")
     check("episode still sized", s1.GetChild(1).HDPosterUrl, "https://image.tmdb.org/t/p/w300/e2.jpg")
     check("episode info [] ok", series.GetChild(2).GetChild(0).title, "Seven Thirty-Seven")
 
@@ -99,7 +109,7 @@ sub Main()
     checkInt("no episodes", ParseSeriesInfo(ParseJson("{""episodes"":[]}")).content.GetChildCount(), 0)
 
     ' --- Continue Watching storage
-    RegDelete("watch", "items")
+    RegDelete("progress", "items")
     ProgressPut({ k: "m:1", kind: "movie", id: "1", name: "One", poster: "", bd: "", ext: "mp4", pos: 600, dur: 6000 })
     ProgressPut({ k: "s:55", kind: "episode", sid: "55", id: "802", name: "Breaking Bad", poster: "", bd: "", ext: "mp4", season: 1, episode: 2, etitle: "Cat", pos: 100, dur: 2880 })
     ProgressPut({ k: "m:1", kind: "movie", id: "1", name: "One", poster: "", bd: "", ext: "mp4", pos: 1200, dur: 6000 })
@@ -118,7 +128,7 @@ sub Main()
         ProgressPut({ k: "m:x" + i.ToStr(), kind: "movie", id: i.ToStr(), name: "", poster: "", bd: "", ext: "mp4", pos: 60, dur: 100 })
     end for
     checkInt("progress capped", ProgressList().Count(), 20)
-    RegDelete("watch", "items")
+    RegDelete("progress", "items")
     check("cw empty", boolText(ContinueWatchingRow() = invalid), "true")
 
     print ""

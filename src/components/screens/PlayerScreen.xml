@@ -18,11 +18,12 @@
       <Label id="upNextHint" translation="[28, 114]" width="380" color="0xB4B4C2FF" />
     </Group>
 
-    <Group id="errorBox" translation="[240, 250]" visible="false">
-      <Rectangle width="800" height="220" color="0x15151CFF" />
-      <Label id="errorTitle" translation="[40, 36]" width="720" color="0xF5F5F7FF" text="This video won't play on your Roku" />
-      <Label id="errorDetail" translation="[40, 84]" width="720" wrap="true" maxLines="3" color="0xB4B4C2FF" />
-      <Label id="errorHint" translation="[40, 170]" width="720" color="0x8A8A9AFF" text="Press Back to return." />
+    <Group id="errorBox" translation="[140, 150]" visible="false">
+      <Rectangle width="1000" height="420" color="0x15151CFF" />
+      <Rectangle width="4" height="420" color="0xF5B83DFF" />
+      <Label id="errorTitle" translation="[44, 34]" width="912" color="0xF5F5F7FF" text="This video didn't play" />
+      <Label id="errorDetail" translation="[44, 86]" width="912" height="270" wrap="true" maxLines="11" lineSpacing="4" color="0xC9C9D4FF" />
+      <Label id="errorHint" translation="[44, 368]" width="912" color="0xF5B83DFF" text="OK to try again   ·   Back to return" />
     </Group>
 
     <Timer id="countdown" duration="1" repeat="true" />

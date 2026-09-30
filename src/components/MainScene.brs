@@ -4,6 +4,8 @@ sub init()
     m.stack = m.top.FindNode("stack")
     m.screens = []
     m.global.AddFields({ creds: {} })
+    ' v0.1 kept Continue Watching here; its only entries came from a failed play.
+    RegDelete("watch", "items")
 
     creds = LoadCreds()
     if creds = invalid then

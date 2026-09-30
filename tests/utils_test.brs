@@ -55,6 +55,29 @@ sub Main()
     check("StreamFormat m3u8", StreamFormatFor("m3u8"), "hls")
     check("StreamFormat avi", StreamFormatFor("avi"), "")
 
+    ' Episode codes and codec descriptions
+    check("EpisodeCode ints", EpisodeCode(1, 2), "S1:E2")
+    check("EpisodeCode strings", EpisodeCode("3", "10"), "S3:E10")
+    check("Describe hevc", DescribeCodecs("hevc", "Main 10", "eac3"), "HEVC Main 10 video, Dolby E-AC-3 audio")
+    check("Describe h264 only", DescribeCodecs("h264", "", ""), "H.264 video")
+    check("Describe unknown", DescribeCodecs("", "", "wmav2"), "WMAV2 audio")
+    check("Roku codec h264", RokuVideoCodec("h264"), "mpeg4 avc")
+    check("Roku codec hevc", RokuVideoCodec("HEVC"), "hevc")
+
+    ' Custom item fields must not reuse ContentNode's built-in metadata names: a built-in
+    ' keeps its own type and silently drops our value (this broke episode numbers in v0.1).
+    builtIn = {}
+    for each name in ["title", "titleseason", "description", "releasedate", "rating", "starrating", "userstarrating", "shortdescriptionline1", "shortdescriptionline2", "episodenumber", "seasonnumber", "numepisodes", "actors", "directors", "director", "categories", "genres", "contenttype", "length", "hdposterurl", "sdposterurl", "fhdposterurl", "hdgridposterurl", "sdgridposterurl", "hdbackgroundimageurl", "sdbackgroundimageurl", "url", "streamformat", "streamurls", "streams", "stream", "playstart", "playduration", "bookmarkposition", "watched", "live", "ishd", "hdbranded", "fullhd", "framerate", "subtitletracks", "subtitleconfig", "subtitleurl", "secondarytitle", "id", "album", "artist", "artists", "language", "closedcaptions", "tracks"]
+        builtIn[name] = true
+    end for
+    for each name in ItemDefaults()
+        m.count = m.count + 1
+        if builtIn.DoesExist(LCase(name)) then
+            m.failures = m.failures + 1
+            print "FAIL item field '" + name + "' collides with a ContentNode built-in"
+        end if
+    end for
+
     ' Episode title cleanup (same pattern as XtreamTask)
     prefix = CreateObject("roRegex", "^.*?S\d+\s*E\d+\s*[-:.]*\s*", "i")
     check("Episode prefix", prefix.Replace("Breaking Bad - S01E02 - Cat's in the Bag", ""), "Cat's in the Bag")

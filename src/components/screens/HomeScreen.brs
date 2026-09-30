@@ -400,8 +400,8 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
         return true
     end if
 
-    ' The rows didn't use this key.
-    if key = "up" then
+    ' The rows didn't use this key: Up on the first row, or Left on a row's first poster.
+    if key = "up" or key = "left" then
         focusNav()
         return true
     else if key = "back" then
