@@ -252,6 +252,7 @@ function ItemDefaults() as Object
         videoProfile: ""
         audioCodec: ""
         problem: ""
+        tmdbId: ""
         hasInfo: false
         placeholder: false
         progress: 0.0
@@ -270,7 +271,7 @@ end function
 ' Copies details fetched from get_vod_info / get_series_info onto an item node.
 sub ApplyInfo(item as Object, info as Dynamic)
     if not IsAA(info) then return
-    for each key in ["description", "year", "genre", "score", "starring", "directedBy", "backdrop", "ext", "videoCodec", "videoProfile", "audioCodec"]
+    for each key in ["description", "year", "genre", "score", "starring", "directedBy", "backdrop", "ext", "videoCodec", "videoProfile", "audioCodec", "tmdbId"]
         value = FieldStr(info, key)
         if value <> "" then item.SetField(key, value)
     end for

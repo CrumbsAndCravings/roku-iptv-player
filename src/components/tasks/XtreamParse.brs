@@ -67,6 +67,7 @@ sub addMovieItem(row as Object, raw as Object)
         itemId: FieldStr(raw, "stream_id")
         ext: FieldStr(raw, "container_extension")
         problem: containerProblem(FieldStr(raw, "container_extension"))
+        tmdbId: FirstText([Field(raw, "tmdb"), Field(raw, "tmdb_id")])
         score: FieldStr(raw, "rating")
         year: YearOf(FirstText([Field(raw, "year"), Field(raw, "releaseDate")]))
         description: FieldStr(raw, "plot")
@@ -87,6 +88,7 @@ sub addSeriesItem(row as Object, raw as Object)
         kind: "series"
         itemId: FieldStr(raw, "series_id")
         seriesId: FieldStr(raw, "series_id")
+        tmdbId: FirstText([Field(raw, "tmdb"), Field(raw, "tmdb_id")])
         backdrop: SizedImage(FirstUrl(Field(raw, "backdrop_path")), "w780")
         description: FieldStr(raw, "plot")
         year: YearOf(FirstText([Field(raw, "releaseDate"), Field(raw, "release_date"), Field(raw, "year")]))
@@ -116,6 +118,7 @@ function ParseVodInfo(data as Dynamic) as Object
         backdrop: SizedImage(FirstUrl(info.backdrop_path), "w780")
         poster: FirstText([info.movie_image, info.cover_big])
         ext: FieldStr(movie, "container_extension")
+        tmdbId: FirstText([info.tmdb_id, info.tmdb])
     }
     result.Append(CodecFields(info))
     return result
@@ -215,6 +218,7 @@ function ParseSeriesInfo(data as Dynamic) as Object
             directedBy: FieldStr(info, "director")
             backdrop: SizedImage(FirstUrl(info.backdrop_path), "w780")
             poster: FieldStr(info, "cover")
+            tmdbId: FirstText([info.tmdb_id, info.tmdb])
         }
     }
 end function

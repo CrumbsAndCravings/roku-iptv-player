@@ -81,6 +81,7 @@
     <Timer id="hideTimer" duration="5" repeat="false" />
     <Timer id="holdTimer" duration="0.25" repeat="true" />
     <Timer id="commitTimer" duration="0.8" repeat="false" />
+    <Timer id="autoSubTimer" duration="2.5" repeat="false" />
   </children>
   <script type="text/brightscript" uri="pkg:/components/common/Utils.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Registry.brs" />
@@ -88,6 +89,7 @@
   <script type="text/brightscript" uri="pkg:/components/common/Progress.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Pills.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Tracks.brs" />
+  <script type="text/brightscript" uri="pkg:/components/common/Subtitles.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Playback.brs" />
   <script type="text/brightscript" uri="pkg:/components/screens/PlayerScreen.brs" />
 </component>

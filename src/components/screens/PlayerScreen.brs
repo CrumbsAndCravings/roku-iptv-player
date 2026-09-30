@@ -46,6 +46,7 @@ sub init()
     m.hideTimer = m.top.FindNode("hideTimer")
     m.holdTimer = m.top.FindNode("holdTimer")
     m.commitTimer = m.top.FindNode("commitTimer")
+    m.autoSubTimer = m.top.FindNode("autoSubTimer")
 
     m.backLabel.font = MakeFont("Fredoka-Medium", 18)
     m.titleLabel.font = MakeFont("Fredoka-Medium", 22)
@@ -77,6 +78,7 @@ sub init()
     m.hideTimer.ObserveField("fire", "onHideTimer")
     m.holdTimer.ObserveField("fire", "onHoldTick")
     m.commitTimer.ObserveField("fire", "commitSeek")
+    m.autoSubTimer.ObserveField("fire", "autoSubtitles")
 
     m.playback = invalid
     m.kind = "movie"
@@ -112,6 +114,7 @@ sub init()
     m.episodeCursor = 0
     m.audioPrefDone = false
     m.subPrefDone = false
+    resetOnline()
 end sub
 
 sub onPlayback()
@@ -161,6 +164,7 @@ sub startItem(startAt as Integer)
     m.introShown = false
     m.audioPrefDone = false
     m.subPrefDone = false
+    resetOnline()
     cancelSeek()
     closePanel(false)
     hideControls()
@@ -216,6 +220,7 @@ sub loadStream()
     end if
     ' Back up a few seconds so the scene picks up where it left off.
     if m.startAt > 10 then content.playStart = m.startAt - 5
+    if m.extraSubtitle <> "" then content.subtitleTracks = [{ Language: "eng", TrackName: m.extraSubtitle, Description: "Online" }]
 
     m.lastSaved = m.startAt
     m.video.visible = true
@@ -302,6 +307,15 @@ sub onState()
     if state = "playing" then
         m.started = true
         onTracksChanged()
+        if m.pendingSubtitle <> "" then
+            m.video.subtitleTrack = m.pendingSubtitle
+            m.video.globalCaptionMode = "On"
+            m.pendingSubtitle = ""
+        end if
+        if not m.autoChecked then
+            m.autoChecked = true
+            m.autoSubTimer.control = "start"
+        end if
         ' Show the controls briefly the first time, so the buttons are discoverable.
         if not m.introShown then
             m.introShown = true
@@ -778,11 +792,225 @@ end sub
 
 sub close()
     m.closing = true
+    m.autoSubTimer.control = "stop"
+    if m.osTask <> invalid then m.osTask.UnobserveField("result")
     cancelSeek()
     m.countdown.control = "stop"
     m.hideTimer.control = "stop"
     m.video.control = "stop"
     m.top.action = { name: "close" }
+end sub
+
+' --- Online subtitles (OpenSubtitles) -------------------------------------------
+'
+' The Subtitles column ends with online choices. Picking one downloads it and reloads
+' the stream at the same spot, since Roku only reads subtitle files when a stream
+' starts. Choosing one also sets the "online" preference, so later videos without
+' built-in English subtitles fetch the best match by themselves.
+
+sub resetOnline()
+    m.online = { state: "idle", candidates: [], message: "", link: "", fileId: "", shift: 0.0, auto: false, remaining: -1 }
+    m.extraSubtitle = ""
+    m.pendingSubtitle = ""
+    m.autoChecked = false
+    if m.autoSubTimer <> invalid then m.autoSubTimer.control = "stop"
+    if m.osTask <> invalid then m.osTask.UnobserveField("result")
+    m.osTask = invalid
+end sub
+
+function currentStreamUrl() as String
+    item = currentItem()
+    return StreamUrl(m.global.creds, streamKind(), item.id, item.ext)
+end function
+
+sub runOsTask(request as Object, callback as String)
+    if m.osTask <> invalid then m.osTask.UnobserveField("result")
+    request.videoUrl = currentStreamUrl()
+    m.osTask = CreateObject("roSGNode", "SubtitleTask")
+    m.osTask.request = request
+    m.osTask.ObserveField("result", callback)
+    m.osTask.control = "RUN"
+end sub
+
+' Results for a video that's no longer playing are dropped.
+function osResultFor(event as Object) as Dynamic
+    result = event.GetData()
+    m.osTask = invalid
+    if IsAA(result.account) then SaveOsAccount(result.account)
+    if FieldStr(result.request, "videoUrl") <> currentStreamUrl() then return invalid
+    return result
+end function
+
+sub autoSubtitles()
+    if m.closing or m.failed or m.online.link <> "" then return
+    if FieldStr(LoadPrefs(), "subtitles") <> "online" then return
+    if LoadOsAccount() = invalid then return
+    ' Built-in English subtitles beat a download.
+    options = SubtitleOptions(m.video.availableSubtitleTracks)
+    index = OptionIndex(options, "language", "eng")
+    if index < 0 then index = OptionIndex(options, "language", "en")
+    if index > 0 then
+        m.video.subtitleTrack = options[index].id
+        m.video.globalCaptionMode = "On"
+        return
+    end if
+    startOnlineSearch(true)
+end sub
+
+sub startOnlineSearch(auto as Boolean)
+    account = LoadOsAccount()
+    if account = invalid then return
+    item = currentItem()
+    request = { mode: "find", account: account }
+    if m.kind = "movie" then
+        request.kind = "movie"
+        request.tmdbId = FieldStr(m.playback, "tmdbId")
+        request.title = item.title
+    else
+        request.kind = "episode"
+        request.parentTmdbId = FieldStr(m.playback, "seriesTmdbId")
+        request.title = m.playback.seriesName
+        request.season = item.season
+        request.episode = item.episode
+    end if
+    m.online.state = "searching"
+    m.online.auto = auto
+    runOsTask(request, "onOnlineFound")
+    refreshTracksPanel()
+end sub
+
+sub onOnlineFound(event as Object)
+    result = osResultFor(event)
+    if result = invalid then return
+    if not result.ok then
+        m.online.state = "error"
+        m.online.message = result.error
+    else if result.candidates.Count() = 0 then
+        m.online.state = "none"
+    else
+        m.online.state = "results"
+        m.online.candidates = result.candidates
+        if m.online.auto then startOnlineDownload(result.candidates[0].fileId, 0.0)
+    end if
+    refreshTracksPanel()
+end sub
+
+sub startOnlineDownload(fileId as String, shift as Float)
+    account = LoadOsAccount()
+    if account = invalid or fileId = "" then return
+    m.online.state = "downloading"
+    runOsTask({ mode: "download", account: account, fileId: fileId, shift: shift }, "onOnlineDownloaded")
+    refreshTracksPanel()
+end sub
+
+sub onOnlineDownloaded(event as Object)
+    result = osResultFor(event)
+    if result = invalid then return
+    if not result.ok then
+        m.online.state = "error"
+        m.online.message = result.error
+        refreshTracksPanel()
+        return
+    end if
+    m.online.state = "results"
+    m.online.link = result.link
+    m.online.fileId = FieldStr(result.request, "fileId")
+    m.online.shift = result.request.shift
+    m.online.remaining = ToInt(result.remaining)
+    SavePref("subtitles", "online")
+    ' Roku reads subtitle files when a stream loads, so reload at the same spot.
+    m.extraSubtitle = result.link
+    m.pendingSubtitle = result.link
+    if m.started then m.startAt = Int(m.video.position)
+    m.video.control = "stop"
+    loadStream()
+    refreshTracksPanel()
+end sub
+
+sub chooseOnline(id as String)
+    if id = "os:search" then
+        startOnlineSearch(false)
+    else if id = "os:earlier" then
+        startOnlineDownload(m.online.fileId, m.online.shift - 1.0)
+    else if id = "os:later" then
+        startOnlineDownload(m.online.fileId, m.online.shift + 1.0)
+    else if Left(id, 8) = "os:file:" then
+        fileId = Mid(id, 9)
+        if fileId = m.online.fileId and m.online.link <> "" then
+            m.video.subtitleTrack = m.online.link
+            m.video.globalCaptionMode = "On"
+            SavePref("subtitles", "online")
+        else
+            startOnlineDownload(fileId, 0.0)
+        end if
+    end if
+    refreshTracksPanel()
+end sub
+
+' Built-in tracks (minus the loaded online one, which shows as its search result),
+' then the online choices for the current state.
+sub buildSubtitleOptions()
+    options = []
+    for each option in SubtitleOptions(m.video.availableSubtitleTracks)
+        if m.online.link = "" or option.id <> m.online.link then options.Push(option)
+    end for
+    if LoadOsAccount() = invalid then
+        options.Push({ id: "os:setup", label: "Find English subtitles online", language: "" })
+        m.subOptions = options
+        return
+    end if
+    state = m.online.state
+    if state = "searching" then
+        options.Push({ id: "os:busy", label: "Searching online…", language: "" })
+    else if state = "downloading" then
+        options.Push({ id: "os:busy", label: "Downloading subtitles…", language: "" })
+    else if m.online.candidates.Count() = 0 then
+        label = "Find English subtitles online"
+        if state = "none" or state = "error" then label = "Search online again"
+        options.Push({ id: "os:search", label: label, language: "" })
+    end if
+    for each candidate in m.online.candidates
+        options.Push({ id: "os:file:" + candidate.fileId, label: SubtitleLabel(candidate), language: "eng" })
+    end for
+    if m.online.link <> "" then
+        options.Push({ id: "os:earlier", label: "Show subtitles 1s earlier", language: "" })
+        options.Push({ id: "os:later", label: "Show subtitles 1s later", language: "" })
+    end if
+    m.subOptions = options
+end sub
+
+sub updateTracksNote()
+    notes = []
+    state = m.online.state
+    if LoadOsAccount() = invalid then
+        notes.Push("To search online, connect OpenSubtitles: on the home screen press * and choose Online subtitles.")
+    else if state = "searching" then
+        notes.Push("Searching OpenSubtitles for English subtitles…")
+    else if state = "downloading" then
+        notes.Push("Downloading, then the video picks up where it was.")
+    else if state = "none" then
+        notes.Push("OpenSubtitles has no English subtitles for this title.")
+    else if state = "error" then
+        notes.Push(m.online.message)
+    else if m.online.link <> "" then
+        shiftText = ""
+        if m.online.shift <> 0 then shiftText = " Timing moved " + Str(m.online.shift).Trim() + "s."
+        notes.Push("Online subtitles on." + shiftText + " If they're out of sync, nudge them earlier or later (each nudge uses a download).")
+    else if m.online.candidates.Count() > 0 then
+        notes.Push("“Matches this file” means timed for your exact video.")
+    else if m.subOptions.Count() <= 2 then
+        notes.Push("This file has no built-in subtitles.")
+    end if
+    if m.online.remaining >= 0 then notes.Push("Downloads left today: " + m.online.remaining.ToStr() + ".")
+    m.tracksNote.text = notes.Join(" ")
+end sub
+
+sub refreshTracksPanel()
+    if m.panel <> "tracks" then return
+    buildSubtitleOptions()
+    if m.subCursor > m.subOptions.Count() - 1 then m.subCursor = m.subOptions.Count() - 1
+    updateTracksNote()
+    renderTracks()
 end sub
 
 ' --- Panels (audio & subtitles, episodes) ---------------------------------------
@@ -824,16 +1052,13 @@ end sub
 sub openTracks()
     cancelSeek()
     m.audioOptions = AudioOptions(m.video.availableAudioTracks)
-    m.subOptions = SubtitleOptions(m.video.availableSubtitleTracks)
+    buildSubtitleOptions()
     m.audioCursor = activeAudioIndex()
     if m.audioCursor < 0 then m.audioCursor = 0
     m.subCursor = activeSubtitleIndex()
     if m.subCursor < 0 then m.subCursor = 0
     m.trackColumn = 1
-    notes = []
-    if m.subOptions.Count() = 1 then notes.Push("This file has no built-in subtitles.")
-    if m.audioOptions.Count() <= 1 then notes.Push("It has one audio track.")
-    m.tracksNote.text = notes.Join(" ")
+    updateTracksNote()
     hideControls()
     m.panel = "tracks"
     m.tracks.visible = true
@@ -846,7 +1071,9 @@ end function
 
 function activeSubtitleIndex() as Integer
     if ToStr(m.video.globalCaptionMode) <> "On" then return 0
-    return OptionIndex(m.subOptions, "id", ToStr(m.video.subtitleTrack))
+    current = ToStr(m.video.subtitleTrack)
+    if m.online.link <> "" and current = m.online.link then return OptionIndex(m.subOptions, "id", "os:file:" + m.online.fileId)
+    return OptionIndex(m.subOptions, "id", current)
 end function
 
 sub renderTracks()
@@ -862,6 +1089,10 @@ sub chooseTrack()
         if option.language <> "" then SavePref("audio", option.language)
     else
         option = m.subOptions[m.subCursor]
+        if Left(option.id, 3) = "os:" then
+            chooseOnline(option.id)
+            return
+        end if
         if option.id = "" then
             m.video.globalCaptionMode = "Off"
             SavePref("subtitles", "off")

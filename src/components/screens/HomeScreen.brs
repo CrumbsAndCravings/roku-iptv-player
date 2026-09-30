@@ -498,7 +498,7 @@ sub showAccountMenu()
     dialog = CreateObject("roSGNode", "StandardMessageDialog")
     dialog.title = "Account"
     dialog.message = ["Signed in as " + FieldStr(creds, "username") + " on " + FieldStr(creds, "server") + "."]
-    dialog.buttons = ["Keep watching", "Sign out"]
+    dialog.buttons = ["Keep watching", "Online subtitles", "Sign out"]
     dialog.ObserveField("buttonSelected", "onAccountButton")
     dialog.ObserveField("wasClosed", "onDialogClosed")
     m.top.GetScene().dialog = dialog
@@ -509,7 +509,8 @@ sub onAccountButton()
     if dialog = invalid then return
     choice = dialog.buttonSelected
     dialog.close = true
-    if choice = 1 then m.top.action = { name: "signOut" }
+    if choice = 1 then m.top.action = { name: "openSubtitleSetup" }
+    if choice = 2 then m.top.action = { name: "signOut" }
 end sub
 
 sub onDialogClosed()

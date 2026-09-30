@@ -35,6 +35,7 @@ end sub
 sub ClearAccount()
     RegDelete("account", "creds")
     RegDelete("progress", "items")
+    RegDelete("opensubtitles", "account")
 end sub
 
 ' Player preferences, e.g. { audio: "hin", subtitles: "eng" } (language codes, or "off").
@@ -50,4 +51,17 @@ sub SavePref(key as String, value as String)
     prefs = LoadPrefs()
     prefs[key] = value
     RegWrite("prefs", "player", FormatJson(prefs))
+end sub
+
+' OpenSubtitles account: { apiKey, username, password, token, baseUrl }. Stays on the TV.
+function LoadOsAccount() as Dynamic
+    raw = RegRead("opensubtitles", "account")
+    if raw = invalid then return invalid
+    account = ParseJson(raw)
+    if not IsAA(account) or FieldStr(account, "apiKey") = "" then return invalid
+    return account
+end function
+
+sub SaveOsAccount(account as Object)
+    RegWrite("opensubtitles", "account", FormatJson(account))
 end sub

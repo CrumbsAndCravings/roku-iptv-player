@@ -166,6 +166,7 @@ sub playMovie(startAt as Integer)
             videoCodec: item.videoCodec
             videoProfile: item.videoProfile
             audioCodec: item.audioCodec
+            tmdbId: item.tmdbId
             entry: { k: "m:" + item.itemId, kind: "movie", id: item.itemId, name: item.title, poster: item.HDPosterUrl, bd: item.backdrop, ext: ext }
         }
     }
@@ -281,6 +282,7 @@ sub playEpisode(index as Integer, startAt as Integer)
             kind: "episode"
             seriesId: item.itemId
             seriesName: item.title
+            seriesTmdbId: item.tmdbId
             poster: item.HDPosterUrl
             backdrop: item.backdrop
             queue: m.queue

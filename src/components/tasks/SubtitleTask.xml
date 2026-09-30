@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  One OpenSubtitles request off the UI thread. Set `request`, then control = "RUN".
+    { mode: "login", account }                     checks the key (and login, if given)
+    { mode: "find", account, kind, ... }           best English candidates for a title
+    { mode: "download", account, fileId, shift }   a link to the subtitle file
+  `result` always carries ok, and an updated account when a sign-in refreshed its token.
+-->
+<component name="SubtitleTask" extends="Task">
+  <interface>
+    <field id="request" type="assocarray" />
+    <field id="result" type="assocarray" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/components/common/Utils.brs" />
+  <script type="text/brightscript" uri="pkg:/components/common/Subtitles.brs" />
+  <script type="text/brightscript" uri="pkg:/components/tasks/SubtitleTask.brs" />
+</component>

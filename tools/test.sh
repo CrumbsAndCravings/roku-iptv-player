@@ -10,6 +10,6 @@ run() {
 }
 
 status=0
-run $C/common/Utils.brs $C/common/Tracks.brs $C/common/Playback.brs tests/utils_test.brs
+run $C/common/Utils.brs $C/common/Tracks.brs $C/common/Playback.brs $C/common/Subtitles.brs tests/utils_test.brs
 run $C/common/Utils.brs tests/fake_registry.brs $C/common/Progress.brs $C/tasks/XtreamParse.brs $C/tasks/SearchIndex.brs tests/parse_test.brs
 exit $status

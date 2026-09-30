@@ -125,6 +125,48 @@ sub Main()
     checkInt("bar unknown", Int(BarFraction(10.0, 0.0) * 100), 0)
     checkInt("bar over", Int(BarFraction(4000.0, 3600.0) * 100), 100)
 
+    ' OpenSubtitles file fingerprint, checked against a Python reference (tools: struct '<Q' sums)
+    head = [165, 77, 202, 24, 37, 48, 187, 29, 109, 19, 44, 222, 214, 35, 123, 46, 217, 30, 63, 114, 31, 203, 25, 113, 23, 68, 148, 214, 73, 60, 157, 92, 52, 96, 190, 49, 32, 30, 105, 254, 218, 160, 238, 232, 185, 153, 127, 92, 124, 41, 153, 253, 175, 229, 147, 37, 60, 214, 84, 175, 77, 250, 215, 20]
+    tail = [39, 160, 174, 179, 254, 233, 35, 47, 138, 242, 33, 31, 158, 228, 145, 197, 177, 11, 236, 181, 86, 59, 252, 30, 111, 147, 66, 126, 203, 200, 254, 41, 85, 229, 205, 142, 70, 220, 142, 212, 183, 194, 118, 77, 42, 90, 77, 118, 119, 6, 248, 93, 134, 144, 2, 74, 214, 189, 163, 64, 27, 233, 200, 203]
+    check("hash small file", OsHashHex(head, tail, 131072&), "4d9a760e894662f2")
+    check("hash 5GB file", OsHashHex(head, tail, 5368709120&), "4d9a760fc94462f2")
+    check("hash huge size", OsHashHex(head, tail, 6148914691236517205&), "a2efcb63de99b847")
+    ff = []
+    for i = 1 to 64
+        ff.Push(255)
+    end for
+    check("hash wraps at 64 bits", OsHashHex(ff, ff, 12884901895&), "00000002fffffff7")
+    check("content-range total", ParseContentRangeTotal("bytes 0-65535/5368709120").ToStr(), "5368709120")
+    check("content-range unknown", ParseContentRangeTotal("bytes 0-65535/*").ToStr(), "-1")
+    check("content-range missing", ParseContentRangeTotal("").ToStr(), "-1")
+
+    ' Title cleanup for text searches
+    cleaned = CleanTitleForSearch("EN - The Batman (2022)")
+    check("clean tag and year", cleaned.query, "The Batman")
+    check("clean year", cleaned.year, "2022")
+    check("clean pipe tag", CleanTitleForSearch("|EN| Supernatural").query, "Supernatural")
+    check("clean bracket tags", CleanTitleForSearch("[4K] Dune: Part Two [MULTI-SUB]").query, "Dune: Part Two")
+    check("clean keeps hyphenated names", CleanTitleForSearch("Spider-Man: No Way Home (2021)").query, "Spider-Man: No Way Home")
+    check("clean keeps short numeric titles", CleanTitleForSearch("1917").query, "1917")
+    check("clean keeps colon titles", CleanTitleForSearch("CSI: Miami").query, "CSI: Miami")
+
+    ' Query strings are sorted with lowercase values
+    check("os query", OsQuery({ type: "episode", languages: "en", parent_tmdb_id: 1622, season_number: 1, episode_number: 2, moviehash: "ABCDEF0123456789" }), "episode_number=2&languages=en&moviehash=abcdef0123456789&parent_tmdb_id=1622&season_number=1&type=episode")
+    check("os query escapes", OsQuery({ query: "That '70s Show", type: "movie" }), "query=that%20'70s%20show&type=movie")
+
+    ' Picking the best results
+    results = ParseOsResults(ParseJson("{""data"":[" + osResult("11", "Popular.Release", 5000, false, false, false) + "," + osResult("12", "Exact.Match", 10, true, false, false) + "," + osResult("13", "Machine", 90000, false, true, false) + "," + osResult("14", "SDH.Release", 6000, false, false, true) + "," + osResult("11", "Duplicate", 1, false, false, false) + "]}"))
+    checkInt("os results deduped", results.Count(), 4)
+    check("os hash match first", results[0].fileId, "12")
+    check("os human before sdh", results[1].fileId, "11")
+    check("os sdh next", results[2].fileId, "14")
+    check("os machine last", results[3].fileId, "13")
+    check("os label match", SubtitleLabel(results[0]), "English · matches this file")
+    check("os label sdh", SubtitleLabel(results[2]), "English · SDH.Release · SDH")
+    check("os label machine", SubtitleLabel(results[3]), "English · Machine · auto-translated")
+    checkInt("os results empty", ParseOsResults(ParseJson("{""data"":[]}")).Count(), 0)
+    checkInt("os results garbage", ParseOsResults(invalid).Count(), 0)
+
     ' Episode title cleanup (same pattern as XtreamTask)
     prefix = CreateObject("roRegex", "^.*?S\d+\s*E\d+\s*[-:.]*\s*", "i")
     check("Episode prefix", prefix.Replace("Breaking Bad - S01E02 - Cat's in the Bag", ""), "Cat's in the Bag")
@@ -137,6 +179,11 @@ sub Main()
         print "FAILED: " + m.failures.ToStr() + " of " + m.count.ToStr() + " checks"
     end if
 end sub
+
+function osResult(fileId as String, release as String, downloads as Integer, hashMatch as Boolean, machine as Boolean, sdh as Boolean) as String
+    attrs = { release: release, download_count: downloads, moviehash_match: hashMatch, machine_translated: machine, hearing_impaired: sdh, files: [{ file_id: fileId.ToInt() }] }
+    return FormatJson({ attributes: attrs })
+end function
 
 function boolText(value as Boolean) as String
     if value then return "true"

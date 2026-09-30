@@ -53,13 +53,14 @@ sub Main()
     check("series meta", MetaLine(show), "2008   ·   Drama, Crime   ·   Rated 9.5")
 
     ' --- VOD info, including the "info": [] quirk
-    vod = ParseVodInfo(ParseJson("{""info"":{""plot"":""Heist."",""releasedate"":""2019-05-24"",""duration"":""01:30:00"",""genre"":""Thriller"",""rating"":""7.04"",""backdrop_path"":[""https://image.tmdb.org/t/p/w1280/h.jpg""],""cast"":""A, B"",""video"":{""codec_name"":""h264"",""profile"":""High""},""audio"":{""codec_name"":""aac""}},""movie_data"":{""stream_id"":9,""container_extension"":""mkv""}}"))
+    vod = ParseVodInfo(ParseJson("{""info"":{""plot"":""Heist."",""releasedate"":""2019-05-24"",""duration"":""01:30:00"",""genre"":""Thriller"",""rating"":""7.04"",""backdrop_path"":[""https://image.tmdb.org/t/p/w1280/h.jpg""],""cast"":""A, B"",""tmdb_id"":""603"",""video"":{""codec_name"":""h264"",""profile"":""High""},""audio"":{""codec_name"":""aac""}},""movie_data"":{""stream_id"":9,""container_extension"":""mkv""}}"))
     check("vod plot", vod.description, "Heist.")
     check("vod year", vod.year, "2019")
     checkInt("vod duration from clock", vod.durationSecs, 5400)
     check("vod backdrop", vod.backdrop, "https://image.tmdb.org/t/p/w780/h.jpg")
     check("vod ext", vod.ext, "mkv")
     check("vod video codec", vod.videoCodec, "h264")
+    check("vod tmdb id", vod.tmdbId, "603")
     check("vod starring", vod.starring, "A, B")
     empty = ParseVodInfo(ParseJson("{""info"":[],""movie_data"":[]}"))
     check("vod empty info", empty.description, "")
@@ -73,7 +74,7 @@ sub Main()
     ' --- Series info: seasons keyed by number, unsorted episodes, messy titles
     json = "{"
     json = json + """seasons"":[{""season_number"":1,""name"":""Season 1""},{""season_number"":2,""name"":""The Final Season""}],"
-    json = json + """info"":{""name"":""Breaking Bad"",""plot"":""Chemistry."",""backdrop_path"":[""https://image.tmdb.org/t/p/original/s.jpg""]},"
+    json = json + """info"":{""name"":""Breaking Bad"",""tmdb"":1396,""plot"":""Chemistry."",""backdrop_path"":[""https://image.tmdb.org/t/p/original/s.jpg""]},"
     json = json + """episodes"":{"
     json = json + """2"":[{""id"":""902"",""episode_num"":1,""title"":""Breaking Bad - S02E01 - Seven Thirty-Seven"",""container_extension"":""mkv"",""info"":[]}],"
     json = json + """1"":[{""id"":""802"",""episode_num"":""2"",""title"":""Breaking Bad - S01E02 - Cat's in the Bag"",""container_extension"":""mp4"",""info"":{""duration_secs"":2880,""movie_image"":""https://image.tmdb.org/t/p/w500/e2.jpg"",""video"":{""codec_name"":""hevc"",""profile"":""Main 10""},""audio"":{""codec_name"":""eac3""}}},"
@@ -83,6 +84,7 @@ sub Main()
     info = ParseSeriesInfo(ParseJson(json))
     series = info.content
     check("series info name", info.info.name, "Breaking Bad")
+    check("series info tmdb", info.info.tmdbId, "1396")
     check("series info backdrop", info.info.backdrop, "https://image.tmdb.org/t/p/w780/s.jpg")
     checkInt("season count", series.GetChildCount(), 3)
     check("specials first", series.GetChild(0).title, "Specials")

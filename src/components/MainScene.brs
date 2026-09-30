@@ -115,6 +115,9 @@ sub onAction(event as Object)
         ClearAccount()
         m.global.creds = {}
         resetTo("LoginScreen")
+    else if name = "openSubtitleSetup" then
+        screen = pushScreen("SubtitleSetupScreen")
+        screen.takeFocus = true
     else if name = "openSearch" then
         screen = pushScreen("SearchScreen")
         screen.takeFocus = true
