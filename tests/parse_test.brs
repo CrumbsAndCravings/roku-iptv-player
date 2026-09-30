@@ -23,7 +23,7 @@ sub Main()
     json = json + "{""name"":""Older"",""stream_id"":101,""stream_icon"":""https://image.tmdb.org/t/p/w600_and_h900_bestv2/old.jpg"",""added"":""1690000000"",""container_extension"":""mkv"",""rating"":""6.1""},"
     json = json + "{""name"":""Newest"",""stream_id"":102,""stream_icon"":""https://image.tmdb.org/t/p/w600_and_h900_bestv2/new.jpg"",""added"":""1700000000"",""container_extension"":""mp4"",""rating"":7.4},"
     json = json + "{""name"":""Adult"",""stream_id"":103,""added"":""1710000000"",""is_adult"":""1""},"
-    json = json + "{""name"":""Oldest"",""stream_id"":104,""added"":""1680000000""}]"
+    json = json + "{""name"":""Oldest"",""stream_id"":104,""added"":""1680000000"",""container_extension"":""avi""}]"
     streams = ParseJson(json)
     row = BuildRow(streams, "vod", "Action", 2)
     check("row title", row.title, "Action")
@@ -37,6 +37,9 @@ sub Main()
     check("row poster sized", first.HDPosterUrl, "https://image.tmdb.org/t/p/w185/new.jpg")
     check("row second", row.GetChild(1).title, "Older")
     check("row placeholder flag", boolText(first.placeholder), "false")
+    check("row playable has no problem", first.problem, "")
+    oldest = BuildRow(streams, "vod", "Action", 10).GetChild(2)
+    check("row avi flagged", oldest.problem, "AVI files")
 
     ' --- Series row
     shows = ParseJson("[{""name"":""Breaking Bad"",""series_id"":55,""cover"":""https://image.tmdb.org/t/p/w600_and_h900_bestv2/bb.jpg"",""plot"":""A teacher turns."",""releaseDate"":""2008-01-20"",""genre"":""Drama, Crime"",""rating"":""9.5"",""backdrop_path"":[""https://image.tmdb.org/t/p/w1280/bd.jpg""],""last_modified"":""1600000000""}]")

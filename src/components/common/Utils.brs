@@ -217,6 +217,7 @@ function ItemDefaults() as Object
         videoCodec: ""
         videoProfile: ""
         audioCodec: ""
+        problem: ""
         hasInfo: false
         placeholder: false
         progress: 0.0
@@ -249,22 +250,41 @@ function EpisodeCode(seasonNo as Dynamic, episodeNo as Dynamic) as String
     return "S" + ToInt(seasonNo).ToStr() + ":E" + ToInt(episodeNo).ToStr()
 end function
 
-' Provider codec names (ffprobe style) -> "HEVC Main 10 video, E-AC-3 audio"
+' Provider codec name (ffprobe style) -> "HEVC (H.265)"
+function CodecLabel(codec as String) as String
+    names = { h264: "H.264", avc: "H.264", hevc: "HEVC (H.265)", h265: "HEVC (H.265)", mpeg4: "MPEG-4 (DivX/Xvid)", mpeg2video: "MPEG-2", vp9: "VP9", av1: "AV1", wmv3: "Windows Media", vc1: "VC-1", aac: "AAC", ac3: "Dolby AC-3", eac3: "Dolby E-AC-3", dts: "DTS", mp3: "MP3", truehd: "Dolby TrueHD", opus: "Opus", flac: "FLAC", vorbis: "Vorbis" }
+    label = names[LCase(codec)]
+    if label = invalid then return UCase(codec)
+    return label
+end function
+
+' "HEVC (H.265) Main 10 video, Dolby E-AC-3 audio"
 function DescribeCodecs(videoCodec as String, videoProfile as String, audioCodec as String) as String
-    names = { h264: "H.264", hevc: "HEVC", mpeg4: "MPEG-4 (DivX/Xvid)", mpeg2video: "MPEG-2", vp9: "VP9", av1: "AV1", aac: "AAC", ac3: "Dolby AC-3", eac3: "Dolby E-AC-3", dts: "DTS", mp3: "MP3", truehd: "Dolby TrueHD", opus: "Opus", flac: "FLAC", vorbis: "Vorbis" }
     parts = []
     if videoCodec <> "" then
-        label = names[LCase(videoCodec)]
-        if label = invalid then label = UCase(videoCodec)
+        label = CodecLabel(videoCodec)
         if videoProfile <> "" then label = label + " " + videoProfile
         parts.Push(label + " video")
     end if
-    if audioCodec <> "" then
-        label = names[LCase(audioCodec)]
-        if label = invalid then label = UCase(audioCodec)
-        parts.Push(label + " audio")
-    end if
+    if audioCodec <> "" then parts.Push(CodecLabel(audioCodec) + " audio")
     return parts.Join(", ")
+end function
+
+' Containers no Roku device plays, whatever codecs are inside.
+function IsUnsupportedContainer(ext as String) as Boolean
+    e = LCase(ext)
+    for each bad in ["avi", "divx", "wmv", "asf", "flv", "rm", "rmvb"]
+        if e = bad then return true
+    end for
+    return false
+end function
+
+' Plain-English explanation for a file this TV can't play. `blocked` comes from PlaybackCheck.
+function UnplayableText(blocked as String, ext as String) as String
+    if IsUnsupportedContainer(ext) then
+        return "This is an " + UCase(ext) + " file. Roku devices can't play " + UCase(ext) + " files, so no Roku app can play this one. Your provider may have another version of this title."
+    end if
+    return "This file uses " + blocked + ", which this TV's hardware can't decode, so no app on this TV can play it. Most current Roku streaming sticks can, and this app would run on one plugged into the TV."
 end function
 
 ' Maps provider codec names to the names roDeviceInfo.CanDecodeVideo/Audio expects.

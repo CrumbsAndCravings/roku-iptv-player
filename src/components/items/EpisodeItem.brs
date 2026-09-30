@@ -17,7 +17,15 @@ sub onContentChange()
     m.still.uri = item.HDPosterUrl
     m.title.text = ToStr(item.episodeNo) + ".  " + item.title
     m.runtime.text = ""
-    if item.durationSecs > 0 then m.runtime.text = FormatRuntime(item.durationSecs)
+    m.runtime.color = "0x9A9AAAFF"
+    m.still.opacity = 1.0
+    if item.problem <> "" then
+        m.runtime.text = "Won't play"
+        m.runtime.color = "0xF5B83DFF"
+        m.still.opacity = 0.35
+    else if item.durationSecs > 0 then
+        m.runtime.text = FormatRuntime(item.durationSecs)
+    end if
     m.plot.text = item.description
     showProgress = item.progress > 0
     m.track.visible = showProgress

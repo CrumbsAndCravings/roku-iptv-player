@@ -256,6 +256,11 @@ sub showHero(item as Object)
     if item.caption <> "" then
         meta = "Resume  " + item.caption
     end if
+    m.heroMeta.color = "0xB4B4C2FF"
+    if item.problem <> "" then
+        meta = "Won't play on this TV (" + item.problem + ")   ·   " + meta
+        m.heroMeta.color = "0xF5B83DFF"
+    end if
     m.heroMeta.text = meta
     m.heroPlot.text = item.description
     ShowBackdrop(m.backdrop, item.backdrop, item.HDPosterUrl)
@@ -285,6 +290,8 @@ sub onHeroInfo(event as Object)
     m.infoTargets.Delete(key)
     if item = invalid or not result.ok then return
     ApplyInfo(item, result.info)
+    check = PlaybackCheck(item.ext, item.videoCodec, item.videoProfile, item.audioCodec)
+    item.problem = check.blocked
     if m.focusedItem <> invalid and m.focusedItem.IsSameNode(item) then showHero(item)
 end sub
 

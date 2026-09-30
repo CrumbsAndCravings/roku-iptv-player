@@ -14,6 +14,7 @@ sub onContentChange()
     item = m.top.itemContent
     if item = invalid then return
     if item.placeholder then
+        m.poster.opacity = 1.0
         m.poster.uri = ""
         m.fallback.text = ""
         m.caption.text = ""
@@ -24,6 +25,13 @@ sub onContentChange()
     m.poster.uri = item.HDPosterUrl
     m.fallback.text = item.title
     m.caption.text = item.caption
+    m.caption.color = "0xB4B4C2FF"
+    m.poster.opacity = 1.0
+    if item.problem <> "" then
+        m.poster.opacity = 0.35
+        m.caption.text = "Won't play"
+        m.caption.color = "0xF5B83DFF"
+    end if
     showProgress = item.progress > 0
     m.track.visible = showProgress
     m.fill.visible = showProgress

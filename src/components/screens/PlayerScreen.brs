@@ -33,6 +33,8 @@ sub init()
     m.upNextHint = m.top.FindNode("upNextHint")
     m.errorBox = m.top.FindNode("errorBox")
     m.errorDetail = m.top.FindNode("errorDetail")
+    m.errorTitle = m.top.FindNode("errorTitle")
+    m.errorHint = m.top.FindNode("errorHint")
     m.tracks = m.top.FindNode("tracks")
     m.audioList = m.top.FindNode("audioList")
     m.subsList = m.top.FindNode("subsList")
@@ -53,9 +55,9 @@ sub init()
     m.top.FindNode("upNextEyebrow").font = MakeFont("Outfit-SemiBold", 14)
     m.upNextTitle.font = MakeFont("Outfit-SemiBold", 22)
     m.upNextHint.font = MakeFont("Outfit-Regular", 17)
-    m.top.FindNode("errorTitle").font = MakeFont("Outfit-Bold", 28)
+    m.errorTitle.font = MakeFont("Outfit-Bold", 28)
     m.errorDetail.font = MakeFont("Outfit-Regular", 18)
-    m.top.FindNode("errorHint").font = MakeFont("Outfit-SemiBold", 18)
+    m.errorHint.font = MakeFont("Outfit-SemiBold", 18)
     m.top.FindNode("tracksTitle").font = MakeFont("Outfit-Bold", 34)
     m.top.FindNode("audioHeading").font = MakeFont("Outfit-SemiBold", 15)
     m.top.FindNode("subsHeading").font = MakeFont("Outfit-SemiBold", 15)
@@ -86,6 +88,8 @@ sub init()
     m.started = false
     m.failed = false
     m.errors = []
+    m.check = { blocked: "", warning: "" }
+    m.tryAnyway = false
 
     m.row = "bar"
     m.buttons = []
@@ -113,6 +117,7 @@ sub onPlayback()
     m.playback = m.top.playback
     m.kind = m.playback.kind
     m.index = ToInt(m.playback.index)
+    m.tryAnyway = false
     startItem(ToInt(m.playback.startAt))
 end sub
 
@@ -168,8 +173,34 @@ sub startItem(startAt as Integer)
         m.titleLabel.text = m.playback.seriesName + "   ·   " + item.code + "  " + item.title
     end if
     buildButtons()
+
+    ' Files this TV can't decode would only fail after a wait, so explain up front.
+    m.check = PlaybackCheck(item.ext, FieldStr(item, "videoCodec"), FieldStr(item, "videoProfile"), FieldStr(item, "audioCodec"))
+    if m.check.blocked <> "" and not m.tryAnyway then
+        showUnplayable()
+        return
+    end if
     loadStream()
 end sub
+
+sub showUnplayable()
+    item = currentItem()
+    m.failed = true
+    m.video.control = "stop"
+    m.video.visible = false
+    m.spinner.visible = false
+    m.errorTitle.text = "Your TV can't play this file"
+    m.errorDetail.text = UnplayableText(m.check.blocked, item.ext) + Chr(10) + Chr(10) + fileLine(item)
+    m.errorHint.text = "OK to try anyway   ·   Back to return"
+    m.errorBox.visible = true
+end sub
+
+function fileLine(item as Object) as String
+    text = "File: " + UCase(FieldStr(item, "ext"))
+    codecs = DescribeCodecs(FieldStr(item, "videoCodec"), FieldStr(item, "videoProfile"), FieldStr(item, "audioCodec"))
+    if codecs <> "" then return text + ", " + codecs
+    return text + ". Your provider didn't list its codecs."
+end function
 
 ' Attempt 0 tells Roku the format from the file extension. Attempt 1 leaves it out and
 ' lets Roku work it out from the stream itself, in case the extension is wrong.
@@ -313,7 +344,9 @@ sub onPlaybackError()
     m.spinner.visible = false
     hideControls()
     closePanel(false)
+    m.errorTitle.text = "This video didn't play"
     m.errorDetail.text = diagnosis()
+    m.errorHint.text = "OK to try again   ·   Back to return"
     m.errorBox.visible = true
 end sub
 
@@ -339,53 +372,24 @@ function diagnosis() as String
     lines.Push("Roku says: " + m.errors.Peek())
     if m.errors.Count() > 1 then lines.Push("Tried twice: with the format hint from the file name, then without it.")
 
-    codecs = DescribeCodecs(FieldStr(item, "videoCodec"), FieldStr(item, "videoProfile"), FieldStr(item, "audioCodec"))
-    fileLine = "File: " + UCase(FieldStr(item, "ext"))
-    if codecs <> "" then
-        fileLine = fileLine + ", " + codecs
-    else
-        fileLine = fileLine + ". Your provider didn't list its codecs."
-    end if
-    lines.Push(fileLine)
+    lines.Push(fileLine(item))
 
     detected = []
     if ToStr(m.video.videoFormat) <> "" then detected.Push("video " + m.video.videoFormat)
     if ToStr(m.video.audioFormat) <> "" then detected.Push("audio " + m.video.audioFormat)
     if detected.Count() > 0 then lines.Push("Roku detected: " + detected.Join(", "))
 
-    support = decoderSupport(item)
-    if support <> "" then lines.Push(support)
+    if m.check.blocked <> "" then
+        lines.Push(UnplayableText(m.check.blocked, item.ext))
+    else if m.check.warning <> "" then
+        lines.Push("This TV may not fully support " + m.check.warning + ".")
+    else if FieldStr(item, "videoCodec") <> "" then
+        lines.Push("This TV says it supports these codecs, so the stream itself is the likely problem.")
+    end if
 
     creds = m.global.creds
     lines.Push("Stream: " + creds.server + "/" + streamKind() + "/" + creds.username + "/••••/" + item.id + "." + item.ext)
     return lines.Join(Chr(10))
-end function
-
-function decoderSupport(item as Object) as String
-    device = CreateObject("roDeviceInfo")
-    problems = []
-    videoCodec = FieldStr(item, "videoCodec")
-    if videoCodec <> "" then
-        codec = RokuVideoCodec(videoCodec)
-        basic = device.CanDecodeVideo({ Codec: codec })
-        if IsAA(basic) and ToStr(basic.result) = "false" then
-            problems.Push(UCase(videoCodec) + " video")
-        else
-            profile = LCase(FieldStr(item, "videoProfile"))
-            if profile <> "" then
-                withProfile = device.CanDecodeVideo({ Codec: codec, Profile: profile })
-                if IsAA(withProfile) and ToStr(withProfile.result) = "false" then problems.Push(UCase(videoCodec) + " " + FieldStr(item, "videoProfile") + " video")
-            end if
-        end if
-    end if
-    audioCodec = FieldStr(item, "audioCodec")
-    if audioCodec <> "" then
-        audio = device.CanDecodeAudio({ Codec: LCase(audioCodec) })
-        if IsAA(audio) and ToStr(audio.result) = "false" then problems.Push(UCase(audioCodec) + " audio")
-    end if
-    if problems.Count() > 0 then return "This TV can't decode " + problems.Join(" or ") + ". Other apps on this TV will hit the same wall with this file."
-    if videoCodec <> "" or audioCodec <> "" then return "This TV says it supports these codecs, so the stream itself is the likely problem."
-    return ""
 end function
 
 ' --- Controls ------------------------------------------------------------------
@@ -547,6 +551,7 @@ sub goToEpisode(index as Integer)
     saveProgress()
     ProgressPut(entryFor(index, 0, 0))
     m.index = index
+    m.tryAnyway = false
     startItem(0)
 end sub
 
@@ -648,6 +653,7 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
 
     if m.errorBox.visible then
         if key = "OK" then
+            m.tryAnyway = true
             startItem(m.startAt)
         else if key = "back" then
             close()
@@ -664,10 +670,13 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
         return true
     end if
 
+    ' Back cancels a seek preview, then hides the controls, then leaves.
     if key = "back" then
         if m.seeking then
             cancelSeek()
             renderBar()
+        else if m.controls.visible then
+            hideControls()
         else
             leave()
         end if
@@ -762,6 +771,7 @@ end sub
 sub playNext()
     m.countdown.control = "stop"
     m.index = m.index + 1
+    m.tryAnyway = false
     startItem(0)
 end sub
 

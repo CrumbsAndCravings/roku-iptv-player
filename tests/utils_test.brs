@@ -58,7 +58,14 @@ sub Main()
     ' Episode codes and codec descriptions
     check("EpisodeCode ints", EpisodeCode(1, 2), "S1:E2")
     check("EpisodeCode strings", EpisodeCode("3", "10"), "S3:E10")
-    check("Describe hevc", DescribeCodecs("hevc", "Main 10", "eac3"), "HEVC Main 10 video, Dolby E-AC-3 audio")
+    check("Describe hevc", DescribeCodecs("hevc", "Main 10", "eac3"), "HEVC (H.265) Main 10 video, Dolby E-AC-3 audio")
+    check("Describe divx", DescribeCodecs("mpeg4", "Advanced Simple Profile", "mp3"), "MPEG-4 (DivX/Xvid) Advanced Simple Profile video, MP3 audio")
+    check("Codec label unknown", CodecLabel("msmpeg4v3"), "MSMPEG4V3")
+    check("AVI unsupported", boolText(IsUnsupportedContainer("AVI")), "true")
+    check("MKV supported", boolText(IsUnsupportedContainer("mkv")), "false")
+    check("MP4 supported", boolText(IsUnsupportedContainer("mp4")), "false")
+    check("Unplayable AVI text", Left(UnplayableText("AVI files", "avi"), 48), "This is an AVI file. Roku devices can't play AVI")
+    check("Unplayable HEVC text", Left(UnplayableText("HEVC (H.265) video", "mkv"), 81), "This file uses HEVC (H.265) video, which this TV's hardware can't decode, so no a")
     check("Describe h264 only", DescribeCodecs("h264", "", ""), "H.264 video")
     check("Describe unknown", DescribeCodecs("", "", "wmav2"), "WMAV2 audio")
     check("Roku codec h264", RokuVideoCodec("h264"), "mpeg4 avc")
@@ -130,6 +137,11 @@ sub Main()
         print "FAILED: " + m.failures.ToStr() + " of " + m.count.ToStr() + " checks"
     end if
 end sub
+
+function boolText(value as Boolean) as String
+    if value then return "true"
+    return "false"
+end function
 
 sub check(name as String, actual as String, expected as String)
     m.count = m.count + 1

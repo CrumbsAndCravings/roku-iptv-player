@@ -27,13 +27,15 @@ Remote shortcuts: **Left** from a row's first poster (or **Up** from the first r
 | Play/Pause | Pause or resume |
 | Instant replay | Back 10 seconds |
 | \* | Audio & subtitles |
-| Back | Leave the player |
+| Back | Leave the player (with the controls showing, Back hides them first) |
 
 With the controls showing, **Up** reaches Back (top left), **Down** reaches the button row, and on the scrollbar row **OK** pauses and **Left/Right** seek as above. The controls hide after 5 seconds while playing and stay up while paused.
 
 ## When a video won't play
 
-The player retries once without a format hint, then shows what went wrong: Roku's own error, the file's container and codecs (as reported by your provider), whether this TV can decode them, and the stream address with the password hidden. A title only counts as watched once it has actually played.
+Some files can't play on a given Roku no matter which app you use: AVI (DivX/Xvid) files don't play on any Roku, and TVs without an HEVC decoder (like the TCL 32S357) can't play HEVC/H.265 video. Marquee asks the TV what it can decode and marks those titles before you press Play: posters are dimmed with "Won't play", episodes say "Won't play" instead of a runtime, and the details page explains why. Playing one anyway shows a plain explanation, with OK to try anyway.
+
+For other failures the player retries once without a format hint, then shows what went wrong: Roku's own error, the file's container and codecs (as reported by your provider), whether this TV can decode them, and the stream address with the password hidden. A title only counts as watched once it has actually played.
 
 ## Install on your Roku
 

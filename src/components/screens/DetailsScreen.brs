@@ -8,6 +8,7 @@ sub init()
     m.credits = m.top.FindNode("credits")
     m.buttonsGroup = m.top.FindNode("buttons")
     m.status = m.top.FindNode("status")
+    m.compat = m.top.FindNode("compat")
     m.panel = m.top.FindNode("episodesPanel")
     m.seasonsGroup = m.top.FindNode("seasons")
     m.episodes = m.top.FindNode("episodes")
@@ -21,6 +22,7 @@ sub init()
     m.plot.font = "font:SmallSystemFont"
     m.credits.font = "font:SmallestSystemFont"
     m.status.font = MakeFont("Outfit-Regular", 19)
+    m.compat.font = MakeFont("Outfit-SemiBold", 17)
 
     m.zone = "buttons"
     m.scrolled = false
@@ -45,6 +47,7 @@ sub onItem()
     showInfo()
     if m.kind = "movie" then
         buildMovieButtons()
+        updateMovieCompat()
         if not item.hasInfo then runTask({ mode: "vodInfo", id: item.itemId }, "onMovieInfo")
     else
         m.status.text = "Loading episodes…"
@@ -80,6 +83,52 @@ sub onMovieInfo(event as Object)
     ApplyInfo(m.item, result.info)
     if m.item.HDPosterUrl = "" and result.info.poster <> "" then m.item.HDPosterUrl = SizedImage(result.info.poster, "w185")
     showInfo()
+    updateMovieCompat()
+end sub
+
+' --- Will it play on this TV? ------------------------------------------------------
+
+sub updateMovieCompat()
+    item = m.item
+    check = PlaybackCheck(item.ext, item.videoCodec, item.videoProfile, item.audioCodec)
+    item.problem = check.blocked
+    m.compat.text = CompatLine(check, item.ext)
+end sub
+
+function CompatLine(check as Object, ext as String) as String
+    if check.blocked <> "" then
+        if IsUnsupportedContainer(ext) then return "Won't play on this TV: Roku devices can't play " + UCase(ext) + " files."
+        return "Won't play on this TV: its hardware can't decode " + check.blocked + "."
+    end if
+    if check.warning <> "" then return "May not play fully on this TV: it doesn't support " + check.warning + "."
+    return ""
+end function
+
+' Marks each episode this TV can't play, and explains on the page.
+sub updateSeriesCompat()
+    blockedCount = 0
+    total = 0
+    reason = ""
+    for s = 0 to m.seriesNode.GetChildCount() - 1
+        season = m.seriesNode.GetChild(s)
+        for e = 0 to season.GetChildCount() - 1
+            ep = season.GetChild(e)
+            check = PlaybackCheck(ep.ext, ep.videoCodec, ep.videoProfile, ep.audioCodec)
+            ep.problem = check.blocked
+            total = total + 1
+            if check.blocked <> "" then
+                blockedCount = blockedCount + 1
+                reason = CompatLine(check, ep.ext)
+            end if
+        end for
+    end for
+    if blockedCount = 0 then
+        m.compat.text = ""
+    else if blockedCount = total then
+        m.compat.text = reason
+    else
+        m.compat.text = blockedCount.ToStr() + " of " + total.ToStr() + " episodes won't play on this TV. They're marked in the list."
+    end if
 end sub
 
 sub buildMovieButtons()
@@ -156,6 +205,7 @@ sub onSeriesInfo(event as Object)
     end for
     m.seasonPills = BuildPills(m.seasonsGroup, names, 18)
     m.panel.visible = true
+    updateSeriesCompat()
     refreshSeriesProgress(true)
 end sub
 

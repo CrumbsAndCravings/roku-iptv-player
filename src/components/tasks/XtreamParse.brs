@@ -66,12 +66,19 @@ sub addMovieItem(row as Object, raw as Object)
         kind: "movie"
         itemId: FieldStr(raw, "stream_id")
         ext: FieldStr(raw, "container_extension")
+        problem: containerProblem(FieldStr(raw, "container_extension"))
         score: FieldStr(raw, "rating")
         year: YearOf(FirstText([Field(raw, "year"), Field(raw, "releaseDate")]))
         description: FieldStr(raw, "plot")
         genre: FieldStr(raw, "genre")
     })
 end sub
+
+' Codec checks need the TV, so tasks only flag containers Roku never plays.
+function containerProblem(ext as String) as String
+    if IsUnsupportedContainer(ext) then return UCase(ext) + " files"
+    return ""
+end function
 
 sub addSeriesItem(row as Object, raw as Object)
     MakeItem(row, {
@@ -227,6 +234,7 @@ sub addEpisode(season as Object, ep as Object, seasonNo as Integer, seriesName a
         kind: "episode"
         itemId: FieldStr(ep, "id")
         ext: FieldStr(ep, "container_extension")
+        problem: containerProblem(FieldStr(ep, "container_extension"))
         seasonNo: seasonNo
         episodeNo: number
         durationSecs: duration
