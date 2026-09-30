@@ -103,3 +103,4 @@ The Xtream endpoints used are `player_api.php` with `get_vod_categories`, `get_s
 - **See all** grid for a whole category, and **My List**.
 - Audio track and subtitle picker in the player.
 - Profiles, and optional sync of Continue Watching between TVs.
+- **Samsung TVs:** a Tizen version with the same look and features, planned in [docs/samsung-plan.md](docs/samsung-plan.md).
