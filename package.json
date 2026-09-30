@@ -1,7 +1,7 @@
 {
   "name": "roku-iptv-player",
   "private": true,
-  "description": "Marquee: a Netflix-style IPTV player for Roku, built on the Xtream Codes API.",
+  "description": "ARAN+: a cosy, Netflix-style IPTV player for Roku, built on the Xtream Codes API.",
   "scripts": {
     "lint": "bsc --create-package=false",
     "build": "bsc",

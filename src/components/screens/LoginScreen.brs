@@ -1,9 +1,9 @@
 sub init()
-    m.top.FindNode("heading").font = MakeFont("Outfit-Bold", 40)
-    m.top.FindNode("intro").font = MakeFont("Outfit-Regular", 21)
-    m.top.FindNode("status").font = MakeFont("Outfit-SemiBold", 19)
-    m.top.FindNode("tipsHeading").font = MakeFont("Outfit-SemiBold", 22)
-    m.top.FindNode("tips").font = MakeFont("Outfit-Regular", 18)
+    m.top.FindNode("heading").font = MakeFont("Fredoka-SemiBold", 44)
+    m.top.FindNode("intro").font = MakeFont("Nunito-SemiBold", 21)
+    m.top.FindNode("status").font = MakeFont("Nunito-ExtraBold", 19)
+    m.top.FindNode("tipsHeading").font = MakeFont("Fredoka-Medium", 22)
+    m.top.FindNode("tips").font = MakeFont("Nunito-SemiBold", 18)
     m.status = m.top.FindNode("status")
 
     m.labels = ["SERVER", "USERNAME", "PASSWORD"]
@@ -24,12 +24,12 @@ sub init()
         bg.height = 64
         caption = group.CreateChild("Label")
         caption.translation = [22, 9]
-        caption.font = MakeFont("Outfit-SemiBold", 13)
+        caption.font = MakeFont("Nunito-ExtraBold", 13)
         caption.text = m.labels[i]
         value = group.CreateChild("Label")
         value.translation = [22, 27]
         value.width = 516
-        value.font = MakeFont("Outfit-Regular", 22)
+        value.font = MakeFont("Nunito-SemiBold", 22)
         m.fields.Push({ bg: bg, caption: caption, value: value })
     end for
     m.submit = BuildPills(m.top.FindNode("submit"), ["Sign in"], 22)
@@ -54,15 +54,15 @@ sub render()
         end if
         f.value.text = text
         if focused then
-            f.bg.blendColor = "0xF5F5F7FF"
-            f.caption.color = "0x55556AFF"
-            f.value.color = "0x0B0B0FFF"
-            if isHint then f.value.color = "0x8A8A9AFF"
+            f.bg.blendColor = "0xC9B8FFFF"
+            f.caption.color = "0x5A4E86FF"
+            f.value.color = "0x151028FF"
+            if isHint then f.value.color = "0x9083BDFF"
         else
-            f.bg.blendColor = "0x1C1C25FF"
-            f.caption.color = "0x8A8A9AFF"
-            f.value.color = "0xF5F5F7FF"
-            if isHint then f.value.color = "0x5E5E6EFF"
+            f.bg.blendColor = "0x241C42FF"
+            f.caption.color = "0x9083BDFF"
+            f.value.color = "0xF7F3FFFF"
+            if isHint then f.value.color = "0x6B5F96FF"
         end if
     end for
     submitFocus = -1

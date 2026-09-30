@@ -10,7 +10,7 @@ function BuildPills(parent as Object, labels as Object, fontSize as Integer) as 
         bg = pill.CreateChild("Poster")
         bg.uri = "pkg:/images/pill.9.png"
         label = pill.CreateChild("Label")
-        label.font = MakeFont("Outfit-SemiBold", fontSize)
+        label.font = MakeFont("Fredoka-Medium", fontSize)
         label.text = text
         width = label.localBoundingRect().width + fontSize * 2.4
         estimate = Len(text) * fontSize * 0.55 + fontSize * 2.4
@@ -23,6 +23,7 @@ function BuildPills(parent as Object, labels as Object, fontSize as Integer) as 
         label.height = height
         label.horizAlign = "center"
         label.vertAlign = "center"
+        pill.scaleRotateCenter = [width / 2, height / 2]
         pills.Push(pill)
         x = x + width + 14
     end for
@@ -33,20 +34,23 @@ end function
 ' a choice that stays highlighted, like the current season.
 sub StylePills(pills as Object, focusIndex as Integer, selectedIndex as Integer)
     for i = 0 to pills.Count() - 1
-        bg = pills[i].GetChild(0)
-        label = pills[i].GetChild(1)
+        pill = pills[i]
+        bg = pill.GetChild(0)
+        label = pill.GetChild(1)
+        pill.scale = [1.0, 1.0]
         if i = focusIndex then
-            bg.blendColor = "0xF5F5F7FF"
+            bg.blendColor = "0xC9B8FFFF"
             bg.opacity = 1.0
-            label.color = "0x0B0B0FFF"
+            label.color = "0x151028FF"
+            pill.scale = [1.06, 1.06]
         else if i = selectedIndex then
-            bg.blendColor = "0x3A3A48FF"
+            bg.blendColor = "0x43377AFF"
             bg.opacity = 1.0
-            label.color = "0xF5F5F7FF"
+            label.color = "0xF7F3FFFF"
         else
-            bg.blendColor = "0x2B2B36FF"
+            bg.blendColor = "0x30275AFF"
             bg.opacity = 0.85
-            label.color = "0xC9C9D4FF"
+            label.color = "0xD8CEF5FF"
         end if
     end for
 end sub

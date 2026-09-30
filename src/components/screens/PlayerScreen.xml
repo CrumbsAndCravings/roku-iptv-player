@@ -23,55 +23,54 @@
         <Poster id="backBg" width="120" height="44" uri="pkg:/images/pill.9.png" />
         <Label id="backLabel" width="120" height="44" horizAlign="center" vertAlign="center" text="‹  Back" />
       </Group>
-      <Label id="titleLabel" translation="[188, 30]" width="1044" height="44" vertAlign="center" color="0xF5F5F7FF" />
+      <Label id="titleLabel" translation="[188, 30]" width="1044" height="44" vertAlign="center" color="0xF7F3FFFF" />
 
       <Group id="playButton" translation="[48, 558]">
         <Poster id="playBg" width="56" height="56" uri="pkg:/images/circle.png" />
         <Poster id="playIcon" translation="[16, 16]" width="24" height="24" uri="pkg:/images/icon_pause.png" />
       </Group>
-      <Label id="elapsed" translation="[120, 574]" width="96" horizAlign="right" color="0xF5F5F7FF" />
-      <Rectangle id="barTrack" translation="[228, 584]" width="896" height="5" color="0xFFFFFF40" />
-      <Rectangle id="barFill" translation="[228, 584]" width="0" height="5" color="0xF5B83DFF" />
-      <Rectangle id="barPreview" translation="[228, 584]" width="0" height="5" color="0xF5F5F7AA" visible="false" />
-      <Poster id="knob" width="18" height="18" uri="pkg:/images/circle.png" blendColor="0xF5F5F7FF" />
+      <Label id="elapsed" translation="[120, 574]" width="96" horizAlign="right" color="0xF7F3FFFF" />
+      <Rectangle id="barTrack" translation="[228, 584]" width="896" height="5" color="0xC9B8FF40" />
+      <Rectangle id="barFill" translation="[228, 584]" width="0" height="5" color="0xC9B8FFFF" />
+      <Rectangle id="barPreview" translation="[228, 584]" width="0" height="5" color="0xFF9ECFCC" visible="false" />
+      <Poster id="knob" width="18" height="18" uri="pkg:/images/circle.png" blendColor="0xF7F3FFFF" />
       <Group id="bubble" visible="false">
-        <Poster id="bubbleBg" width="104" height="36" uri="pkg:/images/pill.9.png" blendColor="0xF5F5F7FF" />
-        <Label id="bubbleLabel" width="104" height="36" horizAlign="center" vertAlign="center" color="0x0B0B0FFF" />
+        <Poster id="bubbleBg" width="104" height="36" uri="pkg:/images/pill.9.png" blendColor="0xC9B8FFFF" />
+        <Label id="bubbleLabel" width="104" height="36" horizAlign="center" vertAlign="center" color="0x151028FF" />
       </Group>
-      <Label id="remaining" translation="[1136, 574]" width="100" color="0xB4B4C2FF" />
+      <Label id="remaining" translation="[1136, 574]" width="100" color="0xC3B8E6FF" />
 
       <Group id="buttonRow" translation="[48, 636]" />
     </Group>
 
     <Group id="upNext" translation="[800, 500]" visible="false">
-      <Rectangle width="432" height="156" color="0x0B0B0FEE" />
-      <Rectangle width="4" height="156" color="0xF5B83DFF" />
-      <Label id="upNextEyebrow" translation="[28, 20]" width="380" color="0xF5B83DFF" text="UP NEXT" />
-      <Label id="upNextTitle" translation="[28, 48]" width="380" wrap="true" maxLines="2" color="0xF5F5F7FF" />
-      <Label id="upNextHint" translation="[28, 114]" width="380" color="0xB4B4C2FF" />
+      <Poster width="432" height="156" uri="pkg:/images/card.9.png" blendColor="0x151028EE" />
+      <Poster translation="[396, 18]" uri="pkg:/images/sparkle.png" width="18" height="18" blendColor="0xFFD98AFF" />
+      <Label id="upNextEyebrow" translation="[28, 20]" width="380" color="0xFF9ECFFF" text="UP NEXT" />
+      <Label id="upNextTitle" translation="[28, 48]" width="380" wrap="true" maxLines="2" color="0xF7F3FFFF" />
+      <Label id="upNextHint" translation="[28, 114]" width="380" color="0xC3B8E6FF" />
     </Group>
 
     <Group id="errorBox" translation="[140, 150]" visible="false">
-      <Rectangle width="1000" height="420" color="0x15151CFF" />
-      <Rectangle width="4" height="420" color="0xF5B83DFF" />
-      <Label id="errorTitle" translation="[44, 34]" width="912" color="0xF5F5F7FF" text="This video didn't play" />
-      <Label id="errorDetail" translation="[44, 86]" width="912" height="270" wrap="true" maxLines="11" lineSpacing="4" color="0xC9C9D4FF" />
-      <Label id="errorHint" translation="[44, 368]" width="912" color="0xF5B83DFF" text="OK to try again   ·   Back to return" />
+      <Poster width="1000" height="420" uri="pkg:/images/card.9.png" blendColor="0x1E1736FF" />
+      <Label id="errorTitle" translation="[44, 34]" width="912" color="0xF7F3FFFF" text="This video didn't play" />
+      <Label id="errorDetail" translation="[44, 86]" width="912" height="270" wrap="true" maxLines="11" lineSpacing="4" color="0xD8CEF5FF" />
+      <Label id="errorHint" translation="[44, 368]" width="912" color="0xFF9ECFFF" text="OK to try again   ·   Back to return" />
     </Group>
 
     <Group id="tracks" visible="false">
-      <Rectangle width="1280" height="720" color="0x000000CC" />
-      <Label id="tracksTitle" translation="[120, 80]" width="1040" color="0xF5F5F7FF" text="Audio &amp; subtitles" />
-      <Label id="audioHeading" translation="[120, 160]" width="440" color="0xF5B83DFF" text="AUDIO" />
+      <Rectangle width="1280" height="720" color="0x0D0920D9" />
+      <Label id="tracksTitle" translation="[120, 80]" width="1040" color="0xF7F3FFFF" text="Audio &amp; subtitles" />
+      <Label id="audioHeading" translation="[120, 160]" width="440" color="0xFF9ECFFF" text="AUDIO" />
       <Group id="audioList" translation="[120, 196]" />
-      <Label id="subsHeading" translation="[640, 160]" width="440" color="0xF5B83DFF" text="SUBTITLES" />
+      <Label id="subsHeading" translation="[640, 160]" width="440" color="0xFF9ECFFF" text="SUBTITLES" />
       <Group id="subsList" translation="[640, 196]" />
-      <Label id="tracksNote" translation="[120, 610]" width="1040" wrap="true" maxLines="2" color="0x9A9AAAFF" />
+      <Label id="tracksNote" translation="[120, 610]" width="1040" wrap="true" maxLines="2" color="0xA195CCFF" />
     </Group>
 
     <Group id="episodes" visible="false">
-      <Rectangle width="1280" height="720" color="0x000000CC" />
-      <Label id="episodesTitle" translation="[120, 80]" width="1040" color="0xF5F5F7FF" text="Episodes" />
+      <Rectangle width="1280" height="720" color="0x0D0920D9" />
+      <Label id="episodesTitle" translation="[120, 80]" width="1040" color="0xF7F3FFFF" text="Episodes" />
       <Group id="episodeList" translation="[120, 160]" />
     </Group>
 

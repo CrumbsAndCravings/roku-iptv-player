@@ -47,23 +47,24 @@ sub init()
     m.holdTimer = m.top.FindNode("holdTimer")
     m.commitTimer = m.top.FindNode("commitTimer")
 
-    m.backLabel.font = MakeFont("Outfit-SemiBold", 18)
-    m.titleLabel.font = MakeFont("Outfit-SemiBold", 22)
-    m.elapsed.font = MakeFont("Outfit-SemiBold", 17)
-    m.remaining.font = MakeFont("Outfit-SemiBold", 17)
-    m.bubbleLabel.font = MakeFont("Outfit-Bold", 17)
-    m.top.FindNode("upNextEyebrow").font = MakeFont("Outfit-SemiBold", 14)
-    m.upNextTitle.font = MakeFont("Outfit-SemiBold", 22)
-    m.upNextHint.font = MakeFont("Outfit-Regular", 17)
-    m.errorTitle.font = MakeFont("Outfit-Bold", 28)
-    m.errorDetail.font = MakeFont("Outfit-Regular", 18)
-    m.errorHint.font = MakeFont("Outfit-SemiBold", 18)
-    m.top.FindNode("tracksTitle").font = MakeFont("Outfit-Bold", 34)
-    m.top.FindNode("audioHeading").font = MakeFont("Outfit-SemiBold", 15)
-    m.top.FindNode("subsHeading").font = MakeFont("Outfit-SemiBold", 15)
-    m.tracksNote.font = MakeFont("Outfit-Regular", 18)
-    m.top.FindNode("episodesTitle").font = MakeFont("Outfit-Bold", 34)
+    m.backLabel.font = MakeFont("Fredoka-Medium", 18)
+    m.titleLabel.font = MakeFont("Fredoka-Medium", 22)
+    m.elapsed.font = MakeFont("Nunito-ExtraBold", 17)
+    m.remaining.font = MakeFont("Nunito-ExtraBold", 17)
+    m.bubbleLabel.font = MakeFont("Fredoka-SemiBold", 17)
+    m.top.FindNode("upNextEyebrow").font = MakeFont("Nunito-ExtraBold", 14)
+    m.upNextTitle.font = MakeFont("Fredoka-Medium", 22)
+    m.upNextHint.font = MakeFont("Nunito-SemiBold", 17)
+    m.errorTitle.font = MakeFont("Fredoka-SemiBold", 28)
+    m.errorDetail.font = MakeFont("Nunito-SemiBold", 18)
+    m.errorHint.font = MakeFont("Nunito-ExtraBold", 18)
+    m.top.FindNode("tracksTitle").font = MakeFont("Fredoka-SemiBold", 34)
+    m.top.FindNode("audioHeading").font = MakeFont("Nunito-ExtraBold", 15)
+    m.top.FindNode("subsHeading").font = MakeFont("Nunito-ExtraBold", 15)
+    m.tracksNote.font = MakeFont("Nunito-SemiBold", 18)
+    m.top.FindNode("episodesTitle").font = MakeFont("Fredoka-SemiBold", 34)
     m.spinner.poster.uri = "pkg:/images/spinner.png"
+    m.spinner.poster.blendColor = "0xC9B8FFFF"
     m.spinner.poster.width = 64
     m.spinner.poster.height = 64
 
@@ -433,13 +434,13 @@ end sub
 
 sub renderControls()
     if m.row = "top" then
-        m.backBg.blendColor = "0xF5F5F7FF"
+        m.backBg.blendColor = "0xC9B8FFFF"
         m.backBg.opacity = 1.0
-        m.backLabel.color = "0x0B0B0FFF"
+        m.backLabel.color = "0x151028FF"
     else
-        m.backBg.blendColor = "0x0B0B0FFF"
+        m.backBg.blendColor = "0x151028FF"
         m.backBg.opacity = 0.6
-        m.backLabel.color = "0xF5F5F7FF"
+        m.backLabel.color = "0xF7F3FFFF"
     end if
     buttonFocus = -1
     if m.row = "buttons" then buttonFocus = m.buttonIndex
@@ -455,13 +456,13 @@ sub renderPlayButton()
         m.playIcon.uri = "pkg:/images/icon_pause.png"
     end if
     if m.row = "bar" then
-        m.playBg.blendColor = "0xF5F5F7FF"
+        m.playBg.blendColor = "0xC9B8FFFF"
         m.playBg.opacity = 1.0
-        m.playIcon.blendColor = "0x0B0B0FFF"
+        m.playIcon.blendColor = "0x151028FF"
     else
-        m.playBg.blendColor = "0xF5F5F7FF"
+        m.playBg.blendColor = "0xF7F3FFFF"
         m.playBg.opacity = 0.2
-        m.playIcon.blendColor = "0xF5F5F7FF"
+        m.playIcon.blendColor = "0xF7F3FFFF"
     end if
 end sub
 
@@ -936,8 +937,8 @@ sub renderOptions(group as Object, options as Object, activeIndex as Integer, cu
     group.RemoveChildrenIndex(group.GetChildCount(), 0)
     if options.Count() = 0 then
         empty = group.CreateChild("Label")
-        empty.font = MakeFont("Outfit-Regular", 20)
-        empty.color = "0x7C7C8CFF"
+        empty.font = MakeFont("Nunito-SemiBold", 20)
+        empty.color = "0x8579B0FF"
         empty.text = "Default"
         return
     end if
@@ -964,18 +965,18 @@ sub renderOptions(group as Object, options as Object, activeIndex as Integer, cu
         label.width = width - 60
         label.height = 44
         label.vertAlign = "center"
-        label.font = MakeFont("Outfit-SemiBold", 20)
+        label.font = MakeFont("Nunito-ExtraBold", 20)
         label.text = options[i].label
         if focused and i = cursor then
-            bg.blendColor = "0xF5F5F7FF"
+            bg.blendColor = "0xC9B8FFFF"
             bg.opacity = 1.0
-            label.color = "0x0B0B0FFF"
-            dot.color = "0x0B0B0FFF"
+            label.color = "0x151028FF"
+            dot.color = "0x151028FF"
         else
             bg.opacity = 0.0
-            dot.color = "0xF5B83DFF"
-            label.color = "0x9A9AAAFF"
-            if i = activeIndex then label.color = "0xF5F5F7FF"
+            dot.color = "0xFF9ECFFF"
+            label.color = "0xA195CCFF"
+            if i = activeIndex then label.color = "0xF7F3FFFF"
         end if
         y = y + 50
     end for

@@ -16,13 +16,17 @@ sub init()
     m.scrollBody = m.top.FindNode("scrollBody")
     m.scrollDim = m.top.FindNode("scrollDim")
     m.keys = m.top.FindNode("keys")
+    m.backdropIn = m.top.FindNode("backdropIn")
+    m.backdropFade = m.top.FindNode("backdropFade")
+    m.backdropTarget = 1.0
+    m.backdrop.ObserveField("loadStatus", "onBackdropLoaded")
 
-    m.title.font = MakeFont("Outfit-Bold", 40)
-    m.meta.font = MakeFont("Outfit-SemiBold", 18)
+    m.title.font = MakeFont("Fredoka-SemiBold", 42)
+    m.meta.font = MakeFont("Nunito-ExtraBold", 18)
     m.plot.font = "font:SmallSystemFont"
     m.credits.font = "font:SmallestSystemFont"
-    m.status.font = MakeFont("Outfit-Regular", 19)
-    m.compat.font = MakeFont("Outfit-SemiBold", 17)
+    m.status.font = MakeFont("Nunito-SemiBold", 19)
+    m.compat.font = MakeFont("Nunito-ExtraBold", 17)
 
     m.zone = "buttons"
     m.scrolled = false
@@ -71,7 +75,14 @@ sub showInfo()
     if item.starring <> "" then credits.Push("Starring " + item.starring)
     if item.directedBy <> "" then credits.Push("Directed by " + item.directedBy)
     m.credits.text = credits.Join("   ·   ")
-    ShowBackdrop(m.backdrop, item.backdrop, item.HDPosterUrl)
+    m.backdropIn.control = "stop"
+    m.backdropTarget = ShowBackdrop(m.backdrop, item.backdrop, item.HDPosterUrl)
+end sub
+
+sub onBackdropLoaded()
+    if m.backdrop.loadStatus <> "ready" then return
+    m.backdropFade.keyValue = [0.0, m.backdropTarget]
+    m.backdropIn.control = "start"
 end sub
 
 ' --- Movies ------------------------------------------------------------------

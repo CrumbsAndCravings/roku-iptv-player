@@ -330,19 +330,26 @@ function RokuVideoCodec(videoCodec as String) as String
     return c
 end function
 
-' Shows a backdrop when there is one, otherwise a dimmed, zoomed poster.
-sub ShowBackdrop(target as Object, backdrop as String, poster as String)
+' Points `target` at the backdrop, or at a dimmed, zoomed poster when there is none, and
+' returns the opacity it should end at. A new picture starts hidden so the screen can
+' fade it in once it has loaded.
+function ShowBackdrop(target as Object, backdrop as String, poster as String) as Float
+    opacity = 1.0
+    uri = ""
     if backdrop <> "" then
         uri = backdrop
-        target.opacity = 1.0
     else if poster <> "" then
         uri = SizedImage(poster, "w342")
-        target.opacity = 0.35
-    else
-        uri = ""
+        opacity = 0.35
     end if
-    if target.uri <> uri then target.uri = uri
-end sub
+    if target.uri <> uri then
+        target.opacity = 0.0
+        target.uri = uri
+    else
+        target.opacity = opacity
+    end if
+    return opacity
+end function
 
 function MakeFont(name as String, size as Integer) as Object
     f = CreateObject("roSGNode", "Font")

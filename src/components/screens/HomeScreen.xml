@@ -9,22 +9,28 @@
     <field id="takeFocus" type="boolean" alwaysNotify="true" onChange="onTakeFocus" />
   </interface>
   <children>
-    <Rectangle width="1280" height="720" color="0x0B0B0FFF" />
+    <Rectangle width="1280" height="720" color="0x151028FF" />
     <Poster id="backdrop" translation="[340, 0]" width="940" height="529" loadWidth="940" loadHeight="529" loadDisplayMode="scaleToZoom" />
     <Poster translation="[340, 0]" width="440" height="540" uri="pkg:/images/fade_left.png" />
     <Poster translation="[320, 280]" width="960" height="260" uri="pkg:/images/fade_bottom.png" />
-    <Rectangle translation="[0, 528]" width="1280" height="192" color="0x0B0B0FFF" />
+    <Rectangle translation="[0, 528]" width="1280" height="192" color="0x151028FF" />
     <Poster translation="[0, 0]" width="1280" height="140" uri="pkg:/images/fade_top.png" />
 
-    <Poster translation="[48, 30]" uri="pkg:/images/wordmark.png" width="147" height="34" />
+    <!-- Soft lavender and pink glows give the plum background some warmth. -->
+    <Poster translation="[-300, -330]" width="820" height="820" uri="pkg:/images/glow.png" blendColor="0xB9A3FFFF" opacity="0.16" />
+    <Poster translation="[880, 470]" width="640" height="640" uri="pkg:/images/glow.png" blendColor="0xFF9ECFFF" opacity="0.10" />
+
+    <Poster translation="[48, 27]" uri="pkg:/images/logo.png" width="110" height="40" />
+    <Poster translation="[164, 22]" uri="pkg:/images/sparkle.png" width="14" height="14" blendColor="0xFFD98AFF" />
+    <Poster id="tabHighlight" translation="[232, 26]" uri="pkg:/images/pill.9.png" width="0" height="38" blendColor="0x30275AFF" />
     <Group id="tabs" translation="[232, 26]" />
     <!-- Takes focus while the tab bar is active; its keys bubble up to this screen. -->
     <Group id="navKeys" />
 
     <LayoutGroup id="hero" translation="[48, 112]" layoutDirection="vert" itemSpacings="[8, 12]">
-      <Label id="heroTitle" width="600" wrap="true" maxLines="2" color="0xF5F5F7FF" />
-      <Label id="heroMeta" width="600" color="0xB4B4C2FF" />
-      <Label id="heroPlot" width="520" wrap="true" maxLines="3" lineSpacing="3" color="0xD2D2DCFF" />
+      <Label id="heroTitle" width="600" wrap="true" maxLines="2" color="0xF7F3FFFF" />
+      <Label id="heroMeta" width="600" color="0xC3B8E6FF" />
+      <Label id="heroPlot" width="520" wrap="true" maxLines="3" lineSpacing="3" color="0xDDD4F7FF" />
     </LayoutGroup>
 
     <Group translation="[0, 372]" clippingRect="[0, 0, 1280, 348]">
@@ -34,18 +40,32 @@
         numRows="3"
         itemSize="[1232, 236]"
         rowItemSize="[[120, 180]]"
-        rowItemSpacing="[[16, 0]]"
+        rowItemSpacing="[[20, 0]]"
         itemSpacing="[0, 8]"
         showRowLabel="[true]"
-        rowLabelColor="0xE6E6EEFF"
+        rowLabelColor="0xEEE8FFFF"
         rowFocusAnimationStyle="floatingFocus"
         vertFocusAnimationStyle="fixedFocus"
         drawFocusFeedback="false" />
     </Group>
 
-    <Label id="status" translation="[48, 470]" width="1184" horizAlign="center" color="0xB4B4C2FF" />
+    <Label id="status" translation="[48, 470]" width="1184" horizAlign="center" color="0xC3B8E6FF" />
 
     <Timer id="heroTimer" duration="0.6" repeat="false" />
+
+    <!-- The banner floats up and fades in for each new title. -->
+    <Animation id="heroIn" duration="0.35" easeFunction="outCubic">
+      <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[0.0, 1.0]" fieldToInterp="hero.opacity" />
+      <Vector2DFieldInterpolator key="[0.0, 1.0]" keyValue="[[48, 126], [48, 112]]" fieldToInterp="hero.translation" />
+    </Animation>
+    <Animation id="backdropIn" duration="0.5" easeFunction="outQuad">
+      <FloatFieldInterpolator id="backdropFade" key="[0.0, 1.0]" keyValue="[0.0, 1.0]" fieldToInterp="backdrop.opacity" />
+    </Animation>
+    <!-- The tab highlight glides to the chosen tab. -->
+    <Animation id="tabSlide" duration="0.22" easeFunction="outCubic">
+      <Vector2DFieldInterpolator id="tabSlidePos" key="[0.0, 1.0]" fieldToInterp="tabHighlight.translation" />
+      <FloatFieldInterpolator id="tabSlideWidth" key="[0.0, 1.0]" fieldToInterp="tabHighlight.width" />
+    </Animation>
   </children>
   <script type="text/brightscript" uri="pkg:/components/common/Utils.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Registry.brs" />

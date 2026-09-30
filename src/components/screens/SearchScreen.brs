@@ -5,11 +5,11 @@ sub init()
     m.focusTitle = m.top.FindNode("focusTitle")
     m.debounce = m.top.FindNode("debounce")
 
-    m.top.FindNode("heading").font = MakeFont("Outfit-Bold", 30)
-    m.message.font = MakeFont("Outfit-Regular", 22)
-    m.status.font = MakeFont("Outfit-Regular", 16)
-    m.focusTitle.font = MakeFont("Outfit-SemiBold", 20)
-    m.results.rowLabelFont = MakeFont("Outfit-SemiBold", 20)
+    m.top.FindNode("heading").font = MakeFont("Fredoka-SemiBold", 32)
+    m.message.font = MakeFont("Nunito-SemiBold", 22)
+    m.status.font = MakeFont("Nunito-SemiBold", 16)
+    m.focusTitle.font = MakeFont("Nunito-ExtraBold", 20)
+    m.results.rowLabelFont = MakeFont("Fredoka-Medium", 21)
 
     m.zone = "keyboard"
     m.query = ""
@@ -45,25 +45,25 @@ sub styleKeyboard()
     if kb.HasField("palette") then
         palette = CreateObject("roSGNode", "RSGPalette")
         palette.colors = {
-            KeyboardColor: "0x1C1C25FF"
-            PrimaryTextColor: "0xF5F5F7FF"
-            SecondaryTextColor: "0x9A9AAAFF"
-            FocusColor: "0xF5F5F7FF"
-            FocusItemColor: "0x0B0B0FFF"
-            InputFieldColor: "0x2B2B36FF"
-            TextEditBoxColor: "0x2B2B36FF"
+            KeyboardColor: "0x241C42FF"
+            PrimaryTextColor: "0xF7F3FFFF"
+            SecondaryTextColor: "0xA195CCFF"
+            FocusColor: "0xC9B8FFFF"
+            FocusItemColor: "0x151028FF"
+            InputFieldColor: "0x30275AFF"
+            TextEditBoxColor: "0x30275AFF"
         }
         kb.palette = palette
     end if
     if kb.HasField("keyColor") then
-        kb.keyColor = "0xC9C9D4FF"
-        kb.focusedKeyColor = "0x0B0B0FFF"
+        kb.keyColor = "0xD8CEF5FF"
+        kb.focusedKeyColor = "0x151028FF"
     end if
     editBox = kb.textEditBox
     if editBox <> invalid then
         editBox.hintText = "Movies and series"
-        if editBox.HasField("hintTextColor") then editBox.hintTextColor = "0x7C7C8CFF"
-        if editBox.HasField("textColor") then editBox.textColor = "0xF5F5F7FF"
+        if editBox.HasField("hintTextColor") then editBox.hintTextColor = "0x8579B0FF"
+        if editBox.HasField("textColor") then editBox.textColor = "0xF7F3FFFF"
     end if
 end sub
 

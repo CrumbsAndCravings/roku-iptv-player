@@ -7,13 +7,24 @@ sub init()
     m.status = m.top.FindNode("status")
     m.navKeys = m.top.FindNode("navKeys")
     m.heroTimer = m.top.FindNode("heroTimer")
+    m.hero = m.top.FindNode("hero")
+    m.heroIn = m.top.FindNode("heroIn")
+    m.backdropIn = m.top.FindNode("backdropIn")
+    m.backdropFade = m.top.FindNode("backdropFade")
+    m.tabHighlight = m.top.FindNode("tabHighlight")
+    m.tabSlide = m.top.FindNode("tabSlide")
+    m.tabSlidePos = m.top.FindNode("tabSlidePos")
+    m.tabSlideWidth = m.top.FindNode("tabSlideWidth")
+    m.heroItem = invalid
+    m.backdropTarget = 1.0
+    m.backdrop.ObserveField("loadStatus", "onBackdropLoaded")
 
-    m.heroTitle.font = MakeFont("Outfit-Bold", 38)
-    m.heroMeta.font = MakeFont("Outfit-SemiBold", 18)
+    m.heroTitle.font = MakeFont("Fredoka-SemiBold", 40)
+    m.heroMeta.font = MakeFont("Nunito-ExtraBold", 18)
     ' Plots come from the provider and may not be in a Latin script, so they use the system font.
     m.heroPlot.font = "font:SmallSystemFont"
-    m.rows.rowLabelFont = MakeFont("Outfit-SemiBold", 20)
-    m.status.font = MakeFont("Outfit-Regular", 20)
+    m.rows.rowLabelFont = MakeFont("Fredoka-Medium", 21)
+    m.status.font = MakeFont("Nunito-SemiBold", 20)
 
     m.tabNames = ["Home", "Movies", "Series", "Search"]
     m.tab = 0
@@ -256,14 +267,30 @@ sub showHero(item as Object)
     if item.caption <> "" then
         meta = "Resume  " + item.caption
     end if
-    m.heroMeta.color = "0xB4B4C2FF"
+    m.heroMeta.color = "0xC3B8E6FF"
     if item.problem <> "" then
         meta = "Won't play on this TV (" + item.problem + ")   ·   " + meta
-        m.heroMeta.color = "0xF5B83DFF"
+        m.heroMeta.color = "0xFFD98AFF"
     end if
     m.heroMeta.text = meta
     m.heroPlot.text = item.description
-    ShowBackdrop(m.backdrop, item.backdrop, item.HDPosterUrl)
+    ' A new title floats in; a refresh of the same title (details arriving) doesn't.
+    isNew = true
+    if m.heroItem <> invalid then isNew = not m.heroItem.IsSameNode(item)
+    m.heroItem = item
+    if isNew then
+        m.heroIn.control = "stop"
+        m.hero.opacity = 0.0
+        m.heroIn.control = "start"
+    end if
+    m.backdropIn.control = "stop"
+    m.backdropTarget = ShowBackdrop(m.backdrop, item.backdrop, item.HDPosterUrl)
+end sub
+
+sub onBackdropLoaded()
+    if m.backdrop.loadStatus <> "ready" then return
+    m.backdropFade.keyValue = [0.0, m.backdropTarget]
+    m.backdropIn.control = "start"
 end sub
 
 sub clearHero()
@@ -377,23 +404,44 @@ sub activateTab()
     focusRows()
 end sub
 
+' Tab labels sit on one shared highlight that glides between them: lavender while the
+' tab bar has focus, a quiet plum on the current tab otherwise.
 sub styleTabs()
+    target = m.tab
+    if m.navFocused then target = m.tabCursor
     for i = 0 to m.tabPills.Count() - 1
-        bg = m.tabPills[i].GetChild(0)
-        label = m.tabPills[i].GetChild(1)
+        pill = m.tabPills[i]
+        pillBg = pill.GetChild(0)
+        pillBg.opacity = 0.0
+        label = pill.GetChild(1)
         if m.navFocused and i = m.tabCursor then
-            bg.blendColor = "0xF5F5F7FF"
-            bg.opacity = 1.0
-            label.color = "0x0B0B0FFF"
+            label.color = "0x151028FF"
         else if i = m.tab then
-            bg.blendColor = "0x2B2B36FF"
-            bg.opacity = 0.9
-            label.color = "0xF5F5F7FF"
+            label.color = "0xF7F3FFFF"
         else
-            bg.opacity = 0.0
-            label.color = "0x9A9AAAFF"
+            label.color = "0xA195CCFF"
         end if
     end for
+
+    pill = m.tabPills[target]
+    bg = pill.GetChild(0)
+    position = pill.translation
+    toPosition = [232 + position[0], 26]
+    if m.navFocused then
+        m.tabHighlight.blendColor = "0xC9B8FFFF"
+    else
+        m.tabHighlight.blendColor = "0x30275AFF"
+    end if
+    m.tabHighlight.height = bg.height
+    if m.tabHighlight.width = 0 then
+        m.tabHighlight.translation = toPosition
+        m.tabHighlight.width = bg.width
+        return
+    end if
+    m.tabSlide.control = "stop"
+    m.tabSlidePos.keyValue = [m.tabHighlight.translation, toPosition]
+    m.tabSlideWidth.keyValue = [m.tabHighlight.width, bg.width]
+    m.tabSlide.control = "start"
 end sub
 
 function onKeyEvent(key as String, press as Boolean) as Boolean

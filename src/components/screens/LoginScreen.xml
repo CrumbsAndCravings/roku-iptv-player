@@ -5,19 +5,24 @@
     <field id="takeFocus" type="boolean" alwaysNotify="true" onChange="onTakeFocus" />
   </interface>
   <children>
-    <Rectangle width="1280" height="720" color="0x0B0B0FFF" />
-    <Poster translation="[96, 84]" uri="pkg:/images/wordmark.png" width="147" height="34" />
-    <Label id="heading" translation="[96, 146]" width="600" color="0xF5F5F7FF" text="Sign in to your TV service" />
-    <Label id="intro" translation="[96, 204]" width="560" wrap="true" maxLines="2" lineSpacing="4" color="0xB4B4C2FF"
+    <Rectangle width="1280" height="720" color="0x151028FF" />
+    <Poster translation="[-260, -300]" width="900" height="900" uri="pkg:/images/glow.png" blendColor="0xB9A3FFFF" opacity="0.22" />
+    <Poster translation="[760, 330]" width="760" height="760" uri="pkg:/images/glow.png" blendColor="0xFF9ECFFF" opacity="0.14" />
+    <Poster translation="[96, 80]" uri="pkg:/images/logo.png" width="110" height="40" />
+    <Poster translation="[212, 74]" uri="pkg:/images/sparkle.png" width="16" height="16" blendColor="0xFFD98AFF" />
+    <Poster translation="[1168, 118]" uri="pkg:/images/sparkle.png" width="22" height="22" blendColor="0xF7F3FFFF" opacity="0.8" />
+    <Poster translation="[680, 640]" uri="pkg:/images/sparkle.png" width="14" height="14" blendColor="0xC9B8FFFF" opacity="0.8" />
+    <Label id="heading" translation="[96, 146]" width="600" color="0xF7F3FFFF" text="Welcome to ARAN+" />
+    <Label id="intro" translation="[96, 204]" width="560" wrap="true" maxLines="2" lineSpacing="4" color="0xC3B8E6FF"
       text="Enter the Xtream Codes login your provider sent you. You only need to do this once." />
     <Group id="fields" translation="[96, 290]" />
     <Group id="submit" translation="[96, 540]" />
-    <Label id="status" translation="[96, 606]" width="560" wrap="true" maxLines="2" color="0xF5B83DFF" />
+    <Label id="status" translation="[96, 606]" width="560" wrap="true" maxLines="2" color="0xFF9ECFFF" />
 
     <Group translation="[740, 290]">
-      <Rectangle width="444" height="298" color="0x15151CFF" />
-      <Label id="tipsHeading" translation="[28, 26]" width="390" color="0xF5F5F7FF" text="Where to find these" />
-      <Label id="tips" translation="[28, 68]" width="390" wrap="true" lineSpacing="6" color="0xB4B4C2FF"
+      <Poster width="444" height="298" uri="pkg:/images/card.9.png" blendColor="0x1E1736FF" />
+      <Label id="tipsHeading" translation="[28, 26]" width="390" color="0xF7F3FFFF" text="Where to find these" />
+      <Label id="tips" translation="[28, 68]" width="390" wrap="true" lineSpacing="6" color="0xC3B8E6FF"
         text="Your provider's welcome email lists a server address, username and password. It may call them an Xtream or API login.&#10;&#10;Have an M3U link instead? Put it in Server and the username and password fill in by themselves.&#10;&#10;Typing is faster with the keyboard in the Roku mobile app." />
     </Group>
   </children>
