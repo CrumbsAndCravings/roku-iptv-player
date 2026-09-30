@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="LoginScreen" extends="Group">
+  <interface>
+    <field id="action" type="assocarray" alwaysNotify="true" />
+    <field id="takeFocus" type="boolean" alwaysNotify="true" onChange="onTakeFocus" />
+  </interface>
+  <children>
+    <Rectangle width="1280" height="720" color="0x0B0B0FFF" />
+    <Poster translation="[96, 84]" uri="pkg:/images/wordmark.png" width="147" height="34" />
+    <Label id="heading" translation="[96, 146]" width="600" color="0xF5F5F7FF" text="Sign in to your TV service" />
+    <Label id="intro" translation="[96, 204]" width="560" wrap="true" maxLines="2" lineSpacing="4" color="0xB4B4C2FF"
+      text="Enter the Xtream Codes login your provider sent you. You only need to do this once." />
+    <Group id="fields" translation="[96, 290]" />
+    <Group id="submit" translation="[96, 540]" />
+    <Label id="status" translation="[96, 606]" width="560" wrap="true" maxLines="2" color="0xF5B83DFF" />
+
+    <Group translation="[740, 290]">
+      <Rectangle width="444" height="298" color="0x15151CFF" />
+      <Label id="tipsHeading" translation="[28, 26]" width="390" color="0xF5F5F7FF" text="Where to find these" />
+      <Label id="tips" translation="[28, 68]" width="390" wrap="true" lineSpacing="6" color="0xB4B4C2FF"
+        text="Your provider's welcome email lists a server address, username and password. It may call them an Xtream or API login.&#10;&#10;Have an M3U link instead? Put it in Server and the username and password fill in by themselves.&#10;&#10;Typing is faster with the keyboard in the Roku mobile app." />
+    </Group>
+  </children>
+  <script type="text/brightscript" uri="pkg:/components/common/Utils.brs" />
+  <script type="text/brightscript" uri="pkg:/components/common/Registry.brs" />
+  <script type="text/brightscript" uri="pkg:/components/common/Pills.brs" />
+  <script type="text/brightscript" uri="pkg:/components/screens/LoginScreen.brs" />
+</component>

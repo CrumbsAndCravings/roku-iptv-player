@@ -1,0 +1,16 @@
+{
+  "name": "roku-iptv-player",
+  "private": true,
+  "description": "Marquee: a Netflix-style IPTV player for Roku, built on the Xtream Codes API.",
+  "scripts": {
+    "lint": "bsc --create-package=false",
+    "build": "bsc",
+    "deploy": "bsc --deploy --host $ROKU_HOST --password $ROKU_PASSWORD",
+    "images": "python3 tools/make_images.py",
+    "test": "sh tools/test.sh"
+  },
+  "devDependencies": {
+    "brighterscript": "^0.73.5",
+    "brs": "^0.45.0"
+  }
+}

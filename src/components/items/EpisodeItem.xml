@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One episode in the details screen's MarkupList: still, number and title, runtime, synopsis. -->
+<component name="EpisodeItem" extends="Group">
+  <interface>
+    <field id="itemContent" type="node" onChange="onContentChange" />
+    <field id="focusPercent" type="float" onChange="onFocusChange" />
+    <field id="listHasFocus" type="boolean" onChange="onFocusChange" />
+    <field id="width" type="float" />
+    <field id="height" type="float" />
+  </interface>
+  <children>
+    <Rectangle id="highlight" width="1184" height="104" color="0x22222CFF" opacity="0" />
+    <Rectangle translation="[10, 10]" width="150" height="84" color="0x1C1C25FF" />
+    <Poster id="still" translation="[10, 10]" width="150" height="84" loadWidth="150" loadHeight="84" loadDisplayMode="scaleToZoom" />
+    <Rectangle id="track" translation="[10, 90]" width="150" height="4" color="0x0B0B0FCC" visible="false" />
+    <Rectangle id="fill" translation="[10, 90]" width="0" height="4" color="0xF5B83DFF" visible="false" />
+    <Label id="title" translation="[182, 12]" width="840" color="0xF5F5F7FF" />
+    <Label id="runtime" translation="[1030, 12]" width="136" horizAlign="right" color="0x9A9AAAFF" />
+    <Label id="plot" translation="[182, 44]" width="980" wrap="true" maxLines="2" color="0xB4B4C2FF" />
+  </children>
+  <script type="text/brightscript" uri="pkg:/components/common/Utils.brs" />
+  <script type="text/brightscript" uri="pkg:/components/items/EpisodeItem.brs" />
+</component>

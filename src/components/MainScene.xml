@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Holds a simple stack of screens: Login or Home at the bottom, then Details, then Player. -->
+<component name="MainScene" extends="Scene">
+  <children>
+    <Group id="stack" />
+  </children>
+  <script type="text/brightscript" uri="pkg:/components/common/Utils.brs" />
+  <script type="text/brightscript" uri="pkg:/components/common/Registry.brs" />
+  <script type="text/brightscript" uri="pkg:/components/MainScene.brs" />
+</component>

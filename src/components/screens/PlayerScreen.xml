@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Full-screen playback. Saves progress for Continue Watching and rolls into the next episode. -->
+<component name="PlayerScreen" extends="Group">
+  <interface>
+    <field id="playback" type="assocarray" onChange="onPlayback" />
+    <field id="action" type="assocarray" alwaysNotify="true" />
+    <field id="takeFocus" type="boolean" alwaysNotify="true" onChange="onTakeFocus" />
+  </interface>
+  <children>
+    <Rectangle width="1280" height="720" color="0x000000FF" />
+    <Video id="video" width="1280" height="720" />
+
+    <Group id="upNext" translation="[800, 500]" visible="false">
+      <Rectangle width="432" height="156" color="0x0B0B0FEE" />
+      <Rectangle width="4" height="156" color="0xF5B83DFF" />
+      <Label id="upNextEyebrow" translation="[28, 20]" width="380" color="0xF5B83DFF" text="UP NEXT" />
+      <Label id="upNextTitle" translation="[28, 48]" width="380" wrap="true" maxLines="2" color="0xF5F5F7FF" />
+      <Label id="upNextHint" translation="[28, 114]" width="380" color="0xB4B4C2FF" />
+    </Group>
+
+    <Group id="errorBox" translation="[240, 250]" visible="false">
+      <Rectangle width="800" height="220" color="0x15151CFF" />
+      <Label id="errorTitle" translation="[40, 36]" width="720" color="0xF5F5F7FF" text="This video won't play on your Roku" />
+      <Label id="errorDetail" translation="[40, 84]" width="720" wrap="true" maxLines="3" color="0xB4B4C2FF" />
+      <Label id="errorHint" translation="[40, 170]" width="720" color="0x8A8A9AFF" text="Press Back to return." />
+    </Group>
+
+    <Timer id="countdown" duration="1" repeat="true" />
+  </children>
+  <script type="text/brightscript" uri="pkg:/components/common/Utils.brs" />
+  <script type="text/brightscript" uri="pkg:/components/common/Registry.brs" />
+  <script type="text/brightscript" uri="pkg:/components/common/Progress.brs" />
+  <script type="text/brightscript" uri="pkg:/components/screens/PlayerScreen.brs" />
+</component>

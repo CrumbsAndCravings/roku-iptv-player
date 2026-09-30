@@ -1,0 +1,8 @@
+{
+  "rootDir": "src",
+  "files": ["manifest", "source/**/*", "components/**/*", "images/**/*", "fonts/**/*"],
+  "stagingDir": "build/staging",
+  "outFile": "build/marquee.zip",
+  "createPackage": true,
+  "retainStagingDir": false
+}

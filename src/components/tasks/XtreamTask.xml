@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Runs one Xtream Codes API request off the UI thread.
+  Set `request`, then control = "RUN". `content` (if any) is set before `result`,
+  so callers only need to observe `result`.
+-->
+<component name="XtreamTask" extends="Task">
+  <interface>
+    <field id="request" type="assocarray" />
+    <field id="content" type="node" />
+    <field id="result" type="assocarray" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/components/common/Utils.brs" />
+  <script type="text/brightscript" uri="pkg:/components/tasks/XtreamParse.brs" />
+  <script type="text/brightscript" uri="pkg:/components/tasks/XtreamTask.brs" />
+</component>

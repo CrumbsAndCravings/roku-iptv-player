@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A 120x180 poster tile for RowList. Grows and gets a white frame when focused. -->
+<component name="PosterItem" extends="Group">
+  <interface>
+    <field id="itemContent" type="node" onChange="onContentChange" />
+    <field id="focusPercent" type="float" onChange="onFocusChange" />
+    <field id="rowFocusPercent" type="float" onChange="onFocusChange" />
+    <field id="rowListHasFocus" type="boolean" onChange="onFocusChange" />
+    <field id="width" type="float" />
+    <field id="height" type="float" />
+  </interface>
+  <children>
+    <Group id="card" scaleRotateCenter="[60, 90]">
+      <Rectangle id="frame" translation="[-3, -3]" width="126" height="186" color="0xF5F5F7FF" opacity="0" />
+      <Rectangle width="120" height="180" color="0x1C1C25FF" />
+      <Label id="fallback" translation="[10, 10]" width="100" height="160" wrap="true" maxLines="5"
+        horizAlign="center" vertAlign="center" color="0x8A8A9AFF" />
+      <Poster id="poster" width="120" height="180" loadWidth="120" loadHeight="180" loadDisplayMode="scaleToZoom" />
+      <Rectangle id="track" translation="[8, 170]" width="104" height="4" color="0x0B0B0FCC" visible="false" />
+      <Rectangle id="fill" translation="[8, 170]" width="0" height="4" color="0xF5B83DFF" visible="false" />
+    </Group>
+    <Label id="caption" translation="[0, 188]" width="120" horizAlign="center" color="0xB4B4C2FF" />
+  </children>
+  <script type="text/brightscript" uri="pkg:/components/common/Utils.brs" />
+  <script type="text/brightscript" uri="pkg:/components/items/PosterItem.brs" />
+</component>
