@@ -7,7 +7,7 @@ sub init()
     m.status.font = MakeFont("Nunito-ExtraBold", 19)
 
     m.labels = ["API KEY", "USERNAME (OPTIONAL)", "PASSWORD (OPTIONAL)"]
-    m.hints = ["From your OpenSubtitles profile", "For about 20 downloads a day", ""]
+    m.hints = ["From your OpenSubtitles profile", "Your username, not your email", ""]
     m.values = ["", "", ""]
     existing = LoadOsAccount()
     m.hasAccount = existing <> invalid
@@ -129,6 +129,8 @@ sub openKeyboard(index as Integer)
     dialog.title = m.labels[index]
     dialog.text = m.values[index]
     dialog.buttons = ["Done", "Cancel"]
+    ' Keys are 32 characters; don't let the text box cut them short.
+    dialog.textEditBox.maxTextLength = 256
     if index = 2 then dialog.textEditBox.secureMode = true
     dialog.ObserveField("buttonSelected", "onKeyboardButton")
     dialog.ObserveField("wasClosed", "onKeyboardClosed")
@@ -166,8 +168,12 @@ sub save()
         m.index = 2
         return
     end if
+    ' Keep what was typed even if the check fails, so nothing has to be retyped.
+    SaveOsAccount({ apiKey: apiKey, username: username, password: password })
+    m.hasAccount = true
+    buildButtons()
     m.busy = true
-    showStatus("Checking with OpenSubtitles…", true)
+    showStatus("Saved. Checking with OpenSubtitles…", true)
     m.task = CreateObject("roSGNode", "SubtitleTask")
     m.task.request = { mode: "login", account: { apiKey: apiKey, username: username, password: password } }
     m.task.ObserveField("result", "onChecked")
@@ -180,6 +186,7 @@ sub onChecked(event as Object)
     m.task = invalid
     if not result.ok then
         showStatus(result.error, false)
+        render()
         return
     end if
     account = result.request.account

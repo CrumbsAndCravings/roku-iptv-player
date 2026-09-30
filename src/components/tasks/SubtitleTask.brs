@@ -59,17 +59,32 @@ function osRequest(method as String, path as String, body as Dynamic) as Object
     return { ok: code >= 200 and code < 300, code: code, data: ParseJson(msg.GetString()) }
 end function
 
+' Puts OpenSubtitles' own words and the HTTP code in the message, so a photo of the
+' screen says exactly what went wrong.
 function osError(res as Object) as String
-    message = FieldStr(res.data, "message")
     if FieldStr(res, "error") <> "" then return res.error
-    if res.code = 401 or res.code = 403 then return "OpenSubtitles didn't accept the API key or login. Check them under Online subtitles on the home screen (press *)."
-    if res.code = 406 or res.code = 429 then
-        if message <> "" then return "OpenSubtitles: " + message
-        return "You've used today's OpenSubtitles downloads. They reset within a day."
+    message = serverMessage(res.data)
+    code = res.code
+    if code < 0 or code = 0 then return "Couldn't reach OpenSubtitles. Check the TV's internet connection."
+    said = "OpenSubtitles said HTTP " + code.ToStr()
+    if message <> "" then said = said + ": " + message
+    if code = 406 or code = 429 then return said + ". Downloads reset within a day."
+    return said + "."
+end function
+
+function serverMessage(data as Dynamic) as String
+    message = FieldStr(data, "message")
+    if message <> "" then return message
+    errors = Field(data, "errors")
+    if IsArr(errors) then
+        parts = []
+        for each e in errors
+            text = ToStr(e)
+            if text <> "" then parts.Push(text)
+        end for
+        return parts.Join(" ")
     end if
-    if res.code < 0 or res.code = 0 then return "Couldn't reach OpenSubtitles. Check the TV's internet connection."
-    if message <> "" then return "OpenSubtitles: " + message
-    return "OpenSubtitles answered with HTTP " + res.code.ToStr() + "."
+    return ""
 end function
 
 ' Signs in with the saved username and password, keeping the token and the server
@@ -87,18 +102,16 @@ end function
 
 ' --- Modes ----------------------------------------------------------------------
 
+' Checks the key on its own first, then the login, so the message says which one failed.
 function osCheck() as Object
-    if FieldStr(m.account, "apiKey") = "" then return { ok: false, error: "Enter your OpenSubtitles API key first." }
-    if FieldStr(m.account, "username") <> "" then
-        res = osLogin()
-        if not res.ok then return { ok: false, error: osError(res) }
-        user = Field(res.data, "user")
-        return { ok: true, name: FieldStr(m.account, "username"), allowed: ToInt(Field(user, "allowed_downloads")) }
-    end if
-    ' No login: just make sure the key works.
+    if FieldStr(m.account, "apiKey") = "" then return { ok: false, keyOk: false, error: "Enter your OpenSubtitles API key first." }
     res = osRequest("GET", "/infos/formats", invalid)
-    if not res.ok then return { ok: false, error: osError(res) }
-    return { ok: true, name: "", allowed: 5 }
+    if not res.ok then return { ok: false, keyOk: false, error: "The API key didn't work. " + osError(res) }
+    if FieldStr(m.account, "username") = "" then return { ok: true, keyOk: true, name: "", allowed: 5 }
+    res = osLogin()
+    if not res.ok then return { ok: false, keyOk: true, error: "The key works, but the login didn't. " + osError(res) + " Use your username, not your email." }
+    user = Field(res.data, "user")
+    return { ok: true, keyOk: true, name: FieldStr(m.account, "username"), allowed: ToInt(Field(user, "allowed_downloads")) }
 end function
 
 function osFind(req as Object) as Object

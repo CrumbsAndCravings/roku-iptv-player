@@ -97,6 +97,7 @@ sub openKeyboard(index as Integer)
     if index = 0 then dialog.message = ["Your server address, or a full M3U link."]
     dialog.text = m.values[index]
     dialog.buttons = ["Done", "Cancel"]
+    dialog.textEditBox.maxTextLength = 256
     if index = 2 then dialog.textEditBox.secureMode = true
     dialog.ObserveField("buttonSelected", "onKeyboardButton")
     dialog.ObserveField("wasClosed", "onKeyboardClosed")
