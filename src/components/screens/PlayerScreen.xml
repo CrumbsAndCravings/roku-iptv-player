@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Full-screen playback. Saves progress for Continue Watching and rolls into the next episode. -->
+<!--
+  Full-screen playback with our own controls (Roku's built-in UI is off).
+  Rows: Back + title on top; play/pause and the scrollbar; a button row underneath.
+  Saves progress for Continue Watching and rolls into the next episode.
+-->
 <component name="PlayerScreen" extends="Group">
   <interface>
     <field id="playback" type="assocarray" onChange="onPlayback" />
@@ -8,7 +12,36 @@
   </interface>
   <children>
     <Rectangle width="1280" height="720" color="0x000000FF" />
-    <Video id="video" width="1280" height="720" />
+    <Video id="video" width="1280" height="720" enableUI="false" />
+    <BusySpinner id="spinner" translation="[608, 328]" spinInterval="1" visible="false" />
+
+    <Group id="controls" visible="false">
+      <Poster width="1280" height="140" uri="pkg:/images/fade_top.png" />
+      <Poster translation="[0, 430]" width="1280" height="290" uri="pkg:/images/fade_bottom.png" />
+
+      <Group id="backButton" translation="[48, 30]">
+        <Poster id="backBg" width="120" height="44" uri="pkg:/images/pill.9.png" />
+        <Label id="backLabel" width="120" height="44" horizAlign="center" vertAlign="center" text="‹  Back" />
+      </Group>
+      <Label id="titleLabel" translation="[188, 30]" width="1044" height="44" vertAlign="center" color="0xF5F5F7FF" />
+
+      <Group id="playButton" translation="[48, 558]">
+        <Poster id="playBg" width="56" height="56" uri="pkg:/images/circle.png" />
+        <Poster id="playIcon" translation="[16, 16]" width="24" height="24" uri="pkg:/images/icon_pause.png" />
+      </Group>
+      <Label id="elapsed" translation="[120, 574]" width="96" horizAlign="right" color="0xF5F5F7FF" />
+      <Rectangle id="barTrack" translation="[228, 584]" width="896" height="5" color="0xFFFFFF40" />
+      <Rectangle id="barFill" translation="[228, 584]" width="0" height="5" color="0xF5B83DFF" />
+      <Rectangle id="barPreview" translation="[228, 584]" width="0" height="5" color="0xF5F5F7AA" visible="false" />
+      <Poster id="knob" width="18" height="18" uri="pkg:/images/circle.png" blendColor="0xF5F5F7FF" />
+      <Group id="bubble" visible="false">
+        <Poster id="bubbleBg" width="104" height="36" uri="pkg:/images/pill.9.png" blendColor="0xF5F5F7FF" />
+        <Label id="bubbleLabel" width="104" height="36" horizAlign="center" vertAlign="center" color="0x0B0B0FFF" />
+      </Group>
+      <Label id="remaining" translation="[1136, 574]" width="100" color="0xB4B4C2FF" />
+
+      <Group id="buttonRow" translation="[48, 636]" />
+    </Group>
 
     <Group id="upNext" translation="[800, 500]" visible="false">
       <Rectangle width="432" height="156" color="0x0B0B0FEE" />
@@ -26,14 +59,6 @@
       <Label id="errorHint" translation="[44, 368]" width="912" color="0xF5B83DFF" text="OK to try again   ·   Back to return" />
     </Group>
 
-    <!-- Takes focus for overlays; its keys bubble up to this screen instead of the video. -->
-    <Group id="keys" />
-
-    <Group id="hint" translation="[48, 632]" visible="false">
-      <Poster uri="pkg:/images/pill.9.png" width="300" height="42" blendColor="0x0B0B0FDD" />
-      <Label id="hintLabel" width="300" height="42" horizAlign="center" vertAlign="center" color="0xF5F5F7FF" text="↓   Audio &amp; subtitles" />
-    </Group>
-
     <Group id="tracks" visible="false">
       <Rectangle width="1280" height="720" color="0x000000CC" />
       <Label id="tracksTitle" translation="[120, 80]" width="1040" color="0xF5F5F7FF" text="Audio &amp; subtitles" />
@@ -44,12 +69,25 @@
       <Label id="tracksNote" translation="[120, 610]" width="1040" wrap="true" maxLines="2" color="0x9A9AAAFF" />
     </Group>
 
+    <Group id="episodes" visible="false">
+      <Rectangle width="1280" height="720" color="0x000000CC" />
+      <Label id="episodesTitle" translation="[120, 80]" width="1040" color="0xF5F5F7FF" text="Episodes" />
+      <Group id="episodeList" translation="[120, 160]" />
+    </Group>
+
+    <!-- Always holds focus, so every key reaches this screen rather than the video. -->
+    <Group id="keys" />
+
     <Timer id="countdown" duration="1" repeat="true" />
-    <Timer id="hintTimer" duration="5" repeat="false" />
+    <Timer id="hideTimer" duration="5" repeat="false" />
+    <Timer id="holdTimer" duration="0.25" repeat="true" />
+    <Timer id="commitTimer" duration="0.8" repeat="false" />
   </children>
   <script type="text/brightscript" uri="pkg:/components/common/Utils.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Registry.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Progress.brs" />
+  <script type="text/brightscript" uri="pkg:/components/common/Pills.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Tracks.brs" />
+  <script type="text/brightscript" uri="pkg:/components/common/Playback.brs" />
   <script type="text/brightscript" uri="pkg:/components/screens/PlayerScreen.brs" />
 </component>

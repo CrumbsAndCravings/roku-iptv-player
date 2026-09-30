@@ -114,6 +114,41 @@ def nine_patch(radius):
     return img
 
 
+def player_icons():
+    """White glyphs for the player controls, tinted with blendColor on screen."""
+    scale = 8
+    white = (255, 255, 255, 255)
+
+    def canvas(size):
+        return Image.new("RGBA", (size * scale, size * scale), (0, 0, 0, 0))
+
+    def save(img, size, name):
+        img.resize((size, size), Image.LANCZOS).save(OUT / name)
+
+    size = 24
+    img = canvas(size)
+    d = ImageDraw.Draw(img)
+    d.polygon([(5 * scale, 2 * scale), (21 * scale, 12 * scale), (5 * scale, 22 * scale)], fill=white)
+    save(img, size, "icon_play.png")
+
+    img = canvas(size)
+    d = ImageDraw.Draw(img)
+    d.rounded_rectangle((4 * scale, 3 * scale, 9 * scale, 21 * scale), radius=scale, fill=white)
+    d.rounded_rectangle((15 * scale, 3 * scale, 20 * scale, 21 * scale), radius=scale, fill=white)
+    save(img, size, "icon_pause.png")
+
+    size = 64
+    img = canvas(size)
+    ImageDraw.Draw(img).ellipse((0, 0, size * scale - 1, size * scale - 1), fill=white)
+    save(img, size, "circle.png")
+
+    img = canvas(size)
+    ImageDraw.Draw(img).arc(
+        (4 * scale, 4 * scale, 60 * scale, 60 * scale), start=-90, end=180, fill=white, width=6 * scale
+    )
+    save(img, size, "spinner.png")
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     brand_card(290, 218, 34).save(OUT / "icon_hd.png")
@@ -125,6 +160,7 @@ def main():
     fade(960, 260, "bottom").save(OUT / "fade_bottom.png")
     fade(1280, 140, "top", 230).save(OUT / "fade_top.png")
     nine_patch(8).save(OUT / "pill.9.png")
+    player_icons()
     for p in sorted(OUT.iterdir()):
         print(p.name, Image.open(p).size)
 

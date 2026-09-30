@@ -11,11 +11,25 @@ Built for a 720p Roku TV (TCL 32S357, Roku OS 15), so the UI is laid out at 1280
 - **Hero banner** with the focused title's backdrop, year, runtime, genre, rating and plot. Movie details are fetched once you pause on a poster.
 - **Continue Watching** at the top of Home, with a progress bar on each poster. Movies drop off when finished; series move on to the next episode.
 - **Details page** with Resume / Play from start, and for series a season bar and episode list with stills, runtimes and synopses.
-- **Player** that resumes a few seconds before where you stopped, saves progress every 15 seconds, and counts down to the next episode ("Up next", OK to skip the wait).
-- **Audio & subtitles:** press Down (or Up, or \*) while a video plays to pick an audio track or turn on subtitles built into the file. Your choice of language is remembered and applied to the next video automatically.
+- **Player** with its own controls: play/pause beside a scrollbar, a Back button with the title on top, and a button row with Audio & subtitles, Episodes, Next episode and Restart. It resumes a few seconds before where you stopped, saves progress every 15 seconds, and counts down to the next episode ("Up next", OK to skip the wait).
+- **Audio & subtitles:** pick an audio track or turn on subtitles built into the file. Your language choice is remembered and applied to the next video automatically.
 - Adult categories and titles are hidden.
 
 Remote shortcuts: **Left** from a row's first poster (or **Up** from the first row) reaches the tabs, **Back** jumps to the top row, then the tabs, then exits, **\*** (options) opens the account menu with Sign out, **Play** on a details page starts the main button.
+
+## Player controls
+
+| Controls hidden | |
+|---|---|
+| OK | Pause and show the controls |
+| Up / Down | Show the controls |
+| Left / Right (or ⏪ ⏩) | Preview a jump of 10 seconds; hold to go faster (30 s steps after 1.5 s, then doubling every 1.5 s, up to 10 min per step). The video jumps shortly after you let go. |
+| Play/Pause | Pause or resume |
+| Instant replay | Back 10 seconds |
+| \* | Audio & subtitles |
+| Back | Leave the player |
+
+With the controls showing, **Up** reaches Back (top left), **Down** reaches the button row, and on the scrollbar row **OK** pauses and **Left/Right** seek as above. The controls hide after 5 seconds while playing and stay up while paused.
 
 ## When a video won't play
 

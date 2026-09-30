@@ -1,44 +1,82 @@
+' Player with custom controls.
+'
+' Controls hidden:  OK pauses and shows them; Up/Down shows them; Left/Right shows the
+'                   bar and previews a seek. Play/Pause, rewind, fast-forward and instant
+'                   replay work too. Back leaves.
+' Controls shown:   three rows. Top: Back. Middle: play/pause with Left/Right seeking.
+'                   Bottom: Audio & subtitles, Episodes, Next episode, Restart.
+' Seeking previews a target on the bar and jumps once Left/Right has been released
+' for a moment, since every jump makes an IPTV stream rebuffer.
+
 sub init()
     m.video = m.top.FindNode("video")
+    m.spinner = m.top.FindNode("spinner")
+    m.keys = m.top.FindNode("keys")
+
+    m.controls = m.top.FindNode("controls")
+    m.backBg = m.top.FindNode("backBg")
+    m.backLabel = m.top.FindNode("backLabel")
+    m.titleLabel = m.top.FindNode("titleLabel")
+    m.playBg = m.top.FindNode("playBg")
+    m.playIcon = m.top.FindNode("playIcon")
+    m.elapsed = m.top.FindNode("elapsed")
+    m.remaining = m.top.FindNode("remaining")
+    m.barFill = m.top.FindNode("barFill")
+    m.barPreview = m.top.FindNode("barPreview")
+    m.knob = m.top.FindNode("knob")
+    m.bubble = m.top.FindNode("bubble")
+    m.bubbleLabel = m.top.FindNode("bubbleLabel")
+    m.buttonRow = m.top.FindNode("buttonRow")
+
     m.upNext = m.top.FindNode("upNext")
     m.upNextTitle = m.top.FindNode("upNextTitle")
     m.upNextHint = m.top.FindNode("upNextHint")
     m.errorBox = m.top.FindNode("errorBox")
     m.errorDetail = m.top.FindNode("errorDetail")
-    m.countdown = m.top.FindNode("countdown")
-    m.keys = m.top.FindNode("keys")
-    m.hint = m.top.FindNode("hint")
-    m.hintTimer = m.top.FindNode("hintTimer")
     m.tracks = m.top.FindNode("tracks")
     m.audioList = m.top.FindNode("audioList")
     m.subsList = m.top.FindNode("subsList")
     m.tracksNote = m.top.FindNode("tracksNote")
+    m.episodes = m.top.FindNode("episodes")
+    m.episodeList = m.top.FindNode("episodeList")
 
+    m.countdown = m.top.FindNode("countdown")
+    m.hideTimer = m.top.FindNode("hideTimer")
+    m.holdTimer = m.top.FindNode("holdTimer")
+    m.commitTimer = m.top.FindNode("commitTimer")
+
+    m.backLabel.font = MakeFont("Outfit-SemiBold", 18)
+    m.titleLabel.font = MakeFont("Outfit-SemiBold", 22)
+    m.elapsed.font = MakeFont("Outfit-SemiBold", 17)
+    m.remaining.font = MakeFont("Outfit-SemiBold", 17)
+    m.bubbleLabel.font = MakeFont("Outfit-Bold", 17)
     m.top.FindNode("upNextEyebrow").font = MakeFont("Outfit-SemiBold", 14)
     m.upNextTitle.font = MakeFont("Outfit-SemiBold", 22)
     m.upNextHint.font = MakeFont("Outfit-Regular", 17)
     m.top.FindNode("errorTitle").font = MakeFont("Outfit-Bold", 28)
     m.errorDetail.font = MakeFont("Outfit-Regular", 18)
     m.top.FindNode("errorHint").font = MakeFont("Outfit-SemiBold", 18)
-    m.top.FindNode("hintLabel").font = MakeFont("Outfit-SemiBold", 18)
     m.top.FindNode("tracksTitle").font = MakeFont("Outfit-Bold", 34)
     m.top.FindNode("audioHeading").font = MakeFont("Outfit-SemiBold", 15)
     m.top.FindNode("subsHeading").font = MakeFont("Outfit-SemiBold", 15)
     m.tracksNote.font = MakeFont("Outfit-Regular", 18)
+    m.top.FindNode("episodesTitle").font = MakeFont("Outfit-Bold", 34)
+    m.spinner.poster.uri = "pkg:/images/spinner.png"
+    m.spinner.poster.width = 64
+    m.spinner.poster.height = 64
 
-    for each barName in ["trickPlayBar", "bufferingBar", "retrievingBar"]
-        bar = m.video.GetField(barName)
-        if bar <> invalid then bar.filledBarBlendColor = "0xF5B83DFF"
-    end for
     m.video.notificationInterval = 1
     m.video.ObserveField("state", "onState")
     m.video.ObserveField("position", "onPosition")
-    m.countdown.ObserveField("fire", "onCountdown")
-    m.hintTimer.ObserveField("fire", "onHintTimer")
     m.video.ObserveField("availableAudioTracks", "onTracksChanged")
     m.video.ObserveField("availableSubtitleTracks", "onTracksChanged")
+    m.countdown.ObserveField("fire", "onCountdown")
+    m.hideTimer.ObserveField("fire", "onHideTimer")
+    m.holdTimer.ObserveField("fire", "onHoldTick")
+    m.commitTimer.ObserveField("fire", "commitSeek")
 
     m.playback = invalid
+    m.kind = "movie"
     m.index = 0
     m.startAt = 0
     m.lastSaved = 0
@@ -48,14 +86,27 @@ sub init()
     m.started = false
     m.failed = false
     m.errors = []
+
+    m.row = "bar"
+    m.buttons = []
+    m.buttonPills = []
+    m.buttonIndex = 0
+    m.seeking = false
+    m.seekTarget = 0.0
+    m.holdKey = ""
+    m.holdDirection = 1
+    m.holdClock = CreateObject("roTimespan")
+    m.introShown = false
+
+    m.panel = ""
     m.audioOptions = []
     m.subOptions = []
     m.trackColumn = 1
     m.audioCursor = 0
     m.subCursor = 0
+    m.episodeCursor = 0
     m.audioPrefDone = false
     m.subPrefDone = false
-    m.hintShown = false
 end sub
 
 sub onPlayback()
@@ -66,11 +117,7 @@ sub onPlayback()
 end sub
 
 sub onTakeFocus()
-    if m.upNext.visible or m.errorBox.visible or m.tracks.visible then
-        m.keys.SetFocus(true)
-    else
-        m.video.SetFocus(true)
-    end if
+    m.keys.SetFocus(true)
 end sub
 
 ' The movie, or the current episode in the queue, as { id, ext, title, code, codecs }.
@@ -95,14 +142,32 @@ function streamKind() as String
     return "series"
 end function
 
+function hasNextEpisode() as Boolean
+    return m.kind = "episode" and m.index + 1 < m.playback.queue.Count()
+end function
+
 sub startItem(startAt as Integer)
     m.startAt = startAt
     m.attempt = 0
     m.started = false
     m.failed = false
     m.errors = []
+    m.introShown = false
+    m.audioPrefDone = false
+    m.subPrefDone = false
+    cancelSeek()
+    closePanel(false)
+    hideControls()
     m.upNext.visible = false
     m.errorBox.visible = false
+
+    item = currentItem()
+    if m.kind = "movie" then
+        m.titleLabel.text = item.title
+    else
+        m.titleLabel.text = m.playback.seriesName + "   ·   " + item.code + "  " + item.title
+    end if
+    buildButtons()
     loadStream()
 end sub
 
@@ -112,12 +177,7 @@ sub loadStream()
     item = currentItem()
     content = CreateObject("roSGNode", "ContentNode")
     content.url = StreamUrl(m.global.creds, streamKind(), item.id, item.ext)
-    if m.kind = "movie" then
-        content.title = item.title
-    else
-        content.title = item.code + "   " + item.title
-        content.secondaryTitle = m.playback.seriesName
-    end if
+    content.title = m.titleLabel.text
     if m.attempt = 0 then
         fmt = StreamFormatFor(item.ext)
         if fmt <> "" then content.streamFormat = fmt
@@ -126,15 +186,12 @@ sub loadStream()
     if m.startAt > 10 then content.playStart = m.startAt - 5
 
     m.lastSaved = m.startAt
-    m.audioPrefDone = false
-    m.subPrefDone = false
-    m.hintShown = false
-    m.hint.visible = false
-    m.tracks.visible = false
     m.video.visible = true
     m.video.content = content
     m.video.control = "play"
-    m.video.SetFocus(true)
+    m.spinner.visible = true
+    m.spinner.control = "start"
+    m.keys.SetFocus(true)
 end sub
 
 ' --- Progress ----------------------------------------------------------------
@@ -143,6 +200,7 @@ sub onPosition()
     if m.closing or not m.started then return
     position = Int(m.video.position)
     if Abs(position - m.lastSaved) >= 15 then saveProgress()
+    if m.controls.visible then renderBar()
 end sub
 
 sub saveProgress()
@@ -189,7 +247,7 @@ sub markFinished()
     p = m.playback
     if m.kind = "movie" then
         ProgressRemove(p.entry.k)
-    else if m.index + 1 < p.queue.Count() then
+    else if hasNextEpisode() then
         ProgressPut(entryFor(m.index + 1, 0, 0))
     else
         ProgressRemove("s:" + p.seriesId)
@@ -201,14 +259,28 @@ end sub
 sub onState()
     if m.closing then return
     state = m.video.state
+    m.spinner.visible = (state = "buffering")
+    if state = "buffering" then
+        m.spinner.control = "start"
+    else
+        m.spinner.control = "stop"
+    end if
+    renderPlayButton()
+
     if state = "playing" then
         m.started = true
         onTracksChanged()
-        if not m.hintShown then
-            m.hintShown = true
-            m.hint.visible = true
-            m.hintTimer.control = "start"
+        ' Show the controls briefly the first time, so the buttons are discoverable.
+        if not m.introShown then
+            m.introShown = true
+            showControls("bar")
+        else if m.controls.visible then
+            restartHideTimer()
         end if
+    else if state = "paused" then
+        saveProgress()
+        if not m.controls.visible then showControls("bar")
+        m.hideTimer.control = "stop"
     else if state = "error" then
         onPlaybackError()
     else if state = "finished" then
@@ -216,13 +288,11 @@ sub onState()
         ' played counts as watched.
         if m.failed or not m.started then return
         markFinished()
-        if m.kind = "episode" and m.index + 1 < m.playback.queue.Count() then
+        if hasNextEpisode() then
             showUpNext()
         else
             close()
         end if
-    else if state = "paused" then
-        saveProgress()
     end if
 end sub
 
@@ -240,11 +310,11 @@ sub onPlaybackError()
     m.upNext.visible = false
     m.video.control = "stop"
     m.video.visible = false
+    m.spinner.visible = false
+    hideControls()
+    closePanel(false)
     m.errorDetail.text = diagnosis()
-    m.hint.visible = false
-    m.tracks.visible = false
     m.errorBox.visible = true
-    m.keys.SetFocus(true)
 end sub
 
 function describeRokuError() as String
@@ -318,6 +388,351 @@ function decoderSupport(item as Object) as String
     return ""
 end function
 
+' --- Controls ------------------------------------------------------------------
+
+sub buildButtons()
+    m.buttons = [{ label: "Audio & subtitles", action: "tracks" }]
+    if m.kind = "episode" then
+        m.buttons.Push({ label: "Episodes", action: "episodes" })
+        if hasNextEpisode() then m.buttons.Push({ label: "Next episode", action: "next" })
+    end if
+    m.buttons.Push({ label: "Restart", action: "restart" })
+    labels = []
+    for each button in m.buttons
+        labels.Push(button.label)
+    end for
+    m.buttonPills = BuildPills(m.buttonRow, labels, 17)
+    m.buttonIndex = 0
+end sub
+
+sub showControls(row as String)
+    m.controls.visible = true
+    m.row = row
+    renderControls()
+    restartHideTimer()
+end sub
+
+sub hideControls()
+    m.controls.visible = false
+    m.hideTimer.control = "stop"
+end sub
+
+sub restartHideTimer()
+    m.hideTimer.control = "stop"
+    if m.video.state <> "paused" then m.hideTimer.control = "start"
+end sub
+
+sub onHideTimer()
+    if m.seeking or m.panel <> "" or m.video.state = "paused" then return
+    hideControls()
+end sub
+
+sub renderControls()
+    if m.row = "top" then
+        m.backBg.blendColor = "0xF5F5F7FF"
+        m.backBg.opacity = 1.0
+        m.backLabel.color = "0x0B0B0FFF"
+    else
+        m.backBg.blendColor = "0x0B0B0FFF"
+        m.backBg.opacity = 0.6
+        m.backLabel.color = "0xF5F5F7FF"
+    end if
+    buttonFocus = -1
+    if m.row = "buttons" then buttonFocus = m.buttonIndex
+    StylePills(m.buttonPills, buttonFocus, -1)
+    renderPlayButton()
+    renderBar()
+end sub
+
+sub renderPlayButton()
+    if m.video.state = "paused" then
+        m.playIcon.uri = "pkg:/images/icon_play.png"
+    else
+        m.playIcon.uri = "pkg:/images/icon_pause.png"
+    end if
+    if m.row = "bar" then
+        m.playBg.blendColor = "0xF5F5F7FF"
+        m.playBg.opacity = 1.0
+        m.playIcon.blendColor = "0x0B0B0FFF"
+    else
+        m.playBg.blendColor = "0xF5F5F7FF"
+        m.playBg.opacity = 0.2
+        m.playIcon.blendColor = "0xF5F5F7FF"
+    end if
+end sub
+
+sub renderBar()
+    barX = 228
+    barWidth = 896
+    duration = m.video.duration
+    position = m.video.position
+    shown = position
+    if m.seeking then shown = m.seekTarget
+
+    m.elapsed.text = FormatClock(Int(shown))
+    if duration > 0 then
+        timeLeft = duration - shown
+        if timeLeft < 0 then timeLeft = 0
+        m.remaining.text = "-" + FormatClock(Int(timeLeft))
+    else
+        m.remaining.text = ""
+    end if
+
+    playedFraction = BarFraction(position, duration)
+    shownFraction = BarFraction(shown, duration)
+    m.barFill.width = barWidth * playedFraction
+    if m.seeking and duration > 0 then
+        low = playedFraction
+        high = shownFraction
+        if high < low then
+            low = shownFraction
+            high = playedFraction
+        end if
+        m.barPreview.translation = [barX + barWidth * low, 584]
+        m.barPreview.width = barWidth * (high - low)
+        m.barPreview.visible = true
+    else
+        m.barPreview.visible = false
+    end if
+
+    knobX = barX + barWidth * shownFraction
+    m.knob.translation = [knobX - 9, 577.5]
+    m.knob.visible = (m.row = "bar")
+
+    m.bubble.visible = m.seeking
+    if m.seeking then
+        m.bubbleLabel.text = FormatClock(Int(shown))
+        bubbleX = knobX - 52
+        if bubbleX < barX - 40 then bubbleX = barX - 40
+        if bubbleX > 1232 - 104 then bubbleX = 1232 - 104
+        m.bubble.translation = [bubbleX, 530]
+    end if
+end sub
+
+sub setRow(row as String)
+    m.row = row
+    renderControls()
+    restartHideTimer()
+end sub
+
+sub togglePause()
+    if m.video.state = "paused" then
+        m.video.control = "resume"
+    else
+        m.video.control = "pause"
+        showControls(m.row)
+    end if
+end sub
+
+sub runButton()
+    if m.buttonIndex >= m.buttons.Count() then return
+    action = m.buttons[m.buttonIndex].action
+    if action = "tracks" then
+        openTracks()
+    else if action = "episodes" then
+        openEpisodes()
+    else if action = "next" then
+        goToEpisode(m.index + 1)
+    else if action = "restart" then
+        cancelSeek()
+        m.video.seek = 0
+        m.lastSaved = 0
+        if m.video.state = "paused" then m.video.control = "resume"
+        setRow("bar")
+    end if
+end sub
+
+' Jumps to another episode in the queue; Continue Watching follows.
+sub goToEpisode(index as Integer)
+    saveProgress()
+    ProgressPut(entryFor(index, 0, 0))
+    m.index = index
+    startItem(0)
+end sub
+
+sub leave()
+    if not m.failed then saveProgress()
+    close()
+end sub
+
+' --- Seeking -------------------------------------------------------------------
+
+sub beginHold(key as String, direction as Integer)
+    ' Already held: the hold timer does the stepping (guards against key repeats).
+    if m.holdKey = key then return
+    m.commitTimer.control = "stop"
+    if not m.seeking then
+        m.seeking = true
+        m.seekTarget = m.video.position
+    end if
+    m.holdKey = key
+    m.holdDirection = direction
+    m.holdClock.Mark()
+    stepSeek(10)
+    m.holdTimer.control = "start"
+end sub
+
+sub onHoldTick()
+    if m.holdKey = "" then
+        m.holdTimer.control = "stop"
+        return
+    end if
+    held = m.holdClock.TotalMilliseconds()
+    ' A missed key release shouldn't leave the target running away.
+    if held > 20000 then
+        endHold()
+        return
+    end if
+    ' Taps shorter than half a second are a single step.
+    if held >= 500 then stepSeek(HoldStep(held))
+end sub
+
+sub stepSeek(seconds as Integer)
+    m.seekTarget = ClampSeek(m.seekTarget + seconds * m.holdDirection, m.video.duration)
+    if not m.controls.visible then showControls("bar")
+    renderBar()
+    restartHideTimer()
+end sub
+
+sub endHold()
+    m.holdKey = ""
+    m.holdTimer.control = "stop"
+    if m.seeking then m.commitTimer.control = "start"
+end sub
+
+sub commitSeek()
+    m.commitTimer.control = "stop"
+    if not m.seeking then return
+    m.seeking = false
+    m.video.seek = m.seekTarget
+    m.lastSaved = Int(m.seekTarget)
+    renderBar()
+    restartHideTimer()
+end sub
+
+sub cancelSeek()
+    m.holdKey = ""
+    m.holdTimer.control = "stop"
+    m.commitTimer.control = "stop"
+    m.seeking = false
+end sub
+
+sub jumpBy(seconds as Integer)
+    cancelSeek()
+    target = ClampSeek(m.video.position + seconds, m.video.duration)
+    m.video.seek = target
+    m.lastSaved = Int(target)
+    showControls("bar")
+end sub
+
+' --- Keys ----------------------------------------------------------------------
+
+function directionOf(key as String) as Integer
+    if key = "left" or key = "rewind" then return -1
+    return 1
+end function
+
+function isSeekKey(key as String) as Boolean
+    return key = "left" or key = "right" or key = "rewind" or key = "fastforward"
+end function
+
+function onKeyEvent(key as String, press as Boolean) as Boolean
+    ' Releases only matter for ending a held Left/Right.
+    if not press then
+        if key = m.holdKey then endHold()
+        return true
+    end if
+
+    if m.panel = "tracks" then return onTrackKey(key)
+    if m.panel = "episodes" then return onEpisodeKey(key)
+
+    if m.errorBox.visible then
+        if key = "OK" then
+            startItem(m.startAt)
+        else if key = "back" then
+            close()
+        end if
+        return true
+    end if
+
+    if m.upNext.visible then
+        if key = "OK" or key = "play" then
+            playNext()
+        else if key = "back" then
+            close()
+        end if
+        return true
+    end if
+
+    if key = "back" then
+        if m.seeking then
+            cancelSeek()
+            renderBar()
+        else
+            leave()
+        end if
+        return true
+    else if key = "play" then
+        togglePause()
+        return true
+    else if key = "replay" then
+        jumpBy(-10)
+        return true
+    else if key = "options" then
+        openTracks()
+        return true
+    end if
+
+    if not m.controls.visible then
+        if key = "OK" then
+            if m.video.state <> "paused" then m.video.control = "pause"
+            showControls("bar")
+        else if key = "up" or key = "down" then
+            showControls("bar")
+        else if isSeekKey(key) then
+            showControls("bar")
+            beginHold(key, directionOf(key))
+        end if
+        return true
+    end if
+
+    restartHideTimer()
+    if m.row = "bar" then
+        if key = "OK" then
+            if m.seeking then
+                commitSeek()
+            else
+                togglePause()
+            end if
+        else if isSeekKey(key) then
+            beginHold(key, directionOf(key))
+        else if key = "up" then
+            setRow("top")
+        else if key = "down" then
+            setRow("buttons")
+        end if
+    else if m.row = "top" then
+        if key = "OK" then
+            leave()
+        else if key = "down" then
+            setRow("bar")
+        end if
+    else if m.row = "buttons" then
+        if key = "left" and m.buttonIndex > 0 then
+            m.buttonIndex = m.buttonIndex - 1
+            renderControls()
+        else if key = "right" and m.buttonIndex < m.buttons.Count() - 1 then
+            m.buttonIndex = m.buttonIndex + 1
+            renderControls()
+        else if key = "OK" then
+            runButton()
+        else if key = "up" then
+            setRow("bar")
+        end if
+    end if
+    return true
+end function
+
 ' --- Up next -------------------------------------------------------------------
 
 sub showUpNext()
@@ -325,10 +740,10 @@ sub showUpNext()
     m.upNextTitle.text = upcoming.code + "  " + upcoming.title
     m.secondsLeft = 8
     updateCountdown()
+    hideControls()
+    closePanel(false)
     m.upNext.visible = true
-    m.tracks.visible = false
     m.countdown.control = "start"
-    m.keys.SetFocus(true)
 end sub
 
 sub onCountdown()
@@ -352,47 +767,20 @@ end sub
 
 sub close()
     m.closing = true
+    cancelSeek()
     m.countdown.control = "stop"
+    m.hideTimer.control = "stop"
     m.video.control = "stop"
     m.top.action = { name: "close" }
 end sub
 
-function onKeyEvent(key as String, press as Boolean) as Boolean
-    if not press then return false
-    if m.tracks.visible then return onTrackKey(key)
-    if m.errorBox.visible then
-        if key = "OK" then
-            startItem(m.startAt)
-        else if key = "back" then
-            close()
-        end if
-        return true
-    end if
-    if m.upNext.visible then
-        if key = "OK" or key = "play" then
-            playNext()
-        else if key = "back" then
-            close()
-        end if
-        return true
-    end if
-    if key = "back" then
-        saveProgress()
-        close()
-        return true
-    end if
-    ' Keys the video didn't use open the audio and subtitle panel.
-    if (key = "down" or key = "up" or key = "options") and m.started then
-        openTracks()
-        return true
-    end if
-    return false
-end function
+' --- Panels (audio & subtitles, episodes) ---------------------------------------
 
-' --- Audio & subtitles -----------------------------------------------------------
-
-sub onHintTimer()
-    m.hint.visible = false
+sub closePanel(backToControls as Boolean)
+    m.panel = ""
+    m.tracks.visible = false
+    m.episodes.visible = false
+    if backToControls then showControls("buttons")
 end sub
 
 ' Applies the audio and subtitle languages chosen earlier, once per stream, as soon as
@@ -423,6 +811,7 @@ sub onTracksChanged()
 end sub
 
 sub openTracks()
+    cancelSeek()
     m.audioOptions = AudioOptions(m.video.availableAudioTracks)
     m.subOptions = SubtitleOptions(m.video.availableSubtitleTracks)
     m.audioCursor = activeAudioIndex()
@@ -434,15 +823,10 @@ sub openTracks()
     if m.subOptions.Count() = 1 then notes.Push("This file has no built-in subtitles.")
     if m.audioOptions.Count() <= 1 then notes.Push("It has one audio track.")
     m.tracksNote.text = notes.Join(" ")
-    m.hint.visible = false
+    hideControls()
+    m.panel = "tracks"
     m.tracks.visible = true
-    m.keys.SetFocus(true)
     renderTracks()
-end sub
-
-sub closeTracks()
-    m.tracks.visible = false
-    m.video.SetFocus(true)
 end sub
 
 function activeAudioIndex() as Integer
@@ -455,59 +839,8 @@ function activeSubtitleIndex() as Integer
 end function
 
 sub renderTracks()
-    renderOptions(m.audioList, m.audioOptions, activeAudioIndex(), m.audioCursor, m.trackColumn = 0)
-    renderOptions(m.subsList, m.subOptions, activeSubtitleIndex(), m.subCursor, m.trackColumn = 1)
-end sub
-
-' Draws up to eight options around the cursor. The active one gets an amber dot.
-sub renderOptions(group as Object, options as Object, activeIndex as Integer, cursor as Integer, focused as Boolean)
-    group.RemoveChildrenIndex(group.GetChildCount(), 0)
-    if options.Count() = 0 then
-        empty = group.CreateChild("Label")
-        empty.font = MakeFont("Outfit-Regular", 20)
-        empty.color = "0x7C7C8CFF"
-        empty.text = "Default"
-        return
-    end if
-    visibleCount = 8
-    first = cursor - 3
-    if first > options.Count() - visibleCount then first = options.Count() - visibleCount
-    if first < 0 then first = 0
-    last = first + visibleCount - 1
-    if last > options.Count() - 1 then last = options.Count() - 1
-    y = 0
-    for i = first to last
-        row = group.CreateChild("Group")
-        row.translation = [0, y]
-        bg = row.CreateChild("Poster")
-        bg.uri = "pkg:/images/pill.9.png"
-        bg.width = 440
-        bg.height = 44
-        dot = row.CreateChild("Rectangle")
-        dot.translation = [20, 18]
-        dot.width = 8
-        dot.height = 8
-        dot.visible = (i = activeIndex)
-        label = row.CreateChild("Label")
-        label.translation = [44, 0]
-        label.width = 380
-        label.height = 44
-        label.vertAlign = "center"
-        label.font = MakeFont("Outfit-SemiBold", 20)
-        label.text = options[i].label
-        if focused and i = cursor then
-            bg.blendColor = "0xF5F5F7FF"
-            bg.opacity = 1.0
-            label.color = "0x0B0B0FFF"
-            dot.color = "0x0B0B0FFF"
-        else
-            bg.opacity = 0.0
-            dot.color = "0xF5B83DFF"
-            label.color = "0x9A9AAAFF"
-            if i = activeIndex then label.color = "0xF5F5F7FF"
-        end if
-        y = y + 50
-    end for
+    renderOptions(m.audioList, m.audioOptions, activeAudioIndex(), m.audioCursor, m.trackColumn = 0, 440, 8)
+    renderOptions(m.subsList, m.subOptions, activeSubtitleIndex(), m.subCursor, m.trackColumn = 1, 440, 8)
 end sub
 
 sub chooseTrack()
@@ -532,7 +865,8 @@ end sub
 
 function onTrackKey(key as String) as Boolean
     if key = "back" or key = "options" then
-        closeTracks()
+        closePanel(true)
+        return true
     else if key = "left" and m.audioOptions.Count() > 0 then
         m.trackColumn = 0
     else if key = "right" then
@@ -547,6 +881,92 @@ function onTrackKey(key as String) as Boolean
         chooseTrack()
         return true
     end if
-    if m.tracks.visible then renderTracks()
+    renderTracks()
     return true
 end function
+
+sub openEpisodes()
+    cancelSeek()
+    m.episodeCursor = m.index
+    hideControls()
+    m.panel = "episodes"
+    m.episodes.visible = true
+    renderEpisodes()
+end sub
+
+sub renderEpisodes()
+    options = []
+    for each ep in m.playback.queue
+        options.Push({ id: ep.id, label: ep.code + "   " + ep.title })
+    end for
+    renderOptions(m.episodeList, options, m.index, m.episodeCursor, true, 1040, 9)
+end sub
+
+function onEpisodeKey(key as String) as Boolean
+    if key = "back" then
+        closePanel(true)
+    else if key = "up" and m.episodeCursor > 0 then
+        m.episodeCursor = m.episodeCursor - 1
+        renderEpisodes()
+    else if key = "down" and m.episodeCursor < m.playback.queue.Count() - 1 then
+        m.episodeCursor = m.episodeCursor + 1
+        renderEpisodes()
+    else if key = "OK" then
+        if m.episodeCursor = m.index then
+            closePanel(true)
+        else
+            goToEpisode(m.episodeCursor)
+        end if
+    end if
+    return true
+end function
+
+' Draws a window of options around the cursor. The active one gets an amber dot.
+sub renderOptions(group as Object, options as Object, activeIndex as Integer, cursor as Integer, focused as Boolean, width as Integer, visibleCount as Integer)
+    group.RemoveChildrenIndex(group.GetChildCount(), 0)
+    if options.Count() = 0 then
+        empty = group.CreateChild("Label")
+        empty.font = MakeFont("Outfit-Regular", 20)
+        empty.color = "0x7C7C8CFF"
+        empty.text = "Default"
+        return
+    end if
+    first = cursor - (visibleCount \ 2)
+    if first > options.Count() - visibleCount then first = options.Count() - visibleCount
+    if first < 0 then first = 0
+    last = first + visibleCount - 1
+    if last > options.Count() - 1 then last = options.Count() - 1
+    y = 0
+    for i = first to last
+        row = group.CreateChild("Group")
+        row.translation = [0, y]
+        bg = row.CreateChild("Poster")
+        bg.uri = "pkg:/images/pill.9.png"
+        bg.width = width
+        bg.height = 44
+        dot = row.CreateChild("Rectangle")
+        dot.translation = [20, 18]
+        dot.width = 8
+        dot.height = 8
+        dot.visible = (i = activeIndex)
+        label = row.CreateChild("Label")
+        label.translation = [44, 0]
+        label.width = width - 60
+        label.height = 44
+        label.vertAlign = "center"
+        label.font = MakeFont("Outfit-SemiBold", 20)
+        label.text = options[i].label
+        if focused and i = cursor then
+            bg.blendColor = "0xF5F5F7FF"
+            bg.opacity = 1.0
+            label.color = "0x0B0B0FFF"
+            dot.color = "0x0B0B0FFF"
+        else
+            bg.opacity = 0.0
+            dot.color = "0xF5B83DFF"
+            label.color = "0x9A9AAAFF"
+            if i = activeIndex then label.color = "0xF5F5F7FF"
+        end if
+        y = y + 50
+    end for
+end sub
