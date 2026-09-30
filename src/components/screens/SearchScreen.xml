@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Keyboard on the left, results on the right (a Movies row and a Series row) that
+  update as you type. The keyboard is created in code so newer Rokus get the
+  DynamicMiniKeyboard (with voice entry) and older ones fall back to MiniKeyboard.
+-->
+<component name="SearchScreen" extends="Group">
+  <interface>
+    <field id="action" type="assocarray" alwaysNotify="true" />
+    <field id="takeFocus" type="boolean" alwaysNotify="true" onChange="onTakeFocus" />
+  </interface>
+  <children>
+    <Rectangle width="1280" height="720" color="0x0B0B0FFF" />
+    <Poster width="1280" height="140" uri="pkg:/images/fade_top.png" />
+    <Poster translation="[48, 30]" uri="pkg:/images/wordmark.png" width="147" height="34" />
+    <Label id="heading" translation="[232, 26]" width="600" height="42" vertAlign="center" color="0xF5F5F7FF" text="Search" />
+
+    <Group id="keyboardHolder" translation="[36, 96]" />
+    <Label id="status" translation="[48, 668]" width="400" wrap="true" maxLines="2" color="0x7C7C8CFF" />
+
+    <RowList id="results"
+      translation="[480, 96]"
+      itemComponentName="PosterItem"
+      numRows="2"
+      itemSize="[752, 250]"
+      rowItemSize="[[120, 180]]"
+      rowItemSpacing="[[16, 0]]"
+      itemSpacing="[0, 12]"
+      showRowLabel="[true]"
+      rowLabelColor="0xE6E6EEFF"
+      rowFocusAnimationStyle="floatingFocus"
+      vertFocusAnimationStyle="floatingFocus"
+      drawFocusFeedback="false" />
+    <Label id="message" translation="[480, 150]" width="752" wrap="true" maxLines="3" color="0xB4B4C2FF" />
+    <Label id="focusTitle" translation="[480, 626]" width="752" wrap="true" maxLines="2" color="0xF5F5F7FF" />
+
+    <Timer id="debounce" duration="0.35" repeat="false" />
+  </children>
+  <script type="text/brightscript" uri="pkg:/components/common/Utils.brs" />
+  <script type="text/brightscript" uri="pkg:/components/screens/SearchScreen.brs" />
+</component>

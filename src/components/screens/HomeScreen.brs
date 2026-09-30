@@ -15,7 +15,7 @@ sub init()
     m.rows.rowLabelFont = MakeFont("Outfit-SemiBold", 20)
     m.status.font = MakeFont("Outfit-Regular", 20)
 
-    m.tabNames = ["Home", "Movies", "Series"]
+    m.tabNames = ["Home", "Movies", "Series", "Search"]
     m.tab = 0
     m.tabCursor = 0
     m.navFocused = true
@@ -362,6 +362,13 @@ sub focusNav()
 end sub
 
 sub activateTab()
+    ' Search is its own screen; the tab bar stays on the current tab behind it.
+    if m.tabNames[m.tabCursor] = "Search" then
+        m.tabCursor = m.tab
+        styleTabs()
+        m.top.action = { name: "openSearch" }
+        return
+    end if
     if m.failed then
         loadCategories()
         return

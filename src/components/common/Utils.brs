@@ -131,6 +131,40 @@ function MetaLine(item as Object) as String
     return parts.Join("   ·   ")
 end function
 
+' --- Search ------------------------------------------------------------------
+
+' Lowercases and simplifies text for matching: accents folded, apostrophes dropped,
+' other punctuation turned into single spaces. Regexes are built once and reused.
+function NormalizeSearch(text as String) as String
+    if m.searchRegexes = invalid then
+        m.searchRegexes = {
+            nonAscii: CreateObject("roRegex", "[^\x00-\x7F]", "")
+            folds: [
+                [CreateObject("roRegex", "[áàâäãåÁÀÂÄÃÅ]", ""), "a"]
+                [CreateObject("roRegex", "[éèêëÉÈÊË]", ""), "e"]
+                [CreateObject("roRegex", "[íìîïÍÌÎÏ]", ""), "i"]
+                [CreateObject("roRegex", "[óòôöõøÓÒÔÖÕØ]", ""), "o"]
+                [CreateObject("roRegex", "[úùûüÚÙÛÜ]", ""), "u"]
+                [CreateObject("roRegex", "[ñÑ]", ""), "n"]
+                [CreateObject("roRegex", "[çÇ]", ""), "c"]
+                [CreateObject("roRegex", "[‘’]", ""), "'"]
+            ]
+            apostrophes: CreateObject("roRegex", "['`]", "")
+            punctuation: CreateObject("roRegex", "[\s\-_.:,;!?""()\[\]{}|/\\&+*#@~<>=]+", "")
+        }
+    end if
+    r = m.searchRegexes
+    t = LCase(text)
+    if r.nonAscii.IsMatch(t) then
+        for each fold in r.folds
+            t = fold[0].ReplaceAll(t, fold[1])
+        end for
+    end if
+    t = r.apostrophes.ReplaceAll(t, "")
+    t = r.punctuation.ReplaceAll(t, " ")
+    return t.Trim()
+end function
+
 ' --- Xtream URLs -------------------------------------------------------------
 
 ' Accepts "example.com:8080", "http://example.com:8080/" or a pasted M3U link,

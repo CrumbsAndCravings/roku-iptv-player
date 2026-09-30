@@ -11,6 +11,7 @@
     <field id="result" type="assocarray" />
   </interface>
   <script type="text/brightscript" uri="pkg:/components/common/Utils.brs" />
+  <script type="text/brightscript" uri="pkg:/components/tasks/Http.brs" />
   <script type="text/brightscript" uri="pkg:/components/tasks/XtreamParse.brs" />
   <script type="text/brightscript" uri="pkg:/components/tasks/XtreamTask.brs" />
 </component>

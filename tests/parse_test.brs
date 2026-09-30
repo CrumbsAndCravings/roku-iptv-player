@@ -111,6 +111,48 @@ sub Main()
     check("array second season", arrayInfo.content.GetChild(1).title, "Season 2")
     checkInt("no episodes", ParseSeriesInfo(ParseJson("{""episodes"":[]}")).content.GetChildCount(), 0)
 
+    ' --- Search
+    check("normalize case and punctuation", NormalizeSearch("Spider-Man: No Way Home"), "spider man no way home")
+    check("normalize apostrophes", NormalizeSearch("Schindler's List"), "schindlers list")
+    check("normalize curly apostrophe", NormalizeSearch("Ocean’s Eleven"), "oceans eleven")
+    check("normalize accents", NormalizeSearch("Amélie"), "amelie")
+    check("normalize prefixes", NormalizeSearch("EN | The Batman (2022)"), "en the batman 2022")
+    check("normalize keeps other scripts", NormalizeSearch("दंगल"), "दंगल")
+    index = NewSearchIndex()
+    json = "["
+    json = json + "{""name"":""EN - The Batman (2022)"",""stream_id"":1,""stream_icon"":""https://image.tmdb.org/t/p/w600_and_h900_bestv2/b.jpg"",""container_extension"":""mkv""},"
+    json = json + "{""name"":""Batman Begins"",""stream_id"":2,""stream_icon"":"""",""container_extension"":""mp4""},"
+    json = json + "{""name"":""Lego Batman Movie"",""stream_id"":3,""container_extension"":""avi""},"
+    json = json + "{""name"":""Superbatmania"",""stream_id"":4},"
+    json = json + "{""name"":""Adult Batman"",""stream_id"":5,""is_adult"":""1""},"
+    json = json + "{""name"":""Batman Begins"",""stream_id"":2}]"
+    IndexAdd(index, ParseJson(json), "vod")
+    IndexAdd(index, ParseJson("[{""name"":""Batman: The Animated Series"",""series_id"":77,""cover"":""http://x/c.jpg""}]"), "series")
+    IndexAdd(index, ParseJson("{}"), "vod")
+    checkInt("index skips adult and duplicates", index.names.Count(), 5)
+    found = IndexSearch(index, "batman", 40)
+    checkInt("search rows", found.GetChildCount(), 2)
+    movies = found.GetChild(0)
+    check("search movies row", movies.title, "Movies")
+    checkInt("search movie count", movies.GetChildCount(), 4)
+    check("search starts-with first", movies.GetChild(0).title, "Batman Begins")
+    check("search word start next", movies.GetChild(1).title, "Lego Batman Movie")
+    check("search longer word start", movies.GetChild(2).title, "EN - The Batman (2022)")
+    check("search substring last", movies.GetChild(3).title, "Superbatmania")
+    check("search item id", movies.GetChild(0).itemId, "2")
+    check("search blank poster", movies.GetChild(0).HDPosterUrl, "")
+    check("search poster sized", movies.GetChild(2).HDPosterUrl, "https://image.tmdb.org/t/p/w185/b.jpg")
+    check("search avi flagged", movies.GetChild(1).problem, "AVI files")
+    check("search series row", found.GetChild(1).title, "Series")
+    check("search series kind", found.GetChild(1).GetChild(0).kind, "series")
+    check("search series id", found.GetChild(1).GetChild(0).seriesId, "77")
+    checkInt("search all words", IndexSearch(index, "batman begins", 40).GetChild(0).GetChildCount(), 1)
+    checkInt("search any order", IndexSearch(index, "begins batman", 40).GetChild(0).GetChildCount(), 1)
+    checkInt("search punctuation-insensitive", IndexSearch(index, "the-batman", 40).GetChild(0).GetChildCount(), 1)
+    checkInt("search no match", IndexSearch(index, "superman", 40).GetChildCount(), 0)
+    checkInt("search empty query", IndexSearch(index, "  ", 40).GetChildCount(), 0)
+    checkInt("search limit", IndexSearch(index, "bat", 2).GetChild(0).GetChildCount(), 2)
+
     ' --- Continue Watching storage
     RegDelete("progress", "items")
     ProgressPut({ k: "m:1", kind: "movie", id: "1", name: "One", poster: "", bd: "", ext: "mp4", pos: 600, dur: 6000 })

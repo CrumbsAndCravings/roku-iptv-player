@@ -4,6 +4,7 @@ sub init()
     m.stack = m.top.FindNode("stack")
     m.screens = []
     m.global.AddFields({ creds: {} })
+    m.global.AddField("search", "node", false)
     ' v0.1 kept Continue Watching here; its only entries came from a failed play.
     RegDelete("watch", "items")
 
@@ -54,9 +55,13 @@ sub onAction(event as Object)
         m.global.creds = action.creds
         resetTo("HomeScreen")
     else if name = "signOut" then
+        stopSearch()
         ClearAccount()
         m.global.creds = {}
         resetTo("LoginScreen")
+    else if name = "openSearch" then
+        screen = pushScreen("SearchScreen")
+        screen.takeFocus = true
     else if name = "openDetails" then
         screen = pushScreen("DetailsScreen")
         screen.item = action.item
@@ -68,6 +73,16 @@ sub onAction(event as Object)
     else if name = "close" then
         popScreen()
     end if
+end sub
+
+' The search worker holds an index of the signed-in library; drop it on sign-out.
+sub stopSearch()
+    task = m.global.search
+    if task <> invalid then
+        task.stop = true
+        task.control = "stop"
+    end if
+    m.global.search = invalid
 end sub
 
 function onKeyEvent(key as String, press as Boolean) as Boolean

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Long-running search worker. Builds a title index of the whole library in the
+  background (a few categories at a time) and answers each `query` with `results`,
+  a ContentNode of up to two rows (Movies, Series) tagged with the query in `forQuery`.
+  Started once per session and kept in m.global.search.
+-->
+<component name="SearchTask" extends="Task">
+  <interface>
+    <field id="query" type="string" alwaysNotify="true" />
+    <field id="stop" type="boolean" />
+    <field id="results" type="node" />
+    <field id="status" type="assocarray" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/components/common/Utils.brs" />
+  <script type="text/brightscript" uri="pkg:/components/tasks/Http.brs" />
+  <script type="text/brightscript" uri="pkg:/components/tasks/XtreamParse.brs" />
+  <script type="text/brightscript" uri="pkg:/components/tasks/SearchIndex.brs" />
+  <script type="text/brightscript" uri="pkg:/components/tasks/SearchTask.brs" />
+</component>
