@@ -238,7 +238,29 @@ end function
 
 ' How ARAN+ introduces itself when a provider turns away requests that say "Roku".
 function AppUserAgent() as String
-    return "ARANplus/0.4.11"
+    return "ARANplus/0.4.12"
+end function
+
+' A plain desktop web browser, for providers whose servers only answer browsers (a
+' phone's browser gets in while the Roku gets "404 Not Found").
+function BrowserUserAgent() as String
+    return "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+end function
+
+' The ways ARAN+ can introduce itself, starting with `current`: "" is Roku's own.
+function UserAgentsToTry(current as String) as Object
+    agents = [current]
+    for each agent in ["", AppUserAgent(), BrowserUserAgent()]
+        if agent <> current then agents.Push(agent)
+    end for
+    return agents
+end function
+
+' "as a Roku", "as ARAN+" or "as a web browser", for messages.
+function UserAgentName(agent as String) as String
+    if agent = "" then return "as a Roku"
+    if agent = BrowserUserAgent() then return "as a web browser"
+    return "as ARAN+"
 end function
 
 ' True when Cloudflare itself turned the request away, with one of its own pages.

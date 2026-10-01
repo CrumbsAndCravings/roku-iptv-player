@@ -29,21 +29,24 @@ function api(creds as Object, action as String, params as Dynamic) as Object
 end function
 
 function runAuth(creds as Object) as Object
-    res = api(creds, "", invalid)
-    ' Some providers' Cloudflare rules turn away anything that says it's a Roku. Try once
-    ' as ARAN+ itself, and keep using that for this server if it gets through.
-    triedApp = false
-    if cloudflareRefused(res) and FieldStr(creds, "userAgent") = "" then
-        triedApp = true
-        creds.userAgent = AppUserAgent()
+    ' Some providers turn away apps they don't recognise: Cloudflare rules that refuse
+    ' anything saying "Roku", or servers that answer "404 Not Found" to anything but a
+    ' web browser. When the answer looks like that, ask again as ARAN+, then as a web
+    ' browser, and keep whichever gets through for this server.
+    agents = UserAgentsToTry(FieldStr(creds, "userAgent"))
+    tried = 0
+    for each agent in agents
+        creds.userAgent = agent
         res = api(creds, "", invalid)
-        if cloudflareRefused(res) then creds.userAgent = ""
-    end if
+        tried = tried + 1
+        if not clientTurnedAway(res) then exit for
+    end for
+    if clientTurnedAway(res) then creds.userAgent = agents[0]
     if not res.ok then
         ' The address shows typos (a missing port, http vs https) at a glance.
         text = res.error + Chr(10) + "Address: " + creds.server
         code = ToInt(res.code)
-        if triedApp and cloudflareRefused(res) then text = text + Chr(10) + "Asking again as ARAN+ instead of as a Roku got the same answer."
+        if tried > 1 and clientTurnedAway(res) then text = text + Chr(10) + "Asking again as ARAN+ and as a web browser got the same answer."
         if flagged(res, "cfBlock") then
             text = text + Chr(10) + "Only the provider can allow it, or give you another address."
         else if IsRefusalCode(code) then
@@ -57,10 +60,12 @@ function runAuth(creds as Object) as Object
     return ParseAuth(res.data)
 end function
 
-function cloudflareRefused(res as Object) as Boolean
-    if res.ok or not flagged(res, "cloudflare") then return false
+' Answers that can mean "not this app" rather than "wrong login".
+function clientTurnedAway(res as Object) as Boolean
+    if res.ok then return false
     code = ToInt(res.code)
-    return code = 401 or code = 403 or code = 503
+    if code = 403 or code = 404 or code = 503 then return true
+    return code = 401 and flagged(res, "cloudflare")
 end function
 
 function flagged(res as Object, key as String) as Boolean

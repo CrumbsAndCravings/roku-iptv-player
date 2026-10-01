@@ -400,11 +400,8 @@ sub startProbe()
     m.video.control = "stop"
     m.spinner.visible = true
     m.spinner.control = "start"
-    current = FieldStr(m.global.creds, "userAgent")
-    other = AppUserAgent()
-    if current <> "" then other = ""
     m.probeTask = CreateObject("roSGNode", "XtreamTask")
-    m.probeTask.request = { mode: "probe", url: currentStreamUrl(), agents: [current, other] }
+    m.probeTask.request = { mode: "probe", url: currentStreamUrl(), agents: UserAgentsToTry(FieldStr(m.global.creds, "userAgent")) }
     m.probeTask.ObserveField("result", "onProbeResult")
     m.probeTask.control = "RUN"
 end sub
@@ -419,19 +416,25 @@ sub onProbeResult(event as Object)
         return
     end if
     current = results[0]
-    other = results[1]
-    m.probeLines = [probeLine(current), probeLine(other)]
-    if other.ok and not current.ok then
-        ' The server sends it under the other name, so use that from now on.
+    m.probeLines = []
+    better = invalid
+    allRefused = true
+    for each res in results
+        m.probeLines.Push(probeLine(res))
+        if res.ok and better = invalid and res.agent <> current.agent then better = res
+        if res.ok or ToInt(res.code) < 400 then allRefused = false
+    end for
+    if better <> invalid and not current.ok then
+        ' The server sends it under another name, so use that from now on.
         creds = m.global.creds
-        creds.userAgent = other.agent
+        creds.userAgent = better.agent
         m.global.creds = creds
         SaveCreds(creds)
         m.agentSwitched = true
         loadStream()
         return
     end if
-    m.probeRefused = not current.ok and not other.ok and ToInt(current.code) >= 400 and ToInt(other.code) >= 400
+    m.probeRefused = allRefused
     if current.ok and m.attempt = 0 then
         retryWithoutHint()
         return
@@ -440,8 +443,7 @@ sub onProbeResult(event as Object)
 end sub
 
 function probeLine(res as Object) as String
-    who = "Checked as a Roku: "
-    if FieldStr(res, "agent") <> "" then who = "Checked as ARAN+: "
+    who = "Checked " + UserAgentName(FieldStr(res, "agent")) + ": "
     if res.ok then return who + "the server would send it."
     return who + FieldStr(res, "detail") + "."
 end function
@@ -482,10 +484,10 @@ function diagnosis() as String
     lines = []
     lines.Push("Roku says: " + m.errors.Peek())
     if m.formatRetried then lines.Push("Tried twice: with the format hint from the file name, then without it.")
-    if m.agentSwitched then lines.Push("The server accepted ARAN+ under a different name, so it tried again that way.")
+    if m.agentSwitched then lines.Push("The server accepted another way of asking, so it tried again " + UserAgentName(FieldStr(m.global.creds, "userAgent")) + ".")
     lines.Append(m.probeLines)
     if m.probeRefused then
-        lines.Push("The server turned this video down either way. The trial may not include it, may allow one device at a time, or may have ended.")
+        lines.Push("The server turned this video down every way. The trial may not include it, may allow one device at a time, or may have ended.")
         lines.Push(fileLine(item))
         lines.Push(streamLine(item))
         return lines.Join(Chr(10))
