@@ -7,6 +7,7 @@ sub init()
     m.track = m.top.FindNode("track")
     m.fill = m.top.FindNode("fill")
     m.caption = m.top.FindNode("caption")
+    m.captionBand = m.top.FindNode("captionBand")
     m.pulse = m.top.FindNode("pulse")
     ' Titles come from the provider and may not be in a Latin script.
     m.fallback.font = "font:SmallestBoldSystemFont"
@@ -22,6 +23,7 @@ sub onContentChange()
         m.poster.uri = ""
         m.fallback.text = ""
         m.caption.text = ""
+        m.captionBand.visible = false
         m.track.visible = false
         m.fill.visible = false
         m.pulse.control = "start"
@@ -36,6 +38,7 @@ sub onContentChange()
     m.base.blendColor = "0x241C42FF"
     m.fallback.font = "font:SmallestBoldSystemFont"
     m.fallback.color = "0x9083BDFF"
+    m.fallback.height = 160
     m.poster.uri = item.HDPosterUrl
     m.fallback.text = item.title
     m.caption.text = item.caption
@@ -49,7 +52,8 @@ sub onContentChange()
     showProgress = item.progress > 0
     m.track.visible = showProgress
     m.fill.visible = showProgress
-    if showProgress then m.fill.width = 100 * item.progress
+    if showProgress then m.fill.width = 120 * item.progress
+    m.captionBand.visible = m.caption.text <> ""
 end sub
 
 ' A category ("Punjabi", "Movies · 312") or the "See all" tile at the end of a row.
@@ -59,10 +63,12 @@ sub showNameCard(item as Object)
     m.track.visible = false
     m.fill.visible = false
     m.fallback.font = MakeFont("Fredoka-Medium", 19)
+    m.fallback.height = 136
     m.fallback.color = "0xF7F3FFFF"
     m.fallback.text = item.title
     m.caption.text = item.caption
     m.caption.color = "0xC3B8E6FF"
+    m.captionBand.visible = false
     if item.kind = "seeAll" then
         m.base.blendColor = "0x30275AFF"
         m.fallback.text = "See all ›"
@@ -78,7 +84,8 @@ sub onFocusChange()
     else if m.top.rowListHasFocus then
         amount = m.top.focusPercent * m.top.rowFocusPercent
     end if
-    scale = 1 + 0.1 * amount
+    ' A small lift, so a focused poster doesn't run into its close neighbours.
+    scale = 1 + 0.06 * amount
     m.card.scale = [scale, scale]
     m.ring.opacity = amount
 end sub

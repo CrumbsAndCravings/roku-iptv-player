@@ -2,8 +2,8 @@
 ' strings (not associative arrays) to keep memory low on catalogs of tens of thousands.
 '
 ' names[i]    " " + NormalizeSearch(title), the leading space marks a word start
-' records[i]  kind letter, id, ext, poster URL, title, category id, date added (seconds)
-'             joined by Chr(30); "-" for blanks
+' records[i]  kind letter, id, ext, poster URL, title, category id, date added (seconds),
+'             year, joined by Chr(30); "-" for blanks
 '
 ' categories holds the provider's categories ({ key, kind, id, name, label, norm, count }),
 ' so search can offer them and a category's page can list all its titles from here,
@@ -57,11 +57,14 @@ sub IndexAdd(index as Object, data as Dynamic, kind as String, allowed = invalid
             key = letter + id
             if id <> "" and not index.seen.DoesExist(key) then
                 index.seen[key] = true
-                title = SplitTitle(FieldStr(raw, "name")).title
+                named = SplitTitle(FieldStr(raw, "name"))
+                title = named.title
+                year = YearOf(FirstText([Field(raw, "year"), Field(raw, "releaseDate"), Field(raw, "release_date")]))
+                if year = "" then year = named.year
                 category = FieldStr(raw, "category_id")
                 if category = "" then category = fallbackCategory
                 index.names.Push(" " + NormalizeSearch(title))
-                index.records.Push(letter + sep + id + sep + orDash(FieldStr(raw, "container_extension")) + sep + orDash(FieldStr(raw, iconField)) + sep + orDash(title) + sep + orDash(category) + sep + ToInt(raw[addedField]).ToStr())
+                index.records.Push(letter + sep + id + sep + orDash(FieldStr(raw, "container_extension")) + sep + orDash(FieldStr(raw, iconField)) + sep + orDash(title) + sep + orDash(category) + sep + ToInt(raw[addedField]).ToStr() + sep + orDash(year))
                 position = index.catIndex[letter + ":" + category]
                 if position <> invalid then index.categories[position].count = index.categories[position].count + 1
             end if
@@ -251,6 +254,7 @@ sub addSearchItem(row as Object, parts as Object, kind as String)
         problem: containerProblem(ext)
     }
     if kind = "series" then values.seriesId = parts[1]
+    if parts.Count() >= 8 then values.year = fromDash(parts[7])
     MakeItem(row, values)
 end sub
 
@@ -263,7 +267,7 @@ end sub
 ' category (key, kind, id, title count, name; tab-separated), one per line.
 
 function searchFileFormat() as String
-    return "aranplus-search-3"
+    return "aranplus-search-4"
 end function
 
 function SaveSearchIndex(index as Object, path as String, owner as String, savedAt as Integer) as Boolean
@@ -289,7 +293,8 @@ function LoadSearchIndex(path as String, owner as String) as Dynamic
     if text = "" then return invalid
     lines = text.Split(Chr(10))
     header = lines[0].Split(Chr(9))
-    if header.Count() < 5 or header[0] <> searchFileFormat() or header[1] <> owner then return invalid
+    ' Format 3 is the same without years; its titles show none until the next refresh.
+    if header.Count() < 5 or (header[0] <> searchFileFormat() and header[0] <> "aranplus-search-3") or header[1] <> owner then return invalid
     count = header[3].ToInt()
     catCount = header[4].ToInt()
     if count <= 0 or lines.Count() <> 1 + count * 2 + catCount then return invalid

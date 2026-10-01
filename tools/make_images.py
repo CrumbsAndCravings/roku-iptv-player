@@ -220,10 +220,12 @@ def main():
     fade(440, 540, "left").save(OUT / "fade_left.png")
     fade(960, 260, "bottom").save(OUT / "fade_bottom.png")
     fade(1280, 140, "top", 230).save(OUT / "fade_top.png")
-    nine_patch(rounded(14), 14).save(OUT / "pill.9.png")
-    nine_patch(rounded(10), 10).save(OUT / "card.9.png")
-    nine_patch(corner_mask(10), 10).save(OUT / "corners.9.png")
-    nine_patch(rounded(15, outline_width=3), 15).save(OUT / "ring.9.png")
+    # Small, sharp corners in the Netflix manner: buttons, cards, poster corners and the
+    # focus ring all share a 3-4 px radius.
+    nine_patch(rounded(4), 4).save(OUT / "pill.9.png")
+    nine_patch(rounded(4), 4).save(OUT / "card.9.png")
+    nine_patch(corner_mask(3), 3).save(OUT / "corners.9.png")
+    nine_patch(rounded(5, outline_width=3), 5).save(OUT / "ring.9.png")
     glow_png(256).save(OUT / "glow.png")
     player_icons()
     for p in sorted(OUT.iterdir()):

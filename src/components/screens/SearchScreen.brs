@@ -72,7 +72,7 @@ sub layoutResults()
     if x > 620 then x = 620
     width = 1232 - x
     m.results.translation = [x, 96]
-    m.results.itemSize = [width, 250]
+    m.results.itemSize = [width, 232]
     m.message.translation = [x, 150]
     m.message.width = width
     m.focusTitle.translation = [x, 626]

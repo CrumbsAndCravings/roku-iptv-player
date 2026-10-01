@@ -4,10 +4,12 @@ sub init()
     m.grid = m.top.FindNode("grid")
     m.message = m.top.FindNode("message")
     m.focusTitle = m.top.FindNode("focusTitle")
+    m.focusMeta = m.top.FindNode("focusMeta")
     m.heading.font = MakeFont("Fredoka-SemiBold", 32)
     m.count.font = MakeFont("Nunito-SemiBold", 16)
     m.message.font = MakeFont("Nunito-SemiBold", 22)
-    m.focusTitle.font = MakeFont("Nunito-ExtraBold", 20)
+    m.focusTitle.font = MakeFont("Fredoka-Medium", 22)
+    m.focusMeta.font = MakeFont("Nunito-SemiBold", 16)
 
     m.key = ""
     m.loading = false
@@ -44,6 +46,7 @@ sub onBrowsed()
     if shown = 0 then
         m.grid.content = invalid
         m.focusTitle.text = ""
+        m.focusMeta.text = ""
         if m.loading then
             m.message.text = "Your library is still loading. This category's titles will appear here as they arrive."
         else
@@ -73,9 +76,13 @@ sub onFocused()
     if content = invalid then return
     item = content.GetChild(m.grid.itemFocused)
     if item = invalid then return
-    text = item.title
-    if item.problem <> "" then text = text + "   ·   Won't play on this " + DeviceWord()
-    m.focusTitle.text = text
+    m.focusTitle.text = item.title
+    meta = item.year
+    if item.problem <> "" then
+        if meta <> "" then meta = meta + "   ·   "
+        meta = meta + "Won't play on this " + DeviceWord()
+    end if
+    m.focusMeta.text = meta
 end sub
 
 sub onSelected()

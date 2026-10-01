@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  A 120x180 poster tile for RowList and MarkupGrid: rounded corners, grows with a
-  lavender ring when focused, and pulses softly while its row is still loading.
-  Category and "See all" items show their name on a tinted card instead of a poster.
+  A 120x180 poster tile for RowList and MarkupGrid: sharp corners, grows a little with a
+  lavender ring when focused, and pulses softly while its row is still loading. Badges
+  ("Won't play", "S1:E4") and the progress bar sit on the poster, so rows can sit
+  close together. Category and "See all" items show their name on a tinted card.
 -->
 <component name="PosterItem" extends="Group">
   <interface>
@@ -16,16 +17,17 @@
   </interface>
   <children>
     <Group id="card" scaleRotateCenter="[60, 90]">
-      <Poster id="ring" translation="[-5, -5]" width="130" height="190" uri="pkg:/images/ring.9.png" blendColor="0xC9B8FFFF" opacity="0" />
+      <Poster id="ring" translation="[-4, -4]" width="128" height="188" uri="pkg:/images/ring.9.png" blendColor="0xC9B8FFFF" opacity="0" />
       <Poster id="base" width="120" height="180" uri="pkg:/images/card.9.png" blendColor="0x241C42FF" />
       <Label id="fallback" translation="[10, 10]" width="100" height="160" wrap="true" maxLines="5"
         horizAlign="center" vertAlign="center" color="0x9083BDFF" />
       <Poster id="poster" width="120" height="180" loadWidth="120" loadHeight="180" loadDisplayMode="scaleToZoom" />
       <Poster id="corners" width="120" height="180" uri="pkg:/images/corners.9.png" blendColor="0x151028FF" />
-      <Rectangle id="track" translation="[10, 168]" width="100" height="4" color="0x151028CC" visible="false" />
-      <Rectangle id="fill" translation="[10, 168]" width="0" height="4" color="0xFF9ECFFF" visible="false" />
+      <Rectangle id="captionBand" translation="[0, 150]" width="120" height="26" color="0x0D0920D9" visible="false" />
+      <Label id="caption" translation="[0, 150]" width="120" height="26" horizAlign="center" vertAlign="center" color="0xC3B8E6FF" />
+      <Rectangle id="track" translation="[0, 176]" width="120" height="4" color="0x151028CC" visible="false" />
+      <Rectangle id="fill" translation="[0, 176]" width="0" height="4" color="0xFF9ECFFF" visible="false" />
     </Group>
-    <Label id="caption" translation="[0, 190]" width="120" horizAlign="center" color="0xC3B8E6FF" />
 
     <Animation id="pulse" duration="1.4" repeat="true" easeFunction="inOutQuad">
       <FloatFieldInterpolator key="[0.0, 0.5, 1.0]" keyValue="[0.45, 1.0, 0.45]" fieldToInterp="base.opacity" />

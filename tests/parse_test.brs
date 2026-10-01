@@ -189,6 +189,7 @@ sub Main()
     plain = NewSearchIndex()
     IndexAdd(plain, ParseJson("[{""name"":""EN ★ Alterity - 2026"",""stream_id"":1}]"), "vod")
     check("search title untagged", IndexSearch(plain, "alterity", 40).GetChild(0).GetChild(0).title, "Alterity")
+    check("search year from title", IndexSearch(plain, "alterity", 40).GetChild(0).GetChild(0).year, "2026")
 
     ' Categories: counted, offered in search and browsed newest first, all from the index.
     lib = NewSearchIndex()
@@ -216,6 +217,9 @@ sub Main()
     checkInt("lib categories loaded", again.categories.Count(), 3)
     check("lib browse after load", IndexBrowse(again, "vod", "7", 10).GetChild(0).title, "Jatt & Juliet")
     checkInt("lib counts loaded", IndexSearch(again, "punjabi", 40).GetChild(0).GetChildCount(), 2)
+    older = "aranplus-search-3" + Chr(9) + "owner" + Chr(9) + "5" + Chr(9) + "1" + Chr(9) + "0" + Chr(10) + " heat" + Chr(10) + "m" + Chr(30) + "1" + Chr(30) + "mkv" + Chr(30) + "-" + Chr(30) + "Heat" + Chr(30) + "7" + Chr(30) + "100"
+    WriteAsciiFile("tmp:/lib-old.txt", older)
+    check("lib previous format loads", IndexSearch(LoadSearchIndex("tmp:/lib-old.txt", "owner"), "heat", 40).GetChild(0).GetChild(0).title, "Heat")
 
     ' A big library: thousands of movie matches must not crowd out the series, and the
     ' best match counts even when it was indexed last.
