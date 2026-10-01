@@ -19,7 +19,11 @@
     <Label id="heading" translation="[232, 26]" width="600" height="42" vertAlign="center" color="0xF7F3FFFF" text="Search" />
 
     <Group id="keyboardHolder" translation="[36, 96]" />
-    <Label id="status" translation="[48, 668]" width="400" wrap="true" maxLines="2" color="0x8579B0FF" />
+    <!-- Symbols the keyboard lacks; placed under it in code. -->
+    <Group id="symbols" />
+    <Group id="symbolFocus" />
+    <!-- Library loading progress, beside the heading so the symbols have room below the keyboard. -->
+    <Label id="status" translation="[372, 26]" width="860" height="42" vertAlign="center" maxLines="1" color="0x8579B0FF" />
 
     <RowList id="results"
       translation="[480, 96]"

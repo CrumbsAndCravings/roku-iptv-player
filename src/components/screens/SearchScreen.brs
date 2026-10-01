@@ -20,6 +20,7 @@ sub init()
     if m.keyboard = invalid then m.keyboard = holder.CreateChild("MiniKeyboard")
     styleKeyboard()
     layoutResults()
+    buildSymbols()
     m.keyboard.ObserveField("text", "onText")
 
     ' One search worker per session, so the library is only indexed once.
@@ -90,6 +91,117 @@ sub onTakeFocus()
         focusKeyboard()
     end if
 end sub
+
+' --- Symbols -------------------------------------------------------------------------
+'
+' Roku's mini keyboard has only letters and numbers, so a few rows of symbols sit under
+' it. Down from the keyboard's bottom row reaches them; OK types one.
+
+sub buildSymbols()
+    m.symbolRows = [["&", "'", "-", ":", ".", ",", "!"], ["?", "(", ")", "+", "#", "@", "/"]]
+    m.symbolRow = 0
+    m.symbolCol = 0
+    m.symbolKeys = []
+    group = m.top.FindNode("symbols")
+    rect = m.keyboard.BoundingRect()
+    width = Int(rect.width)
+    if width < 300 then width = 404
+    top = 96 + Int(rect.y + rect.height) + 14
+    if rect.height <= 0 then top = 540
+    group.translation = [36, top]
+    columns = m.symbolRows[0].Count()
+    gap = 8
+    keyWidth = Int((width - gap * (columns - 1)) / columns)
+    keyHeight = 42
+    font = MakeFont("Nunito-ExtraBold", 22)
+    for r = 0 to m.symbolRows.Count() - 1
+        row = []
+        for c = 0 to m.symbolRows[r].Count() - 1
+            key = group.CreateChild("Group")
+            key.translation = [c * (keyWidth + gap), r * (keyHeight + gap)]
+            key.scaleRotateCenter = [keyWidth / 2, keyHeight / 2]
+            bg = key.CreateChild("Poster")
+            bg.uri = "pkg:/images/pill.9.png"
+            bg.width = keyWidth
+            bg.height = keyHeight
+            label = key.CreateChild("Label")
+            label.width = keyWidth
+            label.height = keyHeight
+            label.horizAlign = "center"
+            label.vertAlign = "center"
+            label.font = font
+            label.text = m.symbolRows[r][c]
+            row.Push(key)
+        end for
+        m.symbolKeys.Push(row)
+    end for
+    styleSymbols()
+end sub
+
+sub styleSymbols()
+    for r = 0 to m.symbolKeys.Count() - 1
+        for c = 0 to m.symbolKeys[r].Count() - 1
+            key = m.symbolKeys[r][c]
+            bg = key.GetChild(0)
+            label = key.GetChild(1)
+            focused = m.zone = "symbols" and r = m.symbolRow and c = m.symbolCol
+            if focused then
+                bg.blendColor = "0xC9B8FFFF"
+                label.color = "0x151028FF"
+                key.scale = [1.08, 1.08]
+            else
+                bg.blendColor = "0x30275AFF"
+                label.color = "0xD8CEF5FF"
+                key.scale = [1.0, 1.0]
+            end if
+        end for
+    end for
+end sub
+
+sub focusSymbols()
+    m.zone = "symbols"
+    m.top.FindNode("symbolFocus").SetFocus(true)
+    styleSymbols()
+end sub
+
+sub typeSymbol()
+    text = m.keyboard.text + m.symbolRows[m.symbolRow][m.symbolCol]
+    m.keyboard.text = text
+    editBox = m.keyboard.textEditBox
+    if editBox <> invalid and editBox.HasField("cursorPosition") then editBox.cursorPosition = Len(text)
+end sub
+
+function onSymbolKey(key as String) as Boolean
+    columns = m.symbolRows[m.symbolRow].Count()
+    if key = "left" and m.symbolCol > 0 then
+        m.symbolCol = m.symbolCol - 1
+    else if key = "right" or key = "fastforward" then
+        if m.symbolCol < columns - 1 and key = "right" then
+            m.symbolCol = m.symbolCol + 1
+        else
+            focusResults()
+            styleSymbols()
+            return true
+        end if
+    else if key = "up" then
+        if m.symbolRow = 0 then
+            focusKeyboard()
+            styleSymbols()
+            return true
+        end if
+        m.symbolRow = m.symbolRow - 1
+    else if key = "down" and m.symbolRow < m.symbolRows.Count() - 1 then
+        m.symbolRow = m.symbolRow + 1
+    else if key = "OK" then
+        typeSymbol()
+    else if key = "back" then
+        focusKeyboard()
+        styleSymbols()
+        return true
+    end if
+    styleSymbols()
+    return true
+end function
 
 ' --- Typing & results ------------------------------------------------------------
 
@@ -207,6 +319,7 @@ end sub
 
 sub focusKeyboard()
     m.zone = "keyboard"
+    styleSymbols()
     m.keyboard.SetFocus(true)
     if m.pending <> invalid then applyResults(m.pending)
 end sub
@@ -214,16 +327,22 @@ end sub
 sub focusResults()
     if not hasResults() then return
     m.zone = "results"
+    styleSymbols()
     m.results.SetFocus(true)
     onResultFocused()
 end sub
 
 function onKeyEvent(key as String, press as Boolean) as Boolean
     if not press then return false
+    if m.zone = "symbols" then return onSymbolKey(key)
     if m.zone = "keyboard" then
-        ' Right past the keyboard's last column (or fast-forward) moves to the results.
+        ' Right past the keyboard's last column (or fast-forward) moves to the results;
+        ' Down past its bottom row reaches the symbols.
         if key = "right" or key = "fastforward" then
             focusResults()
+            return true
+        else if key = "down" then
+            focusSymbols()
             return true
         end if
         return false

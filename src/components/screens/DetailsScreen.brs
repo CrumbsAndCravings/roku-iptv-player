@@ -415,8 +415,18 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
     if not press then return false
 
     if m.zone = "episodes" then
-        ' Keys the episode list didn't use.
-        if key = "up" then
+        ' Keys the episode list didn't use. Left and Right switch seasons without going
+        ' back up to the season bar.
+        if key = "left" or key = "right" then
+            delta = 1
+            if key = "left" then delta = -1
+            target = m.seasonIndex + delta
+            if target >= 0 and target < m.seasonPills.Count() then
+                showSeason(target)
+                m.episodes.jumpToItem = 0
+            end if
+            return true
+        else if key = "up" then
             enterZone("seasons")
             return true
         else if key = "back" then
