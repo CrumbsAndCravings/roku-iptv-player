@@ -222,6 +222,9 @@ function BriefText(body as String, limit as Integer) as String
     text = CreateObject("roRegex", "<[^>]*>", "s").ReplaceAll(text, " ")
     text = CreateObject("roRegex", "&nbsp;", "i").ReplaceAll(text, " ")
     text = CreateObject("roRegex", "\s+", "").ReplaceAll(text, " ").Trim()
+    ' Error pages often repeat their title as a heading: "404 Not Found 404 Not Found".
+    repeated = CreateObject("roRegex", "^(.{4,60}?) \1(?: |$)", "").Match(text)
+    if repeated.Count() > 1 then text = (repeated[1] + " " + Mid(text, Len(repeated[0]) + 1)).Trim()
     if Len(text) > limit then text = Left(text, limit - 1).Trim() + "…"
     return text
 end function
@@ -235,7 +238,7 @@ end function
 
 ' How ARAN+ introduces itself when a provider turns away requests that say "Roku".
 function AppUserAgent() as String
-    return "ARANplus/0.4.10"
+    return "ARANplus/0.4.11"
 end function
 
 ' True when Cloudflare itself turned the request away, with one of its own pages.

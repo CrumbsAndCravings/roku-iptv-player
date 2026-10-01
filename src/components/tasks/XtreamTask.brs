@@ -49,7 +49,7 @@ function runAuth(creds as Object) as Object
         else if IsRefusalCode(code) then
             text = text + Chr(10) + "Often a typo in the login, an old address the provider has retired, a trial that has ended, or a block on your internet connection after too many attempts."
         else if code = 404 then
-            text = text + Chr(10) + "Nothing here answers as an Xtream server. The address may be missing a port like :8080; pasting the whole M3U link into Server fills it in."
+            text = text + Chr(10) + "Nothing at this address answers as an Xtream server. Ask the provider for the Xtream or API address (often with a port like :8080), or paste their whole M3U link into Server."
         end if
         res.error = text
         return res

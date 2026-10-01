@@ -5,6 +5,11 @@ sub init()
     m.top.FindNode("tipsHeading").font = MakeFont("Fredoka-Medium", 22)
     m.top.FindNode("tips").font = MakeFont("Nunito-SemiBold", 18)
     m.status = m.top.FindNode("status")
+    m.tipsCard = m.top.FindNode("tipsCard")
+    m.errorCard = m.top.FindNode("errorCard")
+    m.errorText = m.top.FindNode("errorText")
+    m.top.FindNode("errorHeading").font = MakeFont("Fredoka-Medium", 22)
+    m.errorText.font = MakeFont("Nunito-SemiBold", 17)
 
     m.labels = ["SERVER", "USERNAME", "PASSWORD"]
     m.hints = ["e.g. http://line.example.com:8080", "", ""]
@@ -123,7 +128,7 @@ sub onKeyboardButton()
             m.values[m.editing] = text.Trim()
         end if
         m.index = nextEmptyField()
-        m.status.text = ""
+        showStatus("")
     end if
     dialog.close = true
     render()
@@ -143,13 +148,13 @@ end function
 sub submit()
     creds = { server: NormalizeServer(m.values[0]), username: m.values[1].Trim(), password: m.values[2].Trim() }
     if creds.server = "" or creds.username = "" or creds.password = "" then
-        m.status.text = "Fill in the server, username and password first."
+        showStatus("Fill in the server, username and password first.")
         m.index = nextEmptyField()
         render()
         return
     end if
     m.busy = true
-    m.status.text = "Checking your login…"
+    showStatus("Checking your login…")
     m.task = CreateObject("roSGNode", "XtreamTask")
     m.task.request = { mode: "auth", creds: creds }
     m.task.ObserveField("result", "onAuthResult")
@@ -163,13 +168,28 @@ sub onAuthResult(event as Object)
     if result.ok then
         creds = result.request.creds
         SaveCreds(creds)
-        m.status.text = ""
+        showStatus("")
         m.top.action = { name: "signedIn", creds: creds }
     else
-        m.status.text = result.error
+        showError(result.error)
     end if
 end sub
 
 sub onAutoSignIn()
     if m.top.autoSignIn and not m.busy then submit()
+end sub
+
+' Short notes go under the button; a failed sign-in replaces the tips card, which has
+' room for the server's answer and the address used.
+sub showStatus(text as String)
+    m.status.text = text
+    m.errorCard.visible = false
+    m.tipsCard.visible = true
+end sub
+
+sub showError(text as String)
+    m.status.text = ""
+    m.errorText.text = text
+    m.errorCard.visible = true
+    m.tipsCard.visible = false
 end sub

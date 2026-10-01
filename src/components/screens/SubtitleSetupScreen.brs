@@ -5,6 +5,11 @@ sub init()
     m.top.FindNode("tips").font = MakeFont("Nunito-SemiBold", 18)
     m.status = m.top.FindNode("status")
     m.status.font = MakeFont("Nunito-ExtraBold", 19)
+    m.tipsCard = m.top.FindNode("tipsCard")
+    m.errorCard = m.top.FindNode("errorCard")
+    m.errorText = m.top.FindNode("errorText")
+    m.top.FindNode("errorHeading").font = MakeFont("Fredoka-Medium", 22)
+    m.errorText.font = MakeFont("Nunito-SemiBold", 17)
 
     m.labels = ["API KEY", "USERNAME (OPTIONAL)", "PASSWORD (OPTIONAL)"]
     m.hints = ["From your OpenSubtitles profile", "Your username, not your email", ""]
@@ -85,7 +90,17 @@ sub render()
     StylePills(m.buttons, buttonFocus, -1)
 end sub
 
+' Good news and short notes go under the buttons; a failure replaces the tips card,
+' which has room for OpenSubtitles' own words.
 sub showStatus(text as String, good as Boolean)
+    showCard = not good and Len(text) > 60
+    m.errorCard.visible = showCard
+    m.tipsCard.visible = not showCard
+    if showCard then
+        m.errorText.text = text
+        m.status.text = ""
+        return
+    end if
     m.status.text = text
     if good then
         m.status.color = "0xC9B8FFFF"
@@ -143,7 +158,7 @@ sub onKeyboardButton()
     if dialog = invalid then return
     if dialog.buttonSelected = 0 then
         m.values[m.editing] = dialog.text.Trim()
-        m.status.text = ""
+        showStatus("", true)
         if m.editing < 2 then m.index = m.editing + 1
     end if
     dialog.close = true
