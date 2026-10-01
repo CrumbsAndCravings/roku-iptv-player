@@ -62,7 +62,8 @@ end function
 '
 ' Every match in the whole library is ranked (there is no cap on how many are looked
 ' at), and movies and series are ranked separately, so a short query that matches
-' thousands of movies can't push the series out.
+' thousands of movies can't push the series out. One or two letters only match the
+' start of a word: "th" finds "The Office" but not "Other", which keeps typing quick.
 function IndexSearch(index as Object, query as String, limit as Integer) as Object
     root = CreateObject("roSGNode", "ContentNode")
     q = NormalizeSearch(query)
@@ -72,6 +73,7 @@ function IndexSearch(index as Object, query as String, limit as Integer) as Obje
         if word <> "" then words.Push(word)
     end for
     phrase = " " + q
+    shortQuery = Len(q) < 3
 
     ' One number per match (rank, then title length, then position in the index), which
     ' sorts the right way and takes far less memory than an object per match.
@@ -82,13 +84,17 @@ function IndexSearch(index as Object, query as String, limit as Integer) as Obje
     records = index.records
     for i = 0 to names.Count() - 1
         name = names[i]
-        matched = true
-        for each word in words
-            if Instr(1, name, word) = 0 then
-                matched = false
-                exit for
-            end if
-        end for
+        if shortQuery then
+            matched = Instr(1, name, phrase) > 0
+        else
+            matched = true
+            for each word in words
+                if Instr(1, name, word) = 0 then
+                    matched = false
+                    exit for
+                end if
+            end for
+        end if
         if matched then
             rank = 2
             if Left(name, Len(phrase)) = phrase then
@@ -147,3 +153,45 @@ sub addSearchItem(row as Object, parts as Object, kind as String)
     if kind = "series" then values.seriesId = parts[1]
     MakeItem(row, values)
 end sub
+
+' --- Keeping the index between launches ---------------------------------------------
+'
+' Loading a whole library from the provider takes minutes, so a finished index is
+' saved and reused for a day. The file is a header line (format, owner, time saved,
+' count), then every name, then every record, one per line.
+
+function searchFileFormat() as String
+    return "aranplus-search-1"
+end function
+
+function SaveSearchIndex(index as Object, path as String, owner as String, savedAt as Integer) as Boolean
+    count = index.names.Count()
+    if count = 0 then return false
+    lines = [searchFileFormat() + Chr(9) + owner + Chr(9) + savedAt.ToStr() + Chr(9) + count.ToStr()]
+    lines.Append(index.names)
+    breaks = CreateObject("roRegex", "[\r\n]", "")
+    for each record in index.records
+        if Instr(1, record, Chr(10)) > 0 or Instr(1, record, Chr(13)) > 0 then record = breaks.ReplaceAll(record, " ")
+        lines.Push(record)
+    end for
+    return WriteAsciiFile(path, lines.Join(Chr(10)))
+end function
+
+' The saved index for `owner` when it is at most maxAge seconds old, else invalid.
+function LoadSearchIndex(path as String, owner as String, now as Integer, maxAge as Integer) as Dynamic
+    text = ReadAsciiFile(path)
+    if text = "" then return invalid
+    lines = text.Split(Chr(10))
+    header = lines[0].Split(Chr(9))
+    if header.Count() < 4 or header[0] <> searchFileFormat() or header[1] <> owner then return invalid
+    age = now - header[2].ToInt()
+    if age < 0 or age > maxAge then return invalid
+    count = header[3].ToInt()
+    if count <= 0 or lines.Count() <> 1 + count * 2 then return invalid
+    index = NewSearchIndex()
+    for i = 1 to count
+        index.names.Push(lines[i])
+        index.records.Push(lines[count + i])
+    end for
+    return index
+end function

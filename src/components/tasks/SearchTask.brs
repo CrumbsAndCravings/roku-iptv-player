@@ -7,10 +7,30 @@ sub work()
     m.top.ObserveField("query", port)
     m.top.ObserveField("stop", port)
     creds = m.global.creds
+    owner = FieldStr(creds, "server") + " " + FieldStr(creds, "username")
+    lastQuery = m.top.query
+
+    ' A library saved in the last day is ready at once.
+    index = LoadSearchIndex(SearchCachePath(), owner, NowSeconds(), 86400)
+    if index <> invalid then
+        report(1, 1, index)
+        if lastQuery <> "" then publish(index, lastQuery)
+        while true
+            msg = Wait(0, port)
+            if type(msg) = "roSGNodeEvent" then
+                if msg.GetField() = "stop" then return
+                ' Typing queues several queries; only the latest matters.
+                if m.top.query <> lastQuery then
+                    lastQuery = m.top.query
+                    publish(index, lastQuery)
+                end if
+            end if
+        end while
+    end if
     index = NewSearchIndex()
 
     ' Xtream has no search call, so we index every list. Series come in one request for
-    ' the whole library (about 5 MB in 3 seconds for 7,000 series on this provider),
+    ' the whole library (about 5 MB in 3 seconds for 7,000 series on one provider),
     ' which saves dozens of requests. Movies are too many for that, so they come one
     ' category at a time; so do series if the big request fails.
     lists = {}
@@ -34,26 +54,27 @@ sub work()
     jobs.Append(lists.vod)
     total = jobs.Count()
     done = 0
-    lastQuery = m.top.query
     report(done, total, index, total = 0)
     if lastQuery <> "" then publish(index, lastQuery)
 
-    ' Gentle on the provider: one list at a time, a pause between lists, and none while a
-    ' video plays. Bursts of requests made this provider stop answering for a while (the
-    ' Samsung app saw it too), and while it sulks, videos don't start either. Each list
-    ' is parsed and dropped before the next, so memory stays low on big catalogs.
+    ' Gentle on the provider: two lists at a time, started a moment apart, none while a
+    ' video plays, and a stop after three failures in a row. Bursts of requests made
+    ' one provider stop answering for a while, and while it sulks videos don't start
+    ' either. Each list is parsed and dropped before the next, so memory stays low.
     inflight = {}
     failures = 0
+    failedLists = 0
     stopped = false
-    sinceLast = CreateObject("roTimespan")
+    saved = false
+    sinceStart = CreateObject("roTimespan")
     pauseMs = 0
     while true
-        if inflight.Count() = 0 and jobs.Count() > 0 and sinceLast.TotalMilliseconds() >= pauseMs then
-            sinceLast.Mark()
+        if inflight.Count() < 2 and jobs.Count() > 0 and sinceStart.TotalMilliseconds() >= pauseMs then
+            sinceStart.Mark()
             if m.global.playing = true then
                 pauseMs = 2000
             else
-                pauseMs = 500
+                pauseMs = 250
                 job = jobs.Shift()
                 action = "get_vod_streams"
                 if job.kind = "series" then action = "get_series"
@@ -77,7 +98,7 @@ sub work()
             end if
         end if
 
-        msg = Wait(250, port)
+        msg = Wait(100, port)
         failed = false
         finishedOne = false
         wasAll = false
@@ -104,8 +125,11 @@ sub work()
             end if
         else if type(msg) = "roSGNodeEvent" then
             if msg.GetField() = "stop" then return
-            lastQuery = msg.GetData()
-            publish(index, lastQuery)
+            ' Typing queues several queries; only the latest matters.
+            if m.top.query <> lastQuery then
+                lastQuery = m.top.query
+                publish(index, lastQuery)
+            end if
         else
             ' Give up on downloads that have hung.
             for each key in inflight.Keys()
@@ -121,12 +145,13 @@ sub work()
 
         if finishedOne then
             done = done + 1
-            sinceLast.Mark()
             ' The whole-series request didn't work: take series category by category,
             ' alternating with the movies still to come.
             if wasAll and failed then
                 jobs = alternate(lists.series, jobs)
                 total = total + lists.series.Count()
+            else if failed then
+                failedLists = failedLists + 1
             end if
             ' A provider that keeps failing may be counting requests; stop asking.
             if failed then
@@ -141,6 +166,8 @@ sub work()
             end if
             report(done, total, index, stopped)
             finished = (jobs.Count() = 0 and inflight.Count() = 0)
+            ' Keep the library for next time (a few broken categories don't spoil it).
+            if finished and not stopped and failedLists <= 3 and not saved then saved = SaveSearchIndex(index, SearchCachePath(), owner, NowSeconds())
             ' Refresh an open search as more of the library arrives.
             if lastQuery <> "" and (done MOD 4 = 0 or finished or wasAll) then publish(index, lastQuery)
         end if

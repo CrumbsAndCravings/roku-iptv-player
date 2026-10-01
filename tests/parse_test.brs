@@ -162,6 +162,22 @@ sub Main()
     checkInt("index allowed search", IndexSearch(whole, "hidden", 40).GetChildCount(), 0)
     checkInt("index no filter", IndexSearch(whole, "show", 40).GetChild(0).GetChildCount(), 2)
 
+    ' One or two letters only match word starts.
+    short = NewSearchIndex()
+    IndexAdd(short, [{ name: "The Show", series_id: 1 }, { name: "Other Life", series_id: 2 }, { name: "Big Thing", series_id: 3 }], "series")
+    checkInt("short query word starts", IndexSearch(short, "th", 40).GetChild(0).GetChildCount(), 2)
+    check("short query prefix first", IndexSearch(short, "th", 40).GetChild(0).GetChild(0).title, "The Show")
+    checkInt("longer query anywhere", IndexSearch(short, "the", 40).GetChild(0).GetChildCount(), 2)
+
+    ' Saved between launches, for the same login and for a day.
+    path = "tmp:/search-test.txt"
+    check("index saved", SaveSearchIndex(short, path, "http://a.b jane", 1000).ToStr(), "true")
+    back = LoadSearchIndex(path, "http://a.b jane", 1500, 86400)
+    checkInt("index loaded", back.names.Count(), 3)
+    check("index loaded search", IndexSearch(back, "big", 40).GetChild(0).GetChild(0).title, "Big Thing")
+    check("index other login", ToStr(LoadSearchIndex(path, "http://a.b joe", 1500, 86400) = invalid), "true")
+    check("index too old", ToStr(LoadSearchIndex(path, "http://a.b jane", 1000 + 86401, 86400) = invalid), "true")
+
     ' A big library: thousands of movie matches must not crowd out the series, and the
     ' best match counts even when it was indexed last.
     big = NewSearchIndex()

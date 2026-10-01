@@ -36,6 +36,7 @@ sub ClearAccount()
     RegDelete("account", "creds")
     RegDelete("progress", "items")
     RegDelete("opensubtitles", "account")
+    DeleteFile(SearchCachePath())
 end sub
 
 ' Player preferences, e.g. { audio: "hin", subtitles: "eng" } (language codes, or "off").

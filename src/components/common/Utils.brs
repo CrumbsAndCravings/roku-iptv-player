@@ -246,7 +246,7 @@ end function
 
 ' How ARAN+ introduces itself when a provider turns away requests that say "Roku".
 function AppUserAgent() as String
-    return "ARANplus/0.4.13"
+    return "ARANplus/0.4.14"
 end function
 
 ' A plain desktop web browser, for providers whose servers only answer browsers (a
@@ -469,6 +469,12 @@ function MakeFont(name as String, size as Integer) as Object
     f.uri = "pkg:/fonts/" + name + ".ttf"
     f.size = size
     return f
+end function
+
+' Where the search index is kept between launches. cachefs: survives restarts of the
+' app, though Roku may clear it when it needs the space.
+function SearchCachePath() as String
+    return "cachefs:/aranplus-search.txt"
 end function
 
 function NowSeconds() as Integer
