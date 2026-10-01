@@ -11,10 +11,14 @@
     <field id="stop" type="boolean" />
     <field id="results" type="node" />
     <field id="status" type="assocarray" />
+    <!-- { kind: "vod" | "series", categoryId } -> `browsed`: that category's titles, newest first -->
+    <field id="browse" type="assocarray" alwaysNotify="true" />
+    <field id="browsed" type="node" />
   </interface>
   <script type="text/brightscript" uri="pkg:/components/common/Utils.brs" />
   <script type="text/brightscript" uri="pkg:/components/tasks/Http.brs" />
   <script type="text/brightscript" uri="pkg:/components/tasks/XtreamParse.brs" />
+  <script type="text/brightscript" uri="pkg:/components/common/Categories.brs" />
   <script type="text/brightscript" uri="pkg:/components/tasks/SearchIndex.brs" />
   <script type="text/brightscript" uri="pkg:/components/tasks/SearchTask.brs" />
 </component>

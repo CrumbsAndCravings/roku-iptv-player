@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  "See all" for one category: every title in it, newest first, as a grid of posters.
+  The titles come from the library stored on the Roku (the search index), so opening
+  a category never asks the provider.
+-->
+<component name="CategoryScreen" extends="Group">
+  <interface>
+    <field id="category" type="assocarray" onChange="onCategory" />
+    <field id="action" type="assocarray" alwaysNotify="true" />
+    <field id="takeFocus" type="boolean" alwaysNotify="true" onChange="onTakeFocus" />
+  </interface>
+  <children>
+    <Rectangle width="1280" height="720" color="0x151028FF" />
+    <Poster translation="[-300, -330]" width="820" height="820" uri="pkg:/images/glow.png" blendColor="0xB9A3FFFF" opacity="0.16" />
+    <Poster translation="[880, 470]" width="640" height="640" uri="pkg:/images/glow.png" blendColor="0xFF9ECFFF" opacity="0.10" />
+    <Poster translation="[164, 22]" uri="pkg:/images/sparkle.png" width="14" height="14" blendColor="0xFFD98AFF" />
+    <Poster translation="[48, 27]" uri="pkg:/images/logo.png" width="110" height="40" />
+    <Label id="heading" translation="[232, 22]" width="1000" height="42" vertAlign="center" color="0xF7F3FFFF" />
+    <Label id="count" translation="[232, 62]" width="1000" color="0x8579B0FF" />
+
+    <MarkupGrid id="grid"
+      translation="[76, 118]"
+      itemComponentName="PosterItem"
+      numColumns="8"
+      numRows="2"
+      itemSize="[120, 180]"
+      itemSpacing="[26, 46]"
+      drawFocusFeedback="false"
+      vertFocusAnimationStyle="floatingFocus" />
+    <Label id="message" translation="[96, 200]" width="1088" wrap="true" maxLines="3" color="0xC3B8E6FF" />
+    <Label id="focusTitle" translation="[76, 566]" width="1128" wrap="true" maxLines="2" color="0xF7F3FFFF" />
+  </children>
+  <script type="text/brightscript" uri="pkg:/components/common/Utils.brs" />
+  <script type="text/brightscript" uri="pkg:/components/screens/CategoryScreen.brs" />
+</component>

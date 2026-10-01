@@ -2,11 +2,33 @@
 ' strings (not associative arrays) to keep memory low on catalogs of tens of thousands.
 '
 ' names[i]    " " + NormalizeSearch(title), the leading space marks a word start
-' records[i]  kind letter, id, ext, poster URL, title joined by Chr(30); "-" for blanks
+' records[i]  kind letter, id, ext, poster URL, title, category id, date added (seconds)
+'             joined by Chr(30); "-" for blanks
+'
+' categories holds the provider's categories ({ key, kind, id, name, label, norm, count }),
+' so search can offer them and a category's page can list all its titles from here,
+' without asking the provider.
 
 function NewSearchIndex() as Object
-    return { names: [], records: [], seen: {}, savedAt: 0 }
+    return { names: [], records: [], seen: {}, savedAt: 0, categories: [], catIndex: {} }
 end function
+
+' Records the provider's categories for one kind ("vod" or "series"): a list of
+' { id, name } as ParseCategories returns. Labels come from ClassifyCategory.
+sub IndexSetCategories(index as Object, kind as String, list as Object, year as Integer)
+    letter = "m"
+    if kind = "series" then letter = "s"
+    for each category in list
+        addCategory(index, letter + ":" + FieldStr(category, "id"), kind, FieldStr(category, "id"), FieldStr(category, "name"), 0, year)
+    end for
+end sub
+
+sub addCategory(index as Object, key as String, kind as String, id as String, name as String, count as Integer, year as Integer)
+    if id = "" or index.catIndex.DoesExist(key) then return
+    label = ClassifyCategory(name, year).label
+    index.catIndex[key] = index.categories.Count()
+    index.categories.Push({ key: key, kind: kind, id: id, name: name, label: label, norm: " " + NormalizeSearch(label), count: count })
+end sub
 
 function searchSeparator() as String
     return Chr(30)
@@ -15,15 +37,18 @@ end function
 ' Adds a get_vod_streams or get_series response. kind is "vod" or "series". With
 ' `allowed` (category id -> true), titles in other categories are left out: the
 ' whole-library answer also holds the adult categories that ParseCategories hides.
-sub IndexAdd(index as Object, data as Dynamic, kind as String, allowed = invalid as Dynamic)
+' fallbackCategory is the category the list was asked for, for titles that don't say.
+sub IndexAdd(index as Object, data as Dynamic, kind as String, allowed = invalid as Dynamic, fallbackCategory = "" as String)
     if not IsArr(data) then return
     letter = "m"
     idField = "stream_id"
     iconField = "stream_icon"
+    addedField = "added"
     if kind = "series" then
         letter = "s"
         idField = "series_id"
         iconField = "cover"
+        addedField = "last_modified"
     end if
     sep = searchSeparator()
     for each raw in data
@@ -33,8 +58,12 @@ sub IndexAdd(index as Object, data as Dynamic, kind as String, allowed = invalid
             if id <> "" and not index.seen.DoesExist(key) then
                 index.seen[key] = true
                 title = FieldStr(raw, "name")
+                category = FieldStr(raw, "category_id")
+                if category = "" then category = fallbackCategory
                 index.names.Push(" " + NormalizeSearch(title))
-                index.records.Push(letter + sep + id + sep + orDash(FieldStr(raw, "container_extension")) + sep + orDash(FieldStr(raw, iconField)) + sep + orDash(title))
+                index.records.Push(letter + sep + id + sep + orDash(FieldStr(raw, "container_extension")) + sep + orDash(FieldStr(raw, iconField)) + sep + orDash(title) + sep + orDash(category) + sep + ToInt(raw[addedField]).ToStr())
+                position = index.catIndex[letter + ":" + category]
+                if position <> invalid then index.categories[position].count = index.categories[position].count + 1
             end if
         end if
     end for
@@ -113,11 +142,82 @@ function IndexSearch(index as Object, query as String, limit as Integer) as Obje
         end if
     end for
 
+    categories = categoryRow(index, words, phrase, shortQuery)
+    if categories.GetChildCount() > 0 then root.AppendChild(categories)
     movies = searchRow(index, movieKeys, "Movies", "movie", limit)
     series = searchRow(index, seriesKeys, "Series", "series", limit)
     if movies.GetChildCount() > 0 then root.AppendChild(movies)
     if series.GetChildCount() > 0 then root.AppendChild(series)
     return root
+end function
+
+' Categories whose tidy name matches, like "Punjabi" for "punj": names starting with
+' the query first, then the biggest. Each opens a page of all its titles.
+function categoryRow(index as Object, words as Object, phrase as String, shortQuery as Boolean) as Object
+    row = CreateObject("roSGNode", "ContentNode")
+    row.title = "Categories"
+    matches = []
+    for each category in index.categories
+        norm = category.norm
+        matched = category.count > 0
+        if matched and shortQuery then
+            matched = Instr(1, norm, phrase) > 0
+        else if matched then
+            for each word in words
+                if Instr(1, norm, word) = 0 then
+                    matched = false
+                    exit for
+                end if
+            end for
+        end if
+        if matched then
+            rank = 1
+            if Left(norm, Len(phrase)) = phrase then rank = 0
+            ' Bigger categories first within a rank; counts stay below a million.
+            matches.Push({ order: rank * 1000000 + (999999 - category.count), category: category })
+        end if
+    end for
+    matches.SortBy("order")
+    for each match in matches
+        if row.GetChildCount() >= 20 then exit for
+        category = match.category
+        kindName = "Movies"
+        if category.kind = "series" then kindName = "Series"
+        MakeItem(row, { kind: "category", title: category.label, caption: kindName + " · " + category.count.ToStr(), categoryId: category.id, listKind: category.kind })
+    end for
+    return row
+end function
+
+' All titles of one category, newest first, as a ContentNode of items (up to `limit`).
+' Its `total` field holds how many the category has.
+function IndexBrowse(index as Object, kind as String, categoryId as String, limit as Integer) as Object
+    letter = "m"
+    itemKind = "movie"
+    if kind = "series" then
+        letter = "s"
+        itemKind = "series"
+    end if
+    sep = searchSeparator()
+    marker = sep + categoryId + sep
+    found = []
+    records = index.records
+    for i = 0 to records.Count() - 1
+        record = records[i]
+        ' A quick look for the id before splitting keeps big libraries fast.
+        if Left(record, 1) = letter and Instr(1, record, marker) > 0 then
+            parts = record.Split(sep)
+            ' Newest first: a negated date sorts the latest to the top.
+            if parts.Count() >= 7 and parts[5] = categoryId then found.Push({ order: 0# - parts[6].ToInt(), parts: parts })
+        end if
+    end for
+    found.SortBy("order")
+    list = CreateObject("roSGNode", "ContentNode")
+    list.AddFields({ total: found.Count() })
+    for each match in found
+        if list.GetChildCount() >= limit then exit for
+        addSearchItem(list, match.parts, itemKind)
+    end for
+    return list
 end function
 
 ' Positions in the index stay below this, so they fit in the low digits of a match key.
@@ -159,21 +259,26 @@ end sub
 ' Loading a whole library from the provider takes minutes, so a finished index is
 ' saved and searched straight away on later launches (SearchTask refreshes it in the
 ' background once it's a day old). The file is a header line (format, owner, time
-' saved, count), then every name, then every record, one per line.
+' saved, title count, category count), then every name, then every record, then every
+' category (key, kind, id, title count, name; tab-separated), one per line.
 
 function searchFileFormat() as String
-    return "aranplus-search-1"
+    return "aranplus-search-2"
 end function
 
 function SaveSearchIndex(index as Object, path as String, owner as String, savedAt as Integer) as Boolean
     count = index.names.Count()
     if count = 0 then return false
-    lines = [searchFileFormat() + Chr(9) + owner + Chr(9) + savedAt.ToStr() + Chr(9) + count.ToStr()]
+    gap = Chr(9)
+    lines = [searchFileFormat() + gap + owner + gap + savedAt.ToStr() + gap + count.ToStr() + gap + index.categories.Count().ToStr()]
     lines.Append(index.names)
-    breaks = CreateObject("roRegex", "[\r\n]", "")
+    breaks = CreateObject("roRegex", "[\r\n\t]", "")
     for each record in index.records
         if Instr(1, record, Chr(10)) > 0 or Instr(1, record, Chr(13)) > 0 then record = breaks.ReplaceAll(record, " ")
         lines.Push(record)
+    end for
+    for each category in index.categories
+        lines.Push(category.key + gap + category.kind + gap + category.id + gap + category.count.ToStr() + gap + breaks.ReplaceAll(category.name, " "))
     end for
     return WriteAsciiFile(path, lines.Join(Chr(10)))
 end function
@@ -184,14 +289,20 @@ function LoadSearchIndex(path as String, owner as String) as Dynamic
     if text = "" then return invalid
     lines = text.Split(Chr(10))
     header = lines[0].Split(Chr(9))
-    if header.Count() < 4 or header[0] <> searchFileFormat() or header[1] <> owner then return invalid
+    if header.Count() < 5 or header[0] <> searchFileFormat() or header[1] <> owner then return invalid
     count = header[3].ToInt()
-    if count <= 0 or lines.Count() <> 1 + count * 2 then return invalid
+    catCount = header[4].ToInt()
+    if count <= 0 or lines.Count() <> 1 + count * 2 + catCount then return invalid
     index = NewSearchIndex()
     index.savedAt = header[2].ToInt()
     for i = 1 to count
         index.names.Push(lines[i])
         index.records.Push(lines[count + i])
+    end for
+    year = CreateObject("roDateTime").GetYear()
+    for i = 1 to catCount
+        fields = lines[count * 2 + i].Split(Chr(9))
+        if fields.Count() >= 5 then addCategory(index, fields[0], fields[1], fields[2], fields[4], fields[3].ToInt(), year)
     end for
     return index
 end function

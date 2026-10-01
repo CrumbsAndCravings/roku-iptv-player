@@ -17,6 +17,7 @@ sub onContentChange()
     item = m.top.itemContent
     if item = invalid then return
     if item.placeholder then
+        m.base.blendColor = "0x241C42FF"
         m.poster.opacity = 1.0
         m.poster.uri = ""
         m.fallback.text = ""
@@ -28,6 +29,13 @@ sub onContentChange()
     end if
     m.pulse.control = "stop"
     m.base.opacity = 1.0
+    if item.kind = "category" or item.kind = "seeAll" then
+        showNameCard(item)
+        return
+    end if
+    m.base.blendColor = "0x241C42FF"
+    m.fallback.font = "font:SmallestBoldSystemFont"
+    m.fallback.color = "0x9083BDFF"
     m.poster.uri = item.HDPosterUrl
     m.fallback.text = item.title
     m.caption.text = item.caption
@@ -44,9 +52,32 @@ sub onContentChange()
     if showProgress then m.fill.width = 100 * item.progress
 end sub
 
+' A category ("Punjabi", "Movies · 312") or the "See all" tile at the end of a row.
+sub showNameCard(item as Object)
+    m.poster.uri = ""
+    m.poster.opacity = 1.0
+    m.track.visible = false
+    m.fill.visible = false
+    m.fallback.font = MakeFont("Fredoka-Medium", 19)
+    m.fallback.color = "0xF7F3FFFF"
+    m.fallback.text = item.title
+    m.caption.text = item.caption
+    m.caption.color = "0xC3B8E6FF"
+    if item.kind = "seeAll" then
+        m.base.blendColor = "0x30275AFF"
+        m.fallback.text = "See all ›"
+    else
+        m.base.blendColor = "0x43377AFF"
+    end if
+end sub
+
 sub onFocusChange()
     amount = 0.0
-    if m.top.rowListHasFocus then amount = m.top.focusPercent * m.top.rowFocusPercent
+    if m.top.gridHasFocus then
+        amount = m.top.focusPercent
+    else if m.top.rowListHasFocus then
+        amount = m.top.focusPercent * m.top.rowFocusPercent
+    end if
     scale = 1 + 0.1 * amount
     m.card.scale = [scale, scale]
     m.ring.opacity = amount

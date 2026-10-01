@@ -6,6 +6,7 @@ sub work()
     port = CreateObject("roMessagePort")
     m.top.ObserveField("query", port)
     m.top.ObserveField("stop", port)
+    m.top.ObserveField("browse", port)
     creds = m.global.creds
     owner = FieldStr(creds, "server") + " " + FieldStr(creds, "username")
     lastQuery = m.top.query
@@ -44,13 +45,16 @@ sub work()
     ' which saves dozens of requests. Movies are too many for that, so they come one
     ' category at a time; so do series if the big request fails.
     lists = {}
+    year = CreateObject("roDateTime").GetYear()
     for each kind in ["vod", "series"]
         action = "get_vod_categories"
         if kind = "series" then action = "get_series_categories"
         lists[kind] = []
         res = fetchJson(ApiUrl(creds, action, invalid), FieldStr(creds, "userAgent"))
         if res.ok then
-            for each category in ParseCategories(res.data)
+            categories = ParseCategories(res.data)
+            IndexSetCategories(building, kind, categories, year)
+            for each category in categories
                 lists[kind].Push({ kind: kind, id: category.id, all: false })
             end for
         end if
@@ -99,7 +103,7 @@ sub work()
                 http.EnableEncodings(true)
                 if http.AsyncGetToString() then
                     identity = http.GetIdentity()
-                    inflight[identity.ToStr()] = { http: http, kind: job.kind, all: job.all, clock: CreateObject("roTimespan") }
+                    inflight[identity.ToStr()] = { http: http, kind: job.kind, id: job.id, all: job.all, clock: CreateObject("roTimespan") }
                 else
                     done = done + 1
                 end if
@@ -124,7 +128,7 @@ sub work()
                     if entry.all then
                         IndexAdd(building, data, entry.kind, seriesAllowed)
                     else
-                        IndexAdd(building, data, entry.kind)
+                        IndexAdd(building, data, entry.kind, invalid, entry.id)
                     end if
                 else if msg.GetResponseCode() <> 200 or entry.all then
                     failed = true
@@ -133,8 +137,10 @@ sub work()
             end if
         else if type(msg) = "roSGNodeEvent" then
             if msg.GetField() = "stop" then return
-            ' Typing queues several queries; only the latest matters.
-            if m.top.query <> lastQuery then
+            if msg.GetField() = "browse" then
+                answerBrowse(live, not refreshing and not complete)
+            else if m.top.query <> lastQuery then
+                ' Typing queues several queries; only the latest matters.
                 lastQuery = m.top.query
                 publish(live, lastQuery)
             end if
@@ -200,8 +206,10 @@ sub answerQueries(port as Object, index as Object, lastQuery as String)
         msg = Wait(0, port)
         if type(msg) = "roSGNodeEvent" then
             if msg.GetField() = "stop" then return
-            ' Typing queues several queries; only the latest matters.
-            if m.top.query <> lastQuery then
+            if msg.GetField() = "browse" then
+                answerBrowse(index, false)
+            else if m.top.query <> lastQuery then
+                ' Typing queues several queries; only the latest matters.
                 lastQuery = m.top.query
                 publish(index, lastQuery)
             end if
@@ -230,3 +238,12 @@ function alternate(a as Object, b as Object) as Object
     end for
     return merged
 end function
+
+' A category's titles for its "See all" page, from the stored library only. `loading`
+' says the library is still arriving, so the page can ask again later.
+sub answerBrowse(index as Object, loading as Boolean)
+    request = m.top.browse
+    list = IndexBrowse(index, FieldStr(request, "kind"), FieldStr(request, "categoryId"), 1000)
+    list.AddFields({ forKey: FieldStr(request, "kind") + ":" + FieldStr(request, "categoryId"), loading: loading })
+    m.top.browsed = list
+end sub

@@ -23,13 +23,8 @@ sub init()
     buildSymbols()
     m.keyboard.ObserveField("text", "onText")
 
-    ' One search worker per session, so the library is only indexed once.
-    task = m.global.search
-    if task = invalid then
-        task = CreateObject("roSGNode", "SearchTask")
-        m.global.search = task
-        task.control = "RUN"
-    end if
+    ' One library worker per session, so the library is only indexed once.
+    task = LibraryTask()
     m.task = task
     task.ObserveFieldScoped("results", "onResults")
     task.ObserveFieldScoped("status", "onStatus")
@@ -301,6 +296,12 @@ end function
 sub onSelected()
     item = selectedItem(m.results.rowItemSelected)
     if item = invalid then return
+    if item.kind = "category" then
+        kindName = "Movies"
+        if item.listKind = "series" then kindName = "Series"
+        m.top.action = { name: "openCategory", category: { kind: item.listKind, categoryId: item.categoryId, title: item.title + "  ·  " + kindName } }
+        return
+    end if
     m.top.action = { name: "openDetails", item: item }
 end sub
 
@@ -311,6 +312,7 @@ sub onResultFocused()
         return
     end if
     text = item.title
+    if item.kind = "category" then text = item.title + "   ·   " + item.caption + " titles   ·   OK to see all"
     if item.problem <> "" then text = text + "   ·   Won't play on this " + DeviceWord()
     m.focusTitle.text = text
 end sub

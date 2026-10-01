@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  A 120x180 poster tile for RowList: rounded corners, grows with a lavender ring when
-  focused, and pulses softly while its row is still loading.
+  A 120x180 poster tile for RowList and MarkupGrid: rounded corners, grows with a
+  lavender ring when focused, and pulses softly while its row is still loading.
+  Category and "See all" items show their name on a tinted card instead of a poster.
 -->
 <component name="PosterItem" extends="Group">
   <interface>
@@ -9,6 +10,7 @@
     <field id="focusPercent" type="float" onChange="onFocusChange" />
     <field id="rowFocusPercent" type="float" onChange="onFocusChange" />
     <field id="rowListHasFocus" type="boolean" onChange="onFocusChange" />
+    <field id="gridHasFocus" type="boolean" onChange="onFocusChange" />
     <field id="width" type="float" />
     <field id="height" type="float" />
   </interface>

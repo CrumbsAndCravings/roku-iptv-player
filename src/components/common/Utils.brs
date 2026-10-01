@@ -246,7 +246,7 @@ end function
 
 ' How ARAN+ introduces itself when a provider turns away requests that say "Roku".
 function AppUserAgent() as String
-    return "ARANplus/0.4.19"
+    return "ARANplus/0.4.20"
 end function
 
 ' A plain desktop web browser, for providers whose servers only answer browsers (a
@@ -369,6 +369,8 @@ function ItemDefaults() as Object
         placeholder: false
         progress: 0.0
         caption: ""
+        categoryId: ""
+        listKind: ""
     }
 end function
 
@@ -487,6 +489,31 @@ end function
 ' app, though Roku may clear it when it needs the space.
 function SearchCachePath() as String
     return "cachefs:/aranplus-search.txt"
+end function
+
+' 1234567 -> "1,234,567"
+function Commas(value as Integer) as String
+    digits = Abs(value).ToStr()
+    out = ""
+    while Len(digits) > 3
+        out = "," + Right(digits, 3) + out
+        digits = Left(digits, Len(digits) - 3)
+    end while
+    out = digits + out
+    if value < 0 then out = "-" + out
+    return out
+end function
+
+' The session's library worker (search and category pages), started on first use and
+' kept in m.global.search until sign-out.
+function LibraryTask() as Object
+    task = m.global.search
+    if task = invalid then
+        task = CreateObject("roSGNode", "SearchTask")
+        m.global.search = task
+        task.control = "RUN"
+    end if
+    return task
 end function
 
 function NowSeconds() as Integer

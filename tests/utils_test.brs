@@ -130,6 +130,10 @@ sub Main()
         end if
     end for
 
+    check("commas small", Commas(12), "12")
+    check("commas thousands", Commas(1234), "1,234")
+    check("commas millions", Commas(1234567), "1,234,567")
+
     ' Provider categories
     c = ClassifyCategory("EN | ACTION ★", 2026)
     check("cat en tag", c.lang, "en")

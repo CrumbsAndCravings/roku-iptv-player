@@ -231,7 +231,12 @@ sub onRowLoaded(event as Object)
     placeholder = m.pendingRows[key]
     m.pendingRows.Delete(key)
     loaded = result.content
-    if result.ok and loaded <> invalid and loaded.GetChildCount() > 0 then m.rowCache[FieldStr(result.request, "kind") + ":" + FieldStr(result.request, "categoryId")] = loaded
+    if result.ok and loaded <> invalid and loaded.GetChildCount() > 0 then
+        ' A "See all" tile ends the row; its page lists the whole category from the
+        ' library stored on the Roku.
+        MakeItem(loaded, { kind: "seeAll", title: "See all", categoryId: FieldStr(result.request, "categoryId"), listKind: FieldStr(result.request, "kind") })
+        m.rowCache[FieldStr(result.request, "kind") + ":" + FieldStr(result.request, "categoryId")] = loaded
+    end if
     if result.request.generation <> m.generation or placeholder = invalid then return
 
     root = m.rows.content
@@ -295,7 +300,7 @@ end sub
 sub refreshHero()
     item = focusedItem()
     if item = invalid then return
-    if item.placeholder then return
+    if item.placeholder or item.kind = "seeAll" then return
     m.focusedItem = item
     showHero(item)
     if not item.hasInfo and item.kind = "movie" then
@@ -377,6 +382,13 @@ sub onRowItemSelected()
     if item = invalid then return
     if item.placeholder then return
     if m.navFocused then return
+    if item.kind = "seeAll" then
+        title = row.title
+        if m.tab = 1 then title = title + "  ·  Movies"
+        if m.tab = 2 then title = title + "  ·  Series"
+        m.top.action = { name: "openCategory", category: { kind: item.listKind, categoryId: item.categoryId, title: title } }
+        return
+    end if
     m.top.action = { name: "openDetails", item: item }
 end sub
 
