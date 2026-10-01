@@ -26,7 +26,7 @@ sub init()
     m.rows.rowLabelFont = MakeFont("Fredoka-Medium", 21)
     m.status.font = MakeFont("Nunito-SemiBold", 20)
 
-    m.tabNames = ["Home", "Movies", "Series", "Search"]
+    m.tabNames = ["Home", "Movies", "Series", "Categories", "Search"]
     m.tab = 0
     m.tabCursor = 0
     m.navFocused = true
@@ -445,11 +445,27 @@ sub focusNav()
 end sub
 
 sub activateTab()
-    ' Search is its own screen; the tab bar stays on the current tab behind it.
+    ' Search and Categories are their own screens; the tab bar stays on the current tab
+    ' behind them.
     if m.tabNames[m.tabCursor] = "Search" then
         m.tabCursor = m.tab
         styleTabs()
         m.top.action = { name: "openSearch" }
+        return
+    end if
+    if m.tabNames[m.tabCursor] = "Categories" then
+        if m.failed then
+            loadCategories()
+            return
+        end if
+        ' Still loading the category lists: nothing to show yet.
+        if m.categories.vod = invalid or m.categories.series = invalid then return
+        m.tabCursor = m.tab
+        styleTabs()
+        langs = LanguagePrefs()
+        year = CreateObject("roDateTime").GetYear()
+        demote4K = not IsUhdScreen()
+        m.top.action = { name: "openCategories", lists: { vod: OrganizeCategories(m.categories.vod, langs, year, demote4K), series: OrganizeCategories(m.categories.series, langs, year, demote4K), langs: langs } }
         return
     end if
     if m.failed then

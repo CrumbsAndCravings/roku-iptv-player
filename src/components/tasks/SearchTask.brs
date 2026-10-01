@@ -7,6 +7,7 @@ sub work()
     m.top.ObserveField("query", port)
     m.top.ObserveField("stop", port)
     m.top.ObserveField("browse", port)
+    m.top.ObserveField("countsRequest", port)
     creds = m.global.creds
     owner = FieldStr(creds, "server") + " " + FieldStr(creds, "username")
     lastQuery = m.top.query
@@ -145,6 +146,8 @@ sub work()
             if msg.GetField() = "stop" then return
             if msg.GetField() = "browse" then
                 answerBrowse(live, not refreshing and not complete)
+            else if msg.GetField() = "countsRequest" then
+                answerCounts(live)
             else if m.top.query <> lastQuery then
                 ' Typing queues several queries; only the latest matters.
                 lastQuery = m.top.query
@@ -214,6 +217,8 @@ sub answerQueries(port as Object, index as Object, lastQuery as String)
             if msg.GetField() = "stop" then return
             if msg.GetField() = "browse" then
                 answerBrowse(index, false)
+            else if msg.GetField() = "countsRequest" then
+                answerCounts(index)
             else if m.top.query <> lastQuery then
                 ' Typing queues several queries; only the latest matters.
                 lastQuery = m.top.query
@@ -249,7 +254,17 @@ end function
 ' says the library is still arriving, so the page can ask again later.
 sub answerBrowse(index as Object, loading as Boolean)
     request = m.top.browse
-    list = IndexBrowse(index, FieldStr(request, "kind"), FieldStr(request, "categoryId"), 1000)
-    list.AddFields({ forKey: FieldStr(request, "kind") + ":" + FieldStr(request, "categoryId"), loading: loading })
+    query = FieldStr(request, "query")
+    list = IndexBrowse(index, FieldStr(request, "kind"), FieldStr(request, "categoryId"), 1000, query)
+    list.AddFields({ forKey: FieldStr(request, "kind") + ":" + FieldStr(request, "categoryId") + ":" + query, loading: loading })
     m.top.browsed = list
+end sub
+
+' How many titles each category holds ("vod:123" -> 104), for the Categories tab.
+sub answerCounts(index as Object)
+    counts = {}
+    for each category in index.categories
+        counts[category.kind + ":" + category.id] = category.count
+    end for
+    m.top.counts = counts
 end sub

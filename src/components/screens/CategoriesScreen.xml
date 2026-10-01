@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The Categories tab: every category in your languages as cards, in rows (new
+  releases, then each language's movies and series). OK opens the category's page.
+  Built from the category lists Home already has, plus title counts from the library
+  stored on the Roku, so it asks the provider for nothing.
+-->
+<component name="CategoriesScreen" extends="Group">
+  <interface>
+    <!-- { vod: [...], series: [...], langs: [...] } from OrganizeCategories -->
+    <field id="lists" type="assocarray" onChange="onLists" />
+    <field id="action" type="assocarray" alwaysNotify="true" />
+    <field id="takeFocus" type="boolean" alwaysNotify="true" onChange="onTakeFocus" />
+  </interface>
+  <children>
+    <Rectangle width="1280" height="720" color="0x151028FF" />
+    <Poster translation="[-300, -330]" width="820" height="820" uri="pkg:/images/glow.png" blendColor="0xB9A3FFFF" opacity="0.16" />
+    <Poster translation="[880, 470]" width="640" height="640" uri="pkg:/images/glow.png" blendColor="0xFF9ECFFF" opacity="0.10" />
+    <Poster translation="[164, 22]" uri="pkg:/images/sparkle.png" width="14" height="14" blendColor="0xFFD98AFF" />
+    <Poster translation="[48, 27]" uri="pkg:/images/logo.png" width="110" height="40" />
+    <Label id="heading" translation="[232, 22]" width="600" height="42" vertAlign="center" color="0xF7F3FFFF" text="Categories" />
+    <Label id="subheading" translation="[232, 62]" width="900" color="0x8579B0FF" />
+
+    <RowList id="rows"
+      translation="[48, 104]"
+      itemComponentName="CategoryTile"
+      numRows="4"
+      itemSize="[1184, 140]"
+      rowItemSize="[[210, 104]]"
+      rowItemSpacing="[[10, 0]]"
+      itemSpacing="[0, 0]"
+      showRowLabel="[true]"
+      rowLabelColor="0xEEE8FFFF"
+      rowFocusAnimationStyle="floatingFocus"
+      vertFocusAnimationStyle="floatingFocus"
+      drawFocusFeedback="false" />
+  </children>
+  <script type="text/brightscript" uri="pkg:/components/common/Utils.brs" />
+  <script type="text/brightscript" uri="pkg:/components/common/Categories.brs" />
+  <script type="text/brightscript" uri="pkg:/components/screens/CategoriesScreen.brs" />
+</component>

@@ -135,6 +135,10 @@ sub onAction(event as Object)
     else if name = "openSearch" then
         screen = pushScreen("SearchScreen")
         screen.takeFocus = true
+    else if name = "openCategories" then
+        screen = pushScreen("CategoriesScreen")
+        screen.lists = action.lists
+        screen.takeFocus = true
     else if name = "openCategory" then
         screen = pushScreen("CategoryScreen")
         screen.category = action.category

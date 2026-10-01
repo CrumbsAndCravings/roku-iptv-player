@@ -192,8 +192,10 @@ function categoryRow(index as Object, words as Object, phrase as String, shortQu
 end function
 
 ' All titles of one category, newest first, as a ContentNode of items (up to `limit`).
-' Its `total` field holds how many the category has.
-function IndexBrowse(index as Object, kind as String, categoryId as String, limit as Integer) as Object
+' Its `total` field holds how many the category has. With a query, only titles whose
+' name holds every word typed, best matches first (names starting with it, then words
+' starting with it), newest first among equals; `total` is then the number of matches.
+function IndexBrowse(index as Object, kind as String, categoryId as String, limit as Integer, query = "" as String) as Object
     letter = "m"
     itemKind = "movie"
     if kind = "series" then
@@ -202,15 +204,27 @@ function IndexBrowse(index as Object, kind as String, categoryId as String, limi
     end if
     sep = searchSeparator()
     marker = sep + categoryId + sep
+    q = NormalizeSearch(query)
+    words = []
+    for each word in q.Split(" ")
+        if word <> "" then words.Push(word)
+    end for
+    phrase = " " + q
     found = []
     records = index.records
+    names = index.names
     for i = 0 to records.Count() - 1
         record = records[i]
         ' A quick look for the id before splitting keeps big libraries fast.
-        if Left(record, 1) = letter and Instr(1, record, marker) > 0 then
+        if Left(record, 1) = letter and Instr(1, record, marker) > 0 and nameMatches(names[i], words, phrase) then
             parts = record.Split(sep)
-            ' Newest first: a negated date sorts the latest to the top.
-            if parts.Count() >= 7 and parts[5] = categoryId then found.Push({ order: 0# - parts[6].ToInt(), parts: parts })
+            if parts.Count() >= 7 and parts[5] = categoryId then
+                ' Newest first: a negated date sorts the latest to the top. With a query,
+                ' the match's rank (in tens of billions) comes before the date.
+                order = 0# - parts[6].ToInt()
+                if q <> "" then order = order + matchRank(names[i], phrase) * 10000000000#
+                found.Push({ order: order, parts: parts })
+            end if
         end if
     end for
     found.SortBy("order")
@@ -221,6 +235,23 @@ function IndexBrowse(index as Object, kind as String, categoryId as String, limi
         addSearchItem(list, match.parts, itemKind)
     end for
     return list
+end function
+
+' Every word typed appears in the name; one or two letters only at the start of a word.
+function nameMatches(name as String, words as Object, phrase as String) as Boolean
+    if words.Count() = 0 then return true
+    if Len(phrase) < 4 then return Instr(1, name, phrase) > 0
+    for each word in words
+        if Instr(1, name, word) = 0 then return false
+    end for
+    return true
+end function
+
+' 0 when the name starts with the query, 1 when a word does, 2 otherwise.
+function matchRank(name as String, phrase as String) as Integer
+    if Left(name, Len(phrase)) = phrase then return 0
+    if Instr(1, name, phrase) > 0 then return 1
+    return 2
 end function
 
 ' Positions in the index stay below this, so they fit in the low digits of a match key.

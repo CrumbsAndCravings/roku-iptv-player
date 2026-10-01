@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  "See all" for one category: every title in it, newest first, as a grid of posters.
-  The titles come from the library stored on the Roku (the search index), so opening
-  a category never asks the provider.
+  "See all" for one category: every title in it, newest first, as a grid of posters,
+  with a search that narrows it down. The titles come from the library stored on the
+  Roku (the search index), so neither opening nor searching a category asks the
+  provider for anything.
 -->
 <component name="CategoryScreen" extends="Group">
   <interface>
@@ -16,11 +17,16 @@
     <Poster translation="[880, 470]" width="640" height="640" uri="pkg:/images/glow.png" blendColor="0xFF9ECFFF" opacity="0.10" />
     <Poster translation="[164, 22]" uri="pkg:/images/sparkle.png" width="14" height="14" blendColor="0xFFD98AFF" />
     <Poster translation="[48, 27]" uri="pkg:/images/logo.png" width="110" height="40" />
-    <Label id="heading" translation="[232, 22]" width="640" height="42" vertAlign="center" color="0xF7F3FFFF" />
-    <Label id="count" translation="[232, 62]" width="640" color="0x8579B0FF" />
+    <Label id="heading" translation="[232, 22]" width="600" height="42" vertAlign="center" color="0xF7F3FFFF" />
+    <Label id="count" translation="[232, 62]" width="420" color="0x8579B0FF" />
+
+    <!-- Up from the top row; OK opens the keyboard. -->
+    <Group id="searchButton" translation="[980, 24]">
+      <Poster id="searchBg" width="240" height="38" uri="pkg:/images/pill.9.png" blendColor="0x30275AFF" />
+      <Label id="searchLabel" width="240" height="38" horizAlign="center" vertAlign="center" color="0xD8CEF5FF" text="Search this category" />
+    </Group>
     <!-- The focused title sits up top, so three full rows of posters fit below. -->
-    <Label id="focusTitle" translation="[700, 26]" width="520" height="34" horizAlign="right" vertAlign="center" maxLines="1" color="0xF7F3FFFF" />
-    <Label id="focusMeta" translation="[700, 62]" width="520" horizAlign="right" maxLines="1" color="0xC3B8E6FF" />
+    <Label id="focusTitle" translation="[660, 64]" width="560" horizAlign="right" maxLines="1" color="0xF7F3FFFF" />
 
     <!-- 9 across and 3 down, close together: 1160 x 560 inside the TV's safe area. -->
     <MarkupGrid id="grid"
@@ -33,6 +39,10 @@
       drawFocusFeedback="false"
       vertFocusAnimationStyle="floatingFocus" />
     <Label id="message" translation="[96, 200]" width="1088" wrap="true" maxLines="3" color="0xC3B8E6FF" />
+
+    <!-- Holds focus while the search button is active; its keys reach this screen. -->
+    <Group id="keys" />
+    <Timer id="debounce" duration="0.35" repeat="false" />
   </children>
   <script type="text/brightscript" uri="pkg:/components/common/Utils.brs" />
   <script type="text/brightscript" uri="pkg:/components/screens/CategoryScreen.brs" />
