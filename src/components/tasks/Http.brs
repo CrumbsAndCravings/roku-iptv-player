@@ -39,3 +39,25 @@ function fetchJson(url as String, userAgent = "" as String) as Object
     if data = invalid then return { ok: false, error: "The server's answer wasn't readable. Check the server address." }
     return { ok: true, data: data }
 end function
+
+' Asks for a video's headers without downloading it, to see whether the server would
+' send it. userAgent "" means Roku's own.
+function checkStream(url as String, userAgent as String) as Object
+    http = CreateObject("roUrlTransfer")
+    port = CreateObject("roMessagePort")
+    http.SetMessagePort(port)
+    http.SetUrl(url)
+    http.SetCertificatesFile("common:/certs/ca-bundle.crt")
+    http.InitClientCertificates()
+    http.RetainBodyOnError(true)
+    if userAgent <> "" then http.AddHeader("User-Agent", userAgent)
+    if not http.AsyncHead() then return { ok: false, code: 0, agent: userAgent, detail: "the request couldn't start" }
+    msg = Wait(10000, port)
+    if type(msg) <> "roUrlEvent" then
+        http.AsyncCancel()
+        return { ok: false, code: 0, agent: userAgent, detail: "no answer in 10 seconds" }
+    end if
+    code = msg.GetResponseCode()
+    if code < 0 then return { ok: false, code: code, agent: userAgent, detail: "couldn't connect (" + msg.GetFailureReason() + ")" }
+    return { ok: code >= 200 and code < 300, code: code, agent: userAgent, detail: HttpDetail(code, msg.GetResponseHeaders(), msg.GetString()) }
+end function

@@ -226,9 +226,16 @@ function BriefText(body as String, limit as Integer) as String
     return text
 end function
 
+' The HTTP status inside Roku's playback error text, like "response code:(403)", or 0.
+function HttpCodeIn(text as String) as Integer
+    found = CreateObject("roRegex", "(?:response code|http)[^0-9]{0,12}([45]\d\d)\b", "i").Match(text)
+    if found.Count() > 1 then return found[1].ToInt()
+    return 0
+end function
+
 ' How ARAN+ introduces itself when a provider turns away requests that say "Roku".
 function AppUserAgent() as String
-    return "ARANplus/0.4.3"
+    return "ARANplus/0.4.4"
 end function
 
 ' True when Cloudflare, rather than the IPTV server itself, answered.

@@ -93,6 +93,8 @@ sub init()
     m.errors = []
     m.check = { blocked: "", warning: "" }
     m.tryAnyway = false
+    m.probeTask = invalid
+    resetProbe()
 
     m.row = "bar"
     m.buttons = []
@@ -161,6 +163,7 @@ sub startItem(startAt as Integer)
     m.started = false
     m.failed = false
     m.errors = []
+    resetProbe()
     m.introShown = false
     m.audioPrefDone = false
     m.subPrefDone = false
@@ -346,13 +349,102 @@ end sub
 
 sub onPlaybackError()
     m.errors.Push(describeRokuError())
-    if m.attempt = 0 then
-        m.attempt = 1
-        if m.started then m.startAt = Int(m.video.position)
-        m.started = false
+    if m.started then m.startAt = Int(m.video.position)
+    m.started = false
+    ' A refused request won't change with a different format hint, so ask the server
+    ' directly, as a Roku and as ARAN+, whether it would send this video.
+    if not m.probed and isHttpRefusal() then
+        m.probed = true
+        startProbe()
+        return
+    end if
+    if m.attempt = 0 and not m.probed then
+        retryWithoutHint()
+        return
+    end if
+    showPlaybackError()
+end sub
+
+sub retryWithoutHint()
+    m.attempt = 1
+    m.formatRetried = true
+    loadStream()
+end sub
+
+sub resetProbe()
+    if m.probeTask <> invalid then m.probeTask.UnobserveField("result")
+    m.probeTask = invalid
+    m.probed = false
+    m.probeLines = []
+    m.probeRefused = false
+    m.formatRetried = false
+    m.agentSwitched = false
+end sub
+
+function rokuErrorText() as String
+    text = ToStr(m.video.errorMsg) + " " + ToStr(m.video.errorStr)
+    info = m.video.errorInfo
+    if IsAA(info) then text = text + " " + FieldStr(info, "dbgmsg")
+    return text
+end function
+
+' Roku's code -1 is an HTTP error; the text usually carries the status too.
+function isHttpRefusal() as Boolean
+    if m.video.errorCode = -1 then return true
+    return HttpCodeIn(rokuErrorText()) >= 400
+end function
+
+sub startProbe()
+    m.video.control = "stop"
+    m.spinner.visible = true
+    m.spinner.control = "start"
+    current = FieldStr(m.global.creds, "userAgent")
+    other = AppUserAgent()
+    if current <> "" then other = ""
+    m.probeTask = CreateObject("roSGNode", "XtreamTask")
+    m.probeTask.request = { mode: "probe", url: currentStreamUrl(), agents: [current, other] }
+    m.probeTask.ObserveField("result", "onProbeResult")
+    m.probeTask.control = "RUN"
+end sub
+
+sub onProbeResult(event as Object)
+    result = event.GetData()
+    m.probeTask = invalid
+    if m.closing then return
+    results = result.results
+    if not IsArr(results) or results.Count() < 2 then
+        showPlaybackError()
+        return
+    end if
+    current = results[0]
+    other = results[1]
+    m.probeLines = [probeLine(current), probeLine(other)]
+    if other.ok and not current.ok then
+        ' The server sends it under the other name, so use that from now on.
+        creds = m.global.creds
+        creds.userAgent = other.agent
+        m.global.creds = creds
+        SaveCreds(creds)
+        m.agentSwitched = true
         loadStream()
         return
     end if
+    m.probeRefused = not current.ok and not other.ok and ToInt(current.code) >= 400 and ToInt(other.code) >= 400
+    if current.ok and m.attempt = 0 then
+        retryWithoutHint()
+        return
+    end if
+    showPlaybackError()
+end sub
+
+function probeLine(res as Object) as String
+    who = "Checked as a Roku: "
+    if FieldStr(res, "agent") <> "" then who = "Checked as ARAN+: "
+    if res.ok then return who + "the server would send it."
+    return who + FieldStr(res, "detail") + "."
+end function
+
+sub showPlaybackError()
     m.failed = true
     m.countdown.control = "stop"
     m.upNext.visible = false
@@ -387,7 +479,15 @@ function diagnosis() as String
     item = currentItem()
     lines = []
     lines.Push("Roku says: " + m.errors.Peek())
-    if m.errors.Count() > 1 then lines.Push("Tried twice: with the format hint from the file name, then without it.")
+    if m.formatRetried then lines.Push("Tried twice: with the format hint from the file name, then without it.")
+    if m.agentSwitched then lines.Push("The server accepted ARAN+ under a different name, so it tried again that way.")
+    lines.Append(m.probeLines)
+    if m.probeRefused then
+        lines.Push("The server turned this video down either way. The trial may not include it, may allow one device at a time, or may have ended.")
+        lines.Push(fileLine(item))
+        lines.Push(streamLine(item))
+        return lines.Join(Chr(10))
+    end if
 
     lines.Push(fileLine(item))
 
@@ -404,9 +504,13 @@ function diagnosis() as String
         lines.Push("This TV says it supports these codecs, so the stream itself is the likely problem.")
     end if
 
-    creds = m.global.creds
-    lines.Push("Stream: " + creds.server + "/" + streamKind() + "/" + creds.username + "/••••/" + item.id + "." + item.ext)
+    lines.Push(streamLine(item))
     return lines.Join(Chr(10))
+end function
+
+function streamLine(item as Object) as String
+    creds = m.global.creds
+    return "Stream: " + creds.server + "/" + streamKind() + "/" + creds.username + "/••••/" + item.id + "." + item.ext
 end function
 
 ' --- Controls ------------------------------------------------------------------
@@ -796,6 +900,7 @@ sub close()
     m.closing = true
     m.autoSubTimer.control = "stop"
     if m.osTask <> invalid then m.osTask.UnobserveField("result")
+    if m.probeTask <> invalid then m.probeTask.UnobserveField("result")
     cancelSeek()
     m.countdown.control = "stop"
     m.hideTimer.control = "stop"

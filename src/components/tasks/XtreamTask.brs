@@ -15,6 +15,8 @@ sub execute()
         result = runVodInfo(FieldStr(req, "id"))
     else if mode = "seriesInfo" then
         result = runSeriesInfo(FieldStr(req, "id"))
+    else if mode = "probe" then
+        result = runProbe(req)
     else
         result = { ok: false, error: "Unknown request." }
     end if
@@ -95,4 +97,13 @@ function runSeriesInfo(id as String) as Object
     parsed = ParseSeriesInfo(res.data)
     m.top.content = parsed.content
     return { ok: true, info: parsed.info }
+end function
+
+' Asks the server about one video under each user agent in `agents`.
+function runProbe(req as Object) as Object
+    results = []
+    for each agent in req.agents
+        results.Push(checkStream(FieldStr(req, "url"), ToStr(agent)))
+    end for
+    return { ok: true, results: results }
 end function
