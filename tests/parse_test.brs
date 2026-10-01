@@ -155,6 +155,25 @@ sub Main()
     checkInt("search empty query", IndexSearch(index, "  ", 40).GetChildCount(), 0)
     checkInt("search limit", IndexSearch(index, "bat", 2).GetChild(0).GetChildCount(), 2)
 
+    ' A big library: thousands of movie matches must not crowd out the series, and the
+    ' best match counts even when it was indexed last.
+    big = NewSearchIndex()
+    films = []
+    for n = 1 to 2500
+        films.Push({ name: "The Long Movie Number " + n.ToStr(), stream_id: n })
+    end for
+    IndexAdd(big, films, "vod")
+    IndexAdd(big, [{ name: "The Show", series_id: 1 }, { name: "The Other Show", series_id: 2 }], "series")
+    IndexAdd(big, [{ name: "The", stream_id: 9999 }], "vod")
+    crowd = IndexSearch(big, "the", 40)
+    checkInt("search keeps series beside many movies", crowd.GetChildCount(), 2)
+    check("search series row", crowd.GetChild(1).title, "Series")
+    checkInt("search series count", crowd.GetChild(1).GetChildCount(), 2)
+    check("search series best first", crowd.GetChild(1).GetChild(0).title, "The Show")
+    check("search exact match indexed last", crowd.GetChild(0).GetChild(0).title, "The")
+    checkInt("search movie row capped", crowd.GetChild(0).GetChildCount(), 40)
+    check("search shorter first", crowd.GetChild(0).GetChild(1).title, "The Long Movie Number 1")
+
     ' --- Continue Watching storage
     RegDelete("progress", "items")
     ProgressPut({ k: "m:1", kind: "movie", id: "1", name: "One", poster: "", bd: "", ext: "mp4", pos: 600, dur: 6000 })

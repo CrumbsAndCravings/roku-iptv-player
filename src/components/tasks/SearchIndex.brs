@@ -51,6 +51,10 @@ end function
 ' Best matches as a ContentNode with up to two rows, Movies and Series, of `limit` each.
 ' Every word typed must appear in the title. Titles starting with the query rank first,
 ' then titles where it starts a word, then the rest; shorter titles first within each.
+'
+' Every match in the whole library is ranked (there is no cap on how many are looked
+' at), and movies and series are ranked separately, so a short query that matches
+' thousands of movies can't push the series out.
 function IndexSearch(index as Object, query as String, limit as Integer) as Object
     root = CreateObject("roSGNode", "ContentNode")
     q = NormalizeSearch(query)
@@ -61,8 +65,13 @@ function IndexSearch(index as Object, query as String, limit as Integer) as Obje
     end for
     phrase = " " + q
 
-    matches = []
+    ' One number per match (rank, then title length, then position in the index), which
+    ' sorts the right way and takes far less memory than an object per match.
+    scale = searchScale()
+    movieKeys = []
+    seriesKeys = []
     names = index.names
+    records = index.records
     for i = 0 to names.Count() - 1
         name = names[i]
         matched = true
@@ -79,31 +88,42 @@ function IndexSearch(index as Object, query as String, limit as Integer) as Obje
             else if Instr(1, name, phrase) > 0 then
                 rank = 1
             end if
-            matches.Push({ k: rank * 100000 + Len(name), i: i })
-            if matches.Count() >= 2000 then exit for
-        end if
-    end for
-    matches.SortBy("k")
-
-    movies = CreateObject("roSGNode", "ContentNode")
-    movies.title = "Movies"
-    series = CreateObject("roSGNode", "ContentNode")
-    series.title = "Series"
-    sep = searchSeparator()
-    for each match in matches
-        parts = index.records[match.i].Split(sep)
-        if parts.Count() >= 5 then
-            if parts[0] = "m" and movies.GetChildCount() < limit then
-                addSearchItem(movies, parts, "movie")
-            else if parts[0] = "s" and series.GetChildCount() < limit then
-                addSearchItem(series, parts, "series")
+            size = Len(name)
+            if size > 999 then size = 999
+            key = (rank * 1000 + size) * scale + i
+            if Left(records[i], 1) = "s" then
+                seriesKeys.Push(key)
+            else
+                movieKeys.Push(key)
             end if
         end if
-        if movies.GetChildCount() >= limit and series.GetChildCount() >= limit then exit for
     end for
+
+    movies = searchRow(index, movieKeys, "Movies", "movie", limit)
+    series = searchRow(index, seriesKeys, "Series", "series", limit)
     if movies.GetChildCount() > 0 then root.AppendChild(movies)
     if series.GetChildCount() > 0 then root.AppendChild(series)
     return root
+end function
+
+' Positions in the index stay below this, so they fit in the low digits of a match key.
+function searchScale() as Double
+    return 10000000#
+end function
+
+function searchRow(index as Object, keys as Object, title as String, kind as String, limit as Integer) as Object
+    row = CreateObject("roSGNode", "ContentNode")
+    row.title = title
+    keys.Sort()
+    scale = searchScale()
+    sep = searchSeparator()
+    for each key in keys
+        if row.GetChildCount() >= limit then exit for
+        position = Int(key - Int(key / scale) * scale)
+        parts = index.records[position].Split(sep)
+        if parts.Count() >= 5 then addSearchItem(row, parts, kind)
+    end for
+    return row
 end function
 
 sub addSearchItem(row as Object, parts as Object, kind as String)

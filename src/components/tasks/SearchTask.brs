@@ -9,17 +9,26 @@ sub work()
     creds = m.global.creds
     index = NewSearchIndex()
 
-    ' One job per category. Xtream has no search call, so we index every list.
-    jobs = []
+    ' One job per category. Xtream has no search call, so we index every list. Movie and
+    ' series lists take turns, so both kinds of results show up while it indexes.
+    lists = {}
     for each kind in ["vod", "series"]
         action = "get_vod_categories"
         if kind = "series" then action = "get_series_categories"
+        lists[kind] = []
         res = fetchJson(ApiUrl(creds, action, invalid), FieldStr(creds, "userAgent"))
         if res.ok then
             for each category in ParseCategories(res.data)
-                jobs.Push({ kind: kind, id: category.id })
+                lists[kind].Push({ kind: kind, id: category.id })
             end for
         end if
+    end for
+    jobs = []
+    longest = lists.vod.Count()
+    if lists.series.Count() > longest then longest = lists.series.Count()
+    for i = 0 to longest - 1
+        if i < lists.vod.Count() then jobs.Push(lists.vod[i])
+        if i < lists.series.Count() then jobs.Push(lists.series[i])
     end for
     total = jobs.Count()
     done = 0
