@@ -16,6 +16,7 @@
     <field id="browsed" type="node" />
   </interface>
   <script type="text/brightscript" uri="pkg:/components/common/Utils.brs" />
+  <script type="text/brightscript" uri="pkg:/components/common/Registry.brs" />
   <script type="text/brightscript" uri="pkg:/components/tasks/Http.brs" />
   <script type="text/brightscript" uri="pkg:/components/tasks/XtreamParse.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Categories.brs" />

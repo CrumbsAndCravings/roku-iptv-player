@@ -246,7 +246,7 @@ end function
 
 ' How ARAN+ introduces itself when a provider turns away requests that say "Roku".
 function AppUserAgent() as String
-    return "ARANplus/0.4.20"
+    return "ARANplus/0.4.21"
 end function
 
 ' A plain desktop web browser, for providers whose servers only answer browsers (a
@@ -439,6 +439,12 @@ function UnplayableText(blocked as String, ext as String) as String
     return "This file uses " + blocked + ", which this Roku can't decode, so no app on it can play this file. Your provider may have another version of this title."
 end function
 
+' True when the Roku is sending a 4K picture to the screen.
+function IsUhdScreen() as Boolean
+    mode = LCase(CreateObject("roDeviceInfo").GetVideoMode())
+    return Instr(1, mode, "2160") > 0 or Instr(1, mode, "4k") > 0
+end function
+
 ' "TV" on a Roku TV, "Roku" on a streaming stick or box, for messages.
 function DeviceWord() as String
     if m.deviceWord = invalid then
@@ -489,6 +495,34 @@ end function
 ' app, though Roku may clear it when it needs the space.
 function SearchCachePath() as String
     return "cachefs:/aranplus-search.txt"
+end function
+
+' "EN ★ Alterity - 2026" -> { title: "Alterity", year: "2026" }. Some providers put a
+' language tag in front of every title (2 to 4 capitals and a symbol like ★ or |) and
+' the year at the end.
+function SplitTitle(name as String) as Object
+    title = name.Trim()
+    letters = 0
+    while letters < Len(title) and letters < 5
+        c = Asc(Mid(title, letters + 1, 1))
+        if c < 65 or c > 90 then exit while
+        letters = letters + 1
+    end while
+    if letters >= 2 and letters <= 4 then
+        rest = Mid(title, letters + 1).Trim()
+        mark = Left(rest, 1)
+        if mark = "|" or (mark <> "" and Asc(mark) > 383) then
+            rest = Mid(rest, 2).Trim()
+            if rest <> "" then title = rest
+        end if
+    end if
+    year = ""
+    found = CreateObject("roRegex", "^(.*\S)\s+-\s+((?:19|20)\d\d)$", "").Match(title)
+    if found.Count() > 2 then
+        title = found[1]
+        year = found[2]
+    end if
+    return { title: title, year: year }
 end function
 
 ' 1234567 -> "1,234,567"

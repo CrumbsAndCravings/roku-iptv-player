@@ -57,7 +57,7 @@ sub IndexAdd(index as Object, data as Dynamic, kind as String, allowed = invalid
             key = letter + id
             if id <> "" and not index.seen.DoesExist(key) then
                 index.seen[key] = true
-                title = FieldStr(raw, "name")
+                title = SplitTitle(FieldStr(raw, "name")).title
                 category = FieldStr(raw, "category_id")
                 if category = "" then category = fallbackCategory
                 index.names.Push(" " + NormalizeSearch(title))
@@ -263,7 +263,7 @@ end sub
 ' category (key, kind, id, title count, name; tab-separated), one per line.
 
 function searchFileFormat() as String
-    return "aranplus-search-2"
+    return "aranplus-search-3"
 end function
 
 function SaveSearchIndex(index as Object, path as String, owner as String, savedAt as Integer) as Boolean

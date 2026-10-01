@@ -127,14 +127,15 @@ end sub
 function buildPlan(tabIndex as Integer) as Object
     langs = LanguagePrefs()
     year = CreateObject("roDateTime").GetYear()
-    vod = OrganizeCategories(m.categories.vod, langs, year)
-    series = OrganizeCategories(m.categories.series, langs, year)
+    demote4K = not IsUhdScreen()
+    vod = OrganizeCategories(m.categories.vod, langs, year, demote4K)
+    series = OrganizeCategories(m.categories.series, langs, year, demote4K)
     plan = []
     if tabIndex = 0 then
-        ' Newest everything: new-release categories first, then the rest, movies and
-        ' series taking turns, up to 18 rows.
+        ' Newest everything: new-release categories first, then the rest with movies and
+        ' series taking turns and each language taking turns, up to 18 rows.
         newest = TakeTurns(planEntries(vod, "vod", true), planEntries(series, "series", true))
-        rest = TakeTurns(planEntries(vod, "vod", false), planEntries(series, "series", false))
+        rest = LanguageTurns(TakeTurns(planEntries(vod, "vod", false), planEntries(series, "series", false)), langs)
         newest.Append(rest)
         for each entry in newest
             if plan.Count() >= 18 then exit for
@@ -158,7 +159,7 @@ end function
 function planEntries(list as Object, kind as String, wantNew as Dynamic) as Object
     entries = []
     for each category in list
-        if wantNew = invalid or category.isNew = wantNew then entries.Push({ kind: kind, categoryId: category.id, label: category.label, title: category.label })
+        if wantNew = invalid or category.isNew = wantNew then entries.Push({ kind: kind, categoryId: category.id, label: category.label, title: category.label, lang: category.lang, demoted: category.demoted })
     end for
     return entries
 end function

@@ -44,15 +44,21 @@ sub work()
     ' the whole library (about 5 MB in 3 seconds for 7,000 series on one provider),
     ' which saves dozens of requests. Movies are too many for that, so they come one
     ' category at a time; so do series if the big request fails.
+    ' Only categories in the languages you watch (all of them when none are set): fewer
+    ' requests, and no French or Arabic titles crowding the results.
     lists = {}
     year = CreateObject("roDateTime").GetYear()
+    langs = LanguagePrefs()
     for each kind in ["vod", "series"]
         action = "get_vod_categories"
         if kind = "series" then action = "get_series_categories"
         lists[kind] = []
         res = fetchJson(ApiUrl(creds, action, invalid), FieldStr(creds, "userAgent"))
         if res.ok then
-            categories = ParseCategories(res.data)
+            categories = []
+            for each category in ParseCategories(res.data)
+                if CategoryWanted(ClassifyCategory(category.name, year), langs) then categories.Push(category)
+            end for
             IndexSetCategories(building, kind, categories, year)
             for each category in categories
                 lists[kind].Push({ kind: kind, id: category.id, all: false })

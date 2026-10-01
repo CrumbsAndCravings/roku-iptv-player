@@ -182,6 +182,14 @@ sub Main()
     check("index loaded search", IndexSearch(back, "big", 40).GetChild(0).GetChild(0).title, "Big Thing")
     check("index other login", ToStr(LoadSearchIndex(path, "http://a.b joe") = invalid), "true")
 
+    ' Provider tags and years come off titles in rows and in search.
+    tagged = BuildRow(ParseJson("[{""name"":""EN ★ Alterity - 2026"",""stream_id"":1,""added"":""5""}]"), "vod", "Row", 40)
+    check("row title untagged", tagged.GetChild(0).title, "Alterity")
+    check("row year from title", tagged.GetChild(0).year, "2026")
+    plain = NewSearchIndex()
+    IndexAdd(plain, ParseJson("[{""name"":""EN ★ Alterity - 2026"",""stream_id"":1}]"), "vod")
+    check("search title untagged", IndexSearch(plain, "alterity", 40).GetChild(0).GetChild(0).title, "Alterity")
+
     ' Categories: counted, offered in search and browsed newest first, all from the index.
     lib = NewSearchIndex()
     IndexSetCategories(lib, "vod", [{ id: "7", name: "PUNJABI MOVIES" }, { id: "8", name: "EN | ACTION" }], 2026)

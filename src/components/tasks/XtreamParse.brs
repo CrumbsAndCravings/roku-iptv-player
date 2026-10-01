@@ -60,8 +60,11 @@ function BuildRow(data as Dynamic, kind as String, title as String, limit as Int
 end function
 
 sub addMovieItem(row as Object, raw as Object)
+    named = SplitTitle(FieldStr(raw, "name"))
+    year = YearOf(FirstText([Field(raw, "year"), Field(raw, "releaseDate")]))
+    if year = "" then year = named.year
     MakeItem(row, {
-        title: FieldStr(raw, "name")
+        title: named.title
         HDPosterUrl: SizedImage(FieldStr(raw, "stream_icon"), "w185")
         kind: "movie"
         itemId: FieldStr(raw, "stream_id")
@@ -69,7 +72,7 @@ sub addMovieItem(row as Object, raw as Object)
         problem: containerProblem(FieldStr(raw, "container_extension"))
         tmdbId: FirstText([Field(raw, "tmdb"), Field(raw, "tmdb_id")])
         score: FieldStr(raw, "rating")
-        year: YearOf(FirstText([Field(raw, "year"), Field(raw, "releaseDate")]))
+        year: year
         description: FieldStr(raw, "plot")
         genre: FieldStr(raw, "genre")
     })
@@ -82,8 +85,11 @@ function containerProblem(ext as String) as String
 end function
 
 sub addSeriesItem(row as Object, raw as Object)
+    named = SplitTitle(FieldStr(raw, "name"))
+    year = YearOf(FirstText([Field(raw, "releaseDate"), Field(raw, "release_date"), Field(raw, "year")]))
+    if year = "" then year = named.year
     MakeItem(row, {
-        title: FieldStr(raw, "name")
+        title: named.title
         HDPosterUrl: SizedImage(FieldStr(raw, "cover"), "w185")
         kind: "series"
         itemId: FieldStr(raw, "series_id")
@@ -91,7 +97,7 @@ sub addSeriesItem(row as Object, raw as Object)
         tmdbId: FirstText([Field(raw, "tmdb"), Field(raw, "tmdb_id")])
         backdrop: SizedImage(FirstUrl(Field(raw, "backdrop_path")), "w780")
         description: FieldStr(raw, "plot")
-        year: YearOf(FirstText([Field(raw, "releaseDate"), Field(raw, "release_date"), Field(raw, "year")]))
+        year: year
         genre: FieldStr(raw, "genre")
         score: FieldStr(raw, "rating")
         starring: FieldStr(raw, "cast")
@@ -147,7 +153,7 @@ end function
 function ParseSeriesInfo(data as Dynamic) as Object
     info = Field(data, "info")
     if not IsAA(info) then info = {}
-    seriesName = FieldStr(info, "name")
+    seriesName = SplitTitle(FieldStr(info, "name")).title
 
     ' "episodes" is normally {"1": [...], "2": [...]}, but PHP turns it into a
     ' plain array when the season keys happen to be sequential.
