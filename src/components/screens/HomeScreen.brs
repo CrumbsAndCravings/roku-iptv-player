@@ -533,7 +533,7 @@ end sub
 sub showLoadError()
     m.failed = true
     text = "Couldn't load your library. " + m.lastError
-    if Instr(1, m.lastError, "refused") > 0 then text = text + " The trial may have ended, or the provider may be blocking your internet connection for a while."
+    if Instr(1, m.lastError, "refused") > 0 then text = text + " The provider may have moved to a new address (ask them, then sign out with * and back in), the trial may have ended, or they may be blocking your connection for a while."
     m.status.text = text + " Press OK to try again."
     clearHero()
     focusNav()
