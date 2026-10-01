@@ -76,6 +76,8 @@ npm run images    # regenerate icons, splash and gradients (needs Pillow)
 
 For a personal build that signs in by itself, put your login in `src/source/account.json` as `{"server": "...", "username": "...", "password": "..."}` before `npm run build`. Git ignores that file, so it never reaches the repo or the CI builds. The login screen also opens filled in with it after a sign-out.
 
+A 35 second vertical promo video, made from the app's own fonts, images and screens, is in [promo/](promo/README.md).
+
 ### Layout
 
 ```

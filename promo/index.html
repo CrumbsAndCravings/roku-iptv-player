@@ -1,0 +1,871 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ARAN+ Promo</title>
+<meta name="description" content="A 35 second vertical promo for ARAN+, the cinematic IPTV player for Roku.">
+<style>
+/* Vertical 1080x1920 stage. Every colour, font and asset comes from the ARAN+ app:
+   the plum night, lavender focus, bubblegum progress and butter sparkles. */
+@font-face { font-family: "Fredoka"; src: url("../src/fonts/Fredoka-SemiBold.ttf") format("truetype"); font-weight: 600; }
+@font-face { font-family: "Fredoka"; src: url("../src/fonts/Fredoka-Medium.ttf") format("truetype"); font-weight: 500; }
+@font-face { font-family: "Nunito"; src: url("../src/fonts/Nunito-ExtraBold.ttf") format("truetype"); font-weight: 800; }
+@font-face { font-family: "Nunito"; src: url("../src/fonts/Nunito-SemiBold.ttf") format("truetype"); font-weight: 600; }
+
+:root {
+  --plum: #151028;        /* backgrounds */
+  --plum-deep: #0D0920;
+  --card: #241C42;
+  --pill: #30275A;
+  --pill-on: #43377A;
+  --lavender: #C9B8FF;    /* focus */
+  --lavender-glow: #B9A3FF;
+  --lavender-light: #E2D8FF;
+  --pink: #FF9ECF;        /* progress, the + */
+  --butter: #FFD98A;      /* sparkles */
+  --ink: #F7F3FF;
+  --ink-2: #C3B8E6;
+  --ink-3: #A195CC;
+  --ink-4: #8579B0;
+  --plot: #DDD4F7;
+  --key: #D8CEF5;
+  --display: "Fredoka", "Nunito", system-ui, sans-serif;
+  --body: "Nunito", "Fredoka", system-ui, sans-serif;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body { margin: 0; background: var(--plum-deep); color: var(--ink); font-family: var(--body); overflow: hidden; }
+
+#app { height: 100%; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding-block: 16px; padding-inline: 16px; }
+#frame { position: relative; overflow: hidden; border-radius: 14px; box-shadow: 0 30px 80px rgba(0,0,0,.55), 0 0 0 1px rgba(201,184,255,.12); max-width: 100%; }
+#stage { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; transform-origin: 0 0; overflow: hidden; background: var(--plum); }
+#bar { display: flex; align-items: center; gap: 12px; width: min(100%, 420px); }
+#bar button { appearance: none; border: 0; border-radius: 4px; background: var(--pill); color: var(--ink); font: 500 15px/1 var(--display); height: 34px; padding: 0 14px; cursor: pointer; min-width: 74px; }
+#bar button:hover { background: var(--pill-on); }
+#bar button:focus-visible, #scrub:focus-visible { outline: 3px solid var(--lavender); outline-offset: 2px; }
+#scrub { flex: 1; min-width: 0; accent-color: var(--lavender); }
+#clock { font: 800 13px/1 var(--body); color: var(--ink-3); font-variant-numeric: tabular-nums; min-width: 34px; text-align: right; }
+html.render #app { padding: 0; gap: 0; display: block; }
+html.render #frame { border-radius: 0; box-shadow: none; }
+html.render #bar { display: none; }
+
+/* --- generic --- */
+.abs { position: absolute; left: 0; top: 0; }
+.tint { -webkit-mask-size: 100% 100%; mask-size: 100% 100%; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; }
+.glow { -webkit-mask-image: url("../src/images/glow.png"); mask-image: url("../src/images/glow.png"); }
+.spark-img { -webkit-mask-image: url("../src/images/sparkle.png"); mask-image: url("../src/images/sparkle.png"); }
+.wm { font-family: var(--display); font-weight: 600; white-space: nowrap; display: inline-flex; align-items: baseline; line-height: 1.2; }
+.wm .n { letter-spacing: .04em; background: linear-gradient(180deg, var(--lavender-light) 15%, var(--lavender-glow) 85%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.wm .p { color: var(--pink); font-size: 1.05em; position: relative; top: -.08em; margin-left: .02em; }
+svg.spark { position: absolute; overflow: visible; }
+
+/* --- stage layers --- */
+#neutralBg { background: radial-gradient(ellipse at 50% 40%, #232327 0%, #121214 70%); }
+#sglowA { left: -620px; top: -560px; width: 1560px; height: 1560px; background: var(--lavender-glow); }
+#sglowB { left: 240px; top: 1040px; width: 1440px; height: 1440px; background: var(--pink); }
+#tvCam { transform-origin: 0 0; will-change: transform; }
+.bezel { position: absolute; left: -20px; top: -20px; width: 1320px; height: 760px; border-radius: 24px; background: linear-gradient(180deg, #1c1631 0%, #0b0817 100%); box-shadow: 0 50px 140px rgba(0,0,0,.65), inset 0 0 0 1.5px rgba(201,184,255,.16), inset 0 2px 0 rgba(255,255,255,.06); }
+.stand { position: absolute; left: 520px; top: 742px; width: 240px; height: 28px; border-radius: 0 0 14px 14px; background: linear-gradient(180deg, #120d22, #07050e); }
+.stand::after { content: ""; position: absolute; left: -110px; top: 26px; width: 460px; height: 8px; border-radius: 6px; background: #0a0714; }
+#screen { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; overflow: hidden; border-radius: 4px; background: var(--plum); }
+#gloss { background: linear-gradient(115deg, rgba(255,255,255,.07) 0%, rgba(255,255,255,0) 38%); pointer-events: none; }
+.scr { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; overflow: hidden; }
+.fill { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+
+#scrimTop { width: 1080px; height: 880px; background: linear-gradient(180deg, var(--plum) 0, var(--plum) 770px, rgba(21,16,40,0) 870px); }
+#scrimBot { width: 1080px; height: 1000px; }
+#scrimFoot { top: 1660px; width: 1080px; height: 260px; background: linear-gradient(180deg, rgba(21,16,40,0) 0, var(--plum) 120px); }
+#vignette { width: 1080px; height: 1920px; background: radial-gradient(ellipse 80% 62% at 50% 46%, rgba(5,3,12,0) 55%, rgba(5,3,12,.5) 100%); pointer-events: none; }
+#grain { width: 1080px; height: 1920px; opacity: .07; mix-blend-mode: overlay; pointer-events: none; }
+#fine { left: 0; top: 1792px; width: 1080px; text-align: center; font: 600 22px/1 var(--body); color: var(--ink-4); letter-spacing: .02em; }
+
+/* --- captions --- */
+.cap { position: absolute; left: 72px; top: 270px; width: 936px; }
+.cap .eb { font: 800 30px/1 var(--body); letter-spacing: .16em; text-transform: uppercase; color: var(--pink); display: flex; align-items: center; gap: 14px; }
+.cap .eb i { width: 26px; height: 26px; background: var(--butter); display: inline-block; }
+.cap h2 { font: 600 98px/1.02 var(--display); color: var(--ink); margin: 22px 0 0; letter-spacing: -.005em; text-wrap: balance; }
+.cap p { font: 600 40px/1.28 var(--body); color: var(--ink-2); margin: 24px 0 0; }
+.cap > * { will-change: transform, opacity; }
+
+#hookCap { left: 72px; top: 270px; width: 936px; font: 600 104px/1.04 var(--display); color: var(--ink); letter-spacing: -.01em; }
+#hookCap span { display: inline-block; margin-right: .22em; }
+#hookCap .bored { color: #9C9AA6; transform-origin: 10% 90%; }
+#brandCap { left: 0; top: 268px; width: 1080px; text-align: center; }
+#brandCap .wmWrap { position: relative; display: inline-block; font-size: 176px; }
+#brandCap p { margin: 34px 0 0; font: 800 42px/1.2 var(--body); color: var(--ink-2); letter-spacing: .01em; }
+
+/* --- dull "before" screen --- */
+#dull { background: #1b1b1d; font-family: Arial, "Liberation Sans", Helvetica, sans-serif; color: #96969c; }
+#dull .top { position: absolute; left: 0; top: 0; width: 1280px; height: 64px; background: #252528; display: flex; align-items: center; gap: 46px; padding-left: 36px; font-size: 21px; letter-spacing: .06em; box-sizing: border-box; }
+#dull .top b { color: #c9c9ce; font-weight: 700; }
+#dull .side { position: absolute; left: 0; top: 64px; width: 420px; height: 656px; background: #202023; border-right: 1px solid #2d2d31; }
+#dull .row { height: 54px; display: flex; align-items: center; padding-left: 30px; font-size: 22px; border-bottom: 1px solid #29292c; white-space: nowrap; }
+#dull .row.sel { background: #3a404e; color: #e3e3e6; }
+#dull .list { position: absolute; left: 420px; top: 64px; width: 860px; height: 656px; overflow: hidden; }
+#dull .item { height: 64px; display: flex; align-items: center; gap: 22px; padding-left: 30px; font-size: 22px; border-bottom: 1px solid #262629; white-space: nowrap; }
+#dull .item .ph { width: 44px; height: 44px; background: #2c2c30; display: grid; place-items: center; font-size: 12px; color: #55555b; }
+#dull .item .bar { height: 14px; background: #2e2e32; border-radius: 2px; }
+
+/* --- ARAN+ screens (logical 1280x720, positions from the app's XML) --- */
+.logo { position: absolute; left: 50px; top: 25px; font-size: 30px; }
+.hsparkle { position: absolute; left: 164px; top: 22px; width: 14px; height: 14px; background: var(--butter); }
+.heading { position: absolute; left: 232px; top: 22px; height: 42px; display: flex; align-items: center; font: 600 32px/1 var(--display); color: var(--ink); }
+.tabs { position: absolute; left: 232px; top: 26px; display: flex; gap: 14px; }
+.tab { position: relative; height: 37.8px; padding: 0 21.6px; min-width: 90px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; font: 500 18px/1 var(--display); color: var(--ink-3); white-space: nowrap; }
+.tabHL { position: absolute; top: 26px; height: 37.8px; border-radius: 4px; background: var(--pill); }
+.hero { position: absolute; left: 48px; top: 112px; width: 600px; }
+.hero .t { font: 600 40px/1.12 var(--display); color: var(--ink); }
+.hero .m { margin-top: 8px; font: 800 18px/1.3 var(--body); color: var(--ink-2); white-space: pre; }
+.hero .pl { margin-top: 12px; width: 520px; font: 600 17px/1.42 var(--body); color: var(--plot); }
+.rowsClip { position: absolute; left: 0; top: 372px; width: 1280px; height: 348px; overflow: hidden; }
+.rowlist { position: absolute; left: 48px; top: 30px; }
+.rowL { position: absolute; left: 0; width: 1232px; height: 218px; }
+.rowL .lab { position: absolute; left: 0; top: 2px; font: 500 21px/1.2 var(--display); color: #EEE8FF; white-space: pre; }
+
+.pi { position: absolute; top: 38px; width: 120px; height: 180px; }
+.pi .card { position: absolute; left: 0; top: 0; width: 120px; height: 180px; transform-origin: 60px 90px; }
+.pi .ring { position: absolute; left: -4px; top: -4px; width: 128px; height: 188px; box-sizing: border-box; border: 3px solid var(--lavender); border-radius: 5px; opacity: 0; }
+.pi .base { position: absolute; left: 0; top: 0; width: 120px; height: 180px; border-radius: 3px; overflow: hidden; background: var(--card); }
+.pi .base svg { display: block; width: 120px; height: 180px; }
+.pi .band { position: absolute; left: 0; top: 150px; width: 120px; height: 26px; background: rgba(13,9,32,.85); display: flex; align-items: center; justify-content: center; font: 800 14px/1 var(--body); color: var(--ink-2); }
+.pi .track { position: absolute; left: 0; top: 176px; width: 120px; height: 4px; background: rgba(21,16,40,.8); border-radius: 0 0 3px 3px; overflow: hidden; }
+.pi .fillbar { position: absolute; left: 0; top: 0; height: 4px; background: var(--pink); }
+.pi .name { position: absolute; left: 10px; top: 10px; width: 100px; height: 136px; display: flex; align-items: center; justify-content: center; text-align: center; font: 500 19px/1.15 var(--display); color: var(--ink); }
+.pi .cap2 { position: absolute; left: 0; top: 150px; width: 120px; height: 26px; display: flex; align-items: center; justify-content: center; font: 800 14px/1 var(--body); color: var(--ink-2); }
+
+.ct { position: absolute; width: 210px; height: 104px; }
+.ct .card { position: absolute; left: 0; top: 0; width: 210px; height: 104px; transform-origin: 105px 52px; }
+.ct .ring { position: absolute; left: -4px; top: -4px; width: 218px; height: 112px; box-sizing: border-box; border: 3px solid var(--lavender); border-radius: 5px; opacity: 0; }
+.ct .base { position: absolute; left: 0; top: 0; width: 210px; height: 104px; border-radius: 4px; background: var(--pill); overflow: hidden; }
+.ct .accent { position: absolute; left: 0; top: 0; width: 4px; height: 104px; background: var(--pink); }
+.ct .nm { position: absolute; left: 16px; top: 12px; width: 182px; font: 500 20px/1.2 var(--display); color: var(--ink); }
+.ct .cp { position: absolute; left: 16px; top: 74px; font: 800 14px/1.2 var(--body); color: var(--ink-2); }
+
+.kb { position: absolute; left: 36px; top: 96px; width: 424px; }
+.kb .box { position: absolute; left: 0; top: 0; width: 424px; height: 54px; border-radius: 4px; background: var(--pill); display: flex; align-items: center; padding-left: 18px; box-sizing: border-box; font: 800 23px/1 var(--body); color: var(--ink); }
+.kb .box .hint { color: var(--ink-4); }
+.kb .box .caret { display: inline-block; width: 2px; height: 26px; background: var(--lavender); margin-left: 2px; }
+.kb .pad { position: absolute; left: 0; top: 64px; width: 424px; height: 384px; border-radius: 4px; background: var(--card); }
+.kb .key { position: absolute; width: 64px; height: 48px; display: flex; align-items: center; justify-content: center; font: 800 22px/1 var(--body); color: var(--key); z-index: 1; }
+.kb .kfocus { position: absolute; width: 64px; height: 48px; border-radius: 4px; background: var(--lavender); }
+.sym { position: absolute; width: 50px; height: 40px; border-radius: 4px; background: var(--pill); opacity: .85; display: flex; align-items: center; justify-content: center; font: 800 20px/1 var(--body); color: var(--key); }
+.results { position: absolute; left: 480px; top: 96px; width: 752px; height: 520px; overflow: hidden; }
+
+.pl-btn { position: absolute; height: 37.8px; padding: 0 21.6px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border-radius: 4px; background: rgba(48,39,90,.85); font: 500 18px/1 var(--display); color: var(--key); white-space: nowrap; }
+.upnext { position: absolute; left: 800px; top: 500px; width: 432px; height: 156px; border-radius: 4px; background: rgba(21,16,40,.93); }
+.upnext .ey { position: absolute; left: 28px; top: 20px; font: 800 14px/1.2 var(--body); letter-spacing: .08em; color: var(--pink); }
+.upnext .tt { position: absolute; left: 28px; top: 48px; font: 500 22px/1.25 var(--display); color: var(--ink); }
+.upnext .hn { position: absolute; left: 28px; top: 114px; font: 600 17px/1.2 var(--body); color: var(--ink-2); white-space: pre; }
+.upnext .sp { position: absolute; left: 396px; top: 18px; width: 18px; height: 18px; background: var(--butter); }
+
+/* --- feature list and outro --- */
+#feats { left: 0; top: 0; width: 1080px; height: 1920px; }
+.fpill { position: absolute; left: 72px; height: 104px; padding: 0 46px; box-sizing: border-box; display: flex; align-items: center; border-radius: 9px; background: rgba(48,39,90,.85); font: 500 46px/1 var(--display); color: var(--key); white-space: nowrap; transform-origin: 0 50%; }
+#outro { left: 0; top: 0; width: 1080px; height: 1920px; text-align: center; }
+#outro .wmWrap { position: relative; display: inline-block; font-size: 210px; }
+#outro .tag { font: 600 66px/1.1 var(--display); color: var(--ink); }
+#outro .sub { font: 600 36px/1.3 var(--body); color: var(--ink-2); }
+.otabs { position: absolute; display: flex; gap: 22px; }
+.otab { position: relative; height: 60px; padding: 0 34px; min-width: 140px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; font: 500 28px/1 var(--display); color: var(--ink-3); white-space: nowrap; z-index: 1; }
+.otabHL { position: absolute; top: 0; height: 60px; border-radius: 6px; background: var(--lavender); }
+
+@media (prefers-reduced-motion: reduce) { #frame { box-shadow: none; } }
+</style>
+
+<main id="app">
+  <div id="frame">
+    <div id="stage">
+      <div id="neutralBg" class="abs fill"></div>
+      <div id="sglowA" class="abs tint glow"></div>
+      <div id="sglowB" class="abs tint glow"></div>
+
+      <div id="tvCam" class="abs">
+        <div class="bezel" id="bezel"></div>
+        <div class="stand" id="stand"></div>
+        <div id="screen">
+          <div id="dull" class="scr"></div>
+          <div id="aran" class="scr">
+            <div id="iglowA" class="abs tint glow" style="left:-300px;top:-330px;width:820px;height:820px;background:var(--lavender-glow)"></div>
+            <div id="iglowB" class="abs tint glow" style="left:880px;top:470px;width:640px;height:640px;background:var(--pink)"></div>
+            <div id="home" class="scr"></div>
+            <div id="cats" class="scr"></div>
+            <div id="search" class="scr"></div>
+            <div id="player" class="scr"></div>
+          </div>
+          <div id="flash" class="abs fill"></div>
+          <div id="gloss" class="abs fill"></div>
+        </div>
+      </div>
+
+      <div id="scrimTop" class="abs"></div>
+      <div id="scrimBot" class="abs"></div>
+      <div id="scrimFoot" class="abs"></div>
+      <div id="burst" class="abs"></div>
+
+      <div id="hookCap" class="abs"></div>
+      <div id="brandCap" class="abs">
+        <div class="wmWrap" id="brandMark"></div>
+        <p id="brandTag">A cinematic IPTV player for Roku</p>
+      </div>
+      <div id="caps"></div>
+      <div id="feats" class="abs"></div>
+      <div id="outro" class="abs"></div>
+
+      <div id="vignette" class="abs"></div>
+      <div id="grain" class="abs"></div>
+      <div id="fine" class="abs">Titles and artwork shown are illustrative.</div>
+    </div>
+  </div>
+  <div id="bar">
+    <button id="playBtn" type="button">Pause</button>
+    <input id="scrub" type="range" min="0" max="35" step="0.01" value="0" aria-label="Position in the promo">
+    <span id="clock">0:00</span>
+  </div>
+</main>
+
+<script>
+(() => {
+"use strict";
+const DUR = 35;
+const $ = (s, r = document) => r.querySelector(s);
+const html = (el, s) => { el.insertAdjacentHTML("beforeend", s); return el.lastElementChild; };
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const seg = (t, a, b) => clamp((t - a) / (b - a));
+const lerp = (a, b, x) => a + (b - a) * x;
+const E = {
+  outCubic: x => 1 - Math.pow(1 - x, 3),
+  inCubic: x => x * x * x,
+  inOutCubic: x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2,
+  outBack: x => { const c1 = 1.5, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); },
+  outQuad: x => 1 - (1 - x) * (1 - x),
+  inOutSine: x => -(Math.cos(Math.PI * x) - 1) / 2,
+};
+// Opacity for something shown between a and b, fading in and out.
+const win = (t, a, b, fin = .35, fout = .3) => E.outCubic(seg(t, a, a + fin)) * (1 - E.inCubic(seg(t, b - fout, b)));
+const keyed = (keys, t, p, ease = E.inOutCubic) => {
+  if (t <= keys[0].t) return keys[0][p];
+  for (let i = 0; i < keys.length - 1; i++) {
+    const a = keys[i], b = keys[i + 1];
+    if (t <= b.t) return lerp(a[p], b[p], ease(seg(t, a.t, b.t)));
+  }
+  return keys[keys.length - 1][p];
+};
+const setStyle = (el, o) => { for (const k in o) { const v = String(o[k]); if (el.style[k] !== v) el.style[k] = v; } };
+const setText = (el, s) => { if (el.textContent !== s) el.textContent = s; };
+
+// The app's four-point sparkle (tools/make_images.py), as a vector so it stays sharp when big.
+const SPARK_PTS = (() => { const p = []; for (let i = 0; i < 8; i++) { const a = Math.PI / 4 * i - Math.PI / 2, r = i % 2 ? 48 * .28 : 48; p.push((50 + Math.cos(a) * r).toFixed(2) + "," + (50 + Math.sin(a) * r).toFixed(2)); } return p.join(" "); })();
+const sparkSVG = (color, style) => `<svg class="spark" viewBox="0 0 100 100" style="${style}"><polygon points="${SPARK_PTS}" fill="${color}"/></svg>`;
+const wordmark = () => `<span class="wm"><span class="n">ARAN</span><span class="p">+</span></span>`;
+
+/* ------------------------------------------------------------------ poster art
+   Posters come from each person's provider, so the promo paints its own:
+   graded to sit in the app's plum, lavender, pink and butter world. */
+const PAL = {
+  dusk:   { sky: ["#1b1238", "#5a2a6e", "#ff8fb8"], sun: "#ffd98a", land: ["#0f0a20", "#26173f", "#3d2559"] },
+  teal:   { sky: ["#071f2b", "#11475a", "#ff9a66"], sun: "#ffe2a8", land: ["#04121a", "#0a2a35", "#15414e"] },
+  ember:  { sky: ["#1a0b14", "#5c1a2a", "#ff6a4d"], sun: "#ffc178", land: ["#0e060c", "#2a0e18", "#45162a"] },
+  arctic: { sky: ["#0a1430", "#24427a", "#9fd6ff"], sun: "#f2f7ff", land: ["#060c1e", "#13254a", "#2a4677"] },
+  gold:   { sky: ["#24120a", "#7a3e14", "#ffcf73"], sun: "#fff1c2", land: ["#140a05", "#3a1d0b", "#5c3212"] },
+  jade:   { sky: ["#071a17", "#11493d", "#7fe3b8"], sun: "#e8fff4", land: ["#04100e", "#0b2b25", "#15443a"] },
+  violet: { sky: ["#120a2e", "#3b2580", "#c9b8ff"], sun: "#ffffff", land: ["#0b0620", "#22164f", "#38277a"] },
+  rose:   { sky: ["#200a1e", "#6e1f52", "#ff9ecf"], sun: "#ffe0ef", land: ["#12050f", "#36102c", "#5a1b49"] },
+};
+function rng(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+let artId = 0;
+const f1 = n => n.toFixed(1);
+function art(spec, w, h) {
+  const P = PAL[spec.pal], r = rng(spec.seed), id = "a" + (artId++), m = Math.min(w, h);
+  const defs = [], b = [];
+  defs.push(`<linearGradient id="${id}s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${P.sky[0]}"/><stop offset=".58" stop-color="${P.sky[1]}"/><stop offset=".9" stop-color="${P.sky[2]}"/></linearGradient>`);
+  defs.push(`<radialGradient id="${id}g"><stop offset="0" stop-color="${P.sun}" stop-opacity=".75"/><stop offset=".35" stop-color="${P.sky[2]}" stop-opacity=".35"/><stop offset="1" stop-color="${P.sky[2]}" stop-opacity="0"/></radialGradient>`);
+  defs.push(`<linearGradient id="${id}v" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#05030c" stop-opacity=".25"/><stop offset=".25" stop-color="#05030c" stop-opacity="0"/><stop offset=".62" stop-color="#05030c" stop-opacity="0"/><stop offset="1" stop-color="#05030c" stop-opacity=".62"/></linearGradient>`);
+  const sky = () => b.push(`<rect width="${w}" height="${h}" fill="url(#${id}s)"/>`);
+  const sun = (x, y, R) => b.push(`<circle cx="${f1(x)}" cy="${f1(y)}" r="${f1(R * 2.8)}" fill="url(#${id}g)"/><circle cx="${f1(x)}" cy="${f1(y)}" r="${f1(R)}" fill="${P.sun}"/>`);
+  const stars = (n, maxY) => { for (let i = 0; i < n; i++) b.push(`<circle cx="${f1(r() * w)}" cy="${f1(r() * maxY)}" r="${(.25 + r() * .55) * m / 120}" fill="#fff" opacity="${(.25 + r() * .7).toFixed(2)}"/>`); };
+  const ridge = (base, amp, n) => { const pts = []; for (let i = 0; i <= n; i++) { const up = i % 2 === 0; pts.push([w * i / n, base - (up ? amp * (.35 + r() * .65) : -amp * .25 * r())]); } return pts; };
+  const ridgeD = pts => `M0,${h} L` + pts.map(p => f1(p[0]) + "," + f1(p[1])).join(" L") + ` L${w},${h} Z`;
+  const ridgeY = (pts, x) => { for (let i = 0; i < pts.length - 1; i++) if (x <= pts[i + 1][0]) { const k = (x - pts[i][0]) / (pts[i + 1][0] - pts[i][0]); return lerp(pts[i][1], pts[i + 1][1], k); } return pts[pts.length - 1][1]; };
+  const figure = (x, foot, s, col) => b.push(`<circle cx="${f1(x)}" cy="${f1(foot - s * .9)}" r="${f1(s * .11)}" fill="${col}"/><path d="M${f1(x - s * .15)},${f1(foot - s * .72)} Q${f1(x)},${f1(foot - s * .84)} ${f1(x + s * .15)},${f1(foot - s * .72)} L${f1(x + s * .1)},${f1(foot)} L${f1(x - s * .1)},${f1(foot)} Z" fill="${col}"/>`);
+  const land = (y, col) => b.push(`<rect y="${f1(y)}" width="${w}" height="${f1(h - y)}" fill="${col}"/>`);
+  const wide = w > h;
+
+  if (spec.kind === "peaks") {
+    sky(); stars(14, h * .35);
+    sun(w * (.35 + r() * .3), h * .5, m * .17);
+    const layers = [[h * .6, h * .14, P.land[2]], [h * .72, h * .1, P.land[1]], [h * .86, h * .06, P.land[0]]];
+    let front;
+    layers.forEach(([base, amp, col], i) => { const pts = ridge(base, amp, wide ? 14 : 8); b.push(`<path d="${ridgeD(pts)}" fill="${col}"/>`); if (i < 2) b.push(`<rect y="${f1(base - amp * .2)}" width="${w}" height="${f1(amp)}" fill="${P.sky[2]}" opacity=".06"/>`); front = pts; });
+    const fx = w * (.58 + r() * .2); figure(fx, ridgeY(front, fx) + 1, h * .09, P.land[0]);
+  } else if (spec.kind === "city") {
+    sky(); stars(10, h * .3);
+    sun(w * (spec.sunX || .72), h * (spec.sunY || .2), m * .085);
+    for (let x = -2; x < w;) { const bw = w * (.07 + r() * .1) * (wide ? .55 : 1), bh = h * (.18 + r() * .22); b.push(`<rect x="${f1(x)}" y="${f1(h * .8 - bh)}" width="${f1(bw)}" height="${f1(bh + h)}" fill="${P.land[2]}"/>`); x += bw + .6; }
+    b.push(`<rect y="${f1(h * .55)}" width="${w}" height="${f1(h * .3)}" fill="${P.sky[2]}" opacity=".08"/>`);
+    for (let x = -3; x < w;) {
+      const bw = w * (.1 + r() * .12) * (wide ? .5 : 1), bh = h * (.28 + r() * .3), top = h * .9 - bh;
+      b.push(`<rect x="${f1(x)}" y="${f1(top)}" width="${f1(bw)}" height="${f1(bh + h)}" fill="${P.land[0]}"/>`);
+      const ws = m * .028;
+      for (let yy = top + ws; yy < h * .88; yy += ws * 1.7) for (let xx = x + ws * .6; xx < x + bw - ws; xx += ws * 1.5) if (r() < (spec.lit || .3)) b.push(`<rect x="${f1(xx)}" y="${f1(yy)}" width="${f1(ws * .7)}" height="${f1(ws)}" fill="${P.sun}" opacity="${(.25 + r() * .6).toFixed(2)}"/>`);
+      x += bw + .8;
+    }
+    land(h * .9, P.land[0]);
+  } else if (spec.kind === "sea") {
+    sky(); stars(8, h * .25);
+    const hz = h * .6, R = m * .24, cx = w * (.42 + r() * .16);
+    sun(cx, hz, R);
+    defs.push(`<linearGradient id="${id}w" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${P.land[2]}"/><stop offset="1" stop-color="${P.land[0]}"/></linearGradient>`);
+    b.push(`<rect y="${f1(hz)}" width="${w}" height="${f1(h - hz)}" fill="url(#${id}w)"/>`);
+    for (let i = 0; i < 16; i++) { const y = hz + 2 + i * (h - hz) / 16, ww = R * (1.5 - i * .05) * (.55 + r() * .45); b.push(`<rect x="${f1(cx - ww / 2 + (r() - .5) * 6)}" y="${f1(y)}" width="${f1(ww)}" height="${f1(m * .009 + .5)}" rx=".5" fill="${P.sun}" opacity="${(.6 - i * .033).toFixed(2)}"/>`); }
+    const bx = w * .26, by = hz + (h - hz) * .32, s = m * .1;
+    b.push(`<path d="M${f1(bx - s * .5)},${f1(by)} L${f1(bx + s * .5)},${f1(by)} L${f1(bx + s * .36)},${f1(by + s * .16)} L${f1(bx - s * .36)},${f1(by + s * .16)} Z" fill="${P.land[0]}"/><path d="M${f1(bx)},${f1(by - s * .02)} L${f1(bx)},${f1(by - s * .7)} L${f1(bx + s * .32)},${f1(by - s * .06)} Z" fill="${P.land[0]}"/>`);
+  } else if (spec.kind === "profile") {
+    defs.push(`<linearGradient id="${id}d" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${P.sky[1]}"/><stop offset="1" stop-color="${P.land[0]}"/></linearGradient>`);
+    defs.push(`<linearGradient id="${id}c" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${P.sun}"/><stop offset="1" stop-color="${P.sky[2]}"/></linearGradient>`);
+    b.push(`<rect width="${w}" height="${h}" fill="url(#${id}d)"/>`);
+    const cx = wide ? w * .66 : w * .5, cy = h * .4, R = m * .37;
+    b.push(`<circle cx="${f1(cx)}" cy="${f1(cy)}" r="${f1(R * 1.9)}" fill="url(#${id}g)" opacity=".7"/><circle cx="${f1(cx)}" cy="${f1(cy)}" r="${f1(R)}" fill="url(#${id}c)"/>`);
+    for (let i = 0; i < 5; i++) { const y = cy + R * (.1 + i * .17); b.push(`<rect x="${f1(cx - R)}" y="${f1(y)}" width="${f1(R * 2)}" height="${f1(R * (.02 + i * .022))}" fill="${P.sky[1]}" opacity=".85"/>`); }
+    const hx = cx + (wide ? 0 : (r() - .5) * w * .1), hy = h * .5, hs = m * .16;
+    b.push(`<ellipse cx="${f1(hx)}" cy="${f1(hy)}" rx="${f1(hs * .86)}" ry="${f1(hs * 1.06)}" fill="${P.land[0]}"/><rect x="${f1(hx - hs * .38)}" y="${f1(hy + hs * .6)}" width="${f1(hs * .76)}" height="${f1(hs * 1.2)}" fill="${P.land[0]}"/><path d="M${f1(hx - hs * 2.7)},${h} C${f1(hx - hs * 2.4)},${f1(hy + hs * 1.6)} ${f1(hx - hs * 1.2)},${f1(hy + hs * 1.4)} ${f1(hx)},${f1(hy + hs * 1.4)} C${f1(hx + hs * 1.2)},${f1(hy + hs * 1.4)} ${f1(hx + hs * 2.4)},${f1(hy + hs * 1.6)} ${f1(hx + hs * 2.7)},${h} Z" fill="${P.land[0]}"/>`);
+  } else if (spec.kind === "planet") {
+    defs.push(`<linearGradient id="${id}d" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${P.land[0]}"/><stop offset="1" stop-color="${P.sky[1]}"/></linearGradient>`);
+    defs.push(`<radialGradient id="${id}p" cx=".34" cy=".3" r=".85"><stop offset="0" stop-color="${P.sun}"/><stop offset=".35" stop-color="${P.sky[2]}"/><stop offset=".75" stop-color="${P.sky[1]}"/><stop offset="1" stop-color="${P.land[0]}"/></radialGradient>`);
+    b.push(`<rect width="${w}" height="${h}" fill="url(#${id}d)"/>`);
+    stars(wide ? 70 : 34, h * .8);
+    const cx = w * (wide ? .64 : .6), cy = h * (wide ? .38 : .34), R = m * (wide ? .3 : .3);
+    b.push(`<circle cx="${f1(cx)}" cy="${f1(cy)}" r="${f1(R * 2.2)}" fill="url(#${id}g)" opacity=".55"/><circle cx="${f1(cx)}" cy="${f1(cy)}" r="${f1(R)}" fill="url(#${id}p)"/>`);
+    b.push(`<ellipse cx="${f1(cx)}" cy="${f1(cy)}" rx="${f1(R * 1.8)}" ry="${f1(R * .3)}" fill="none" stroke="${P.sun}" stroke-opacity=".6" stroke-width="${f1(m * .012)}" transform="rotate(-16 ${f1(cx)} ${f1(cy)})"/>`);
+    const pts = ridge(h * .84, h * .07, wide ? 12 : 7);
+    b.push(`<path d="${ridgeD(pts)}" fill="${P.land[0]}"/>`);
+    const fx = w * (wide ? .3 : .34); figure(fx, ridgeY(pts, fx) + 1, h * (wide ? .14 : .1), "#05030c");
+  } else if (spec.kind === "forest") {
+    sky(); stars(12, h * .3);
+    sun(w * (.25 + r() * .5), h * .24, m * .08);
+    [[h * .6, h * .18, P.land[2]], [h * .74, h * .25, P.land[1]], [h * .92, h * .34, P.land[0]]].forEach(([base, th, col]) => {
+      let d = "";
+      for (let x = -m * .1; x < w + m * .1;) { const hh = th * (.55 + r() * .45), tw = hh * .42; d += `M${f1(x)},${f1(base)} L${f1(x + tw / 2)},${f1(base - hh)} L${f1(x + tw)},${f1(base)} Z `; x += tw * (.45 + r() * .4); }
+      b.push(`<path d="${d}" fill="${col}"/><rect y="${f1(base - 1)}" width="${w}" height="${f1(h - base + 1)}" fill="${col}"/>`);
+      b.push(`<rect y="${f1(base - th * .25)}" width="${w}" height="${f1(th * .5)}" fill="${P.sky[2]}" opacity=".07"/>`);
+    });
+  } else if (spec.kind === "road") {
+    sky(); stars(10, h * .3);
+    const hz = h * .56, vx = w / 2;
+    sun(vx, hz, m * .2);
+    land(hz, P.land[0]);
+    let g = "";
+    for (let i = -6; i <= 6; i++) g += `M${f1(vx)},${f1(hz)} L${f1(vx + i * w * .2)},${h} `;
+    for (let k = 1; k < 9; k++) { const y = hz + (h - hz) * Math.pow(k / 9, 2); g += `M0,${f1(y)} L${w},${f1(y)} `; }
+    b.push(`<path d="${g}" stroke="${P.sky[2]}" stroke-opacity=".38" stroke-width="${f1(m * .006 + .2)}" fill="none"/>`);
+    b.push(`<path d="M${f1(vx - w * .015)},${f1(hz)} L${f1(vx + w * .015)},${f1(hz)} L${f1(vx + w * .3)},${h} L${f1(vx - w * .3)},${h} Z" fill="${P.land[1]}"/>`);
+    for (let k = 0; k < 6; k++) { const a = Math.pow(k / 6, 1.7), c = Math.pow((k + .5) / 6, 1.7); const y1 = hz + (h - hz) * a, y2 = hz + (h - hz) * c; b.push(`<path d="M${f1(vx - .3 - a * 2)},${f1(y1)} L${f1(vx + .3 + a * 2)},${f1(y1)} L${f1(vx + .3 + c * 2)},${f1(y2)} L${f1(vx - .3 - c * 2)},${f1(y2)} Z" fill="${P.sun}" opacity=".85"/>`); }
+    const pts = ridge(hz, h * .05, 10);
+    b.push(`<path d="${ridgeD(pts).replace(`L${w},${h}`, `L${w},${f1(hz)}`).replace(`M0,${h}`, `M0,${f1(hz)}`)}" fill="${P.land[1]}"/>`);
+  } else {
+    // streaks: beams of light and one backlit figure
+    defs.push(`<linearGradient id="${id}d" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${P.sky[0]}"/><stop offset="1" stop-color="${P.land[0]}"/></linearGradient>`);
+    defs.push(`<linearGradient id="${id}b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${P.sky[2]}" stop-opacity=".6"/><stop offset="1" stop-color="${P.sky[2]}" stop-opacity="0"/></linearGradient>`);
+    b.push(`<rect width="${w}" height="${h}" fill="url(#${id}d)"/>`);
+    const ox = w * (.3 + r() * .4);
+    for (let i = 0; i < 6; i++) { const a = -w * .3 + r() * w * 1.6, sp = w * (.05 + r() * .08); b.push(`<path d="M${f1(ox - 2)},${f1(-h * .05)} L${f1(ox + 2)},${f1(-h * .05)} L${f1(a + sp)},${h} L${f1(a - sp)},${h} Z" fill="url(#${id}b)" opacity="${(.35 + r() * .5).toFixed(2)}"/>`); }
+    b.push(`<ellipse cx="${f1(w * .5)}" cy="${f1(h * .97)}" rx="${f1(w * .35)}" ry="${f1(h * .05)}" fill="${P.sky[2]}" opacity=".35"/>`);
+    figure(w * .5, h * .97, h * .42, "#05030c");
+  }
+  b.push(`<rect width="${w}" height="${h}" fill="url(#${id}v)"/>`);
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg"><defs>${defs.join("")}</defs>${b.join("")}</svg>`;
+}
+
+const KINDS = ["peaks", "city", "sea", "profile", "planet", "forest", "road", "streaks"];
+const PALS = ["dusk", "teal", "ember", "arctic", "gold", "jade", "violet", "rose"];
+const auto = n => ({ kind: KINDS[(n * 5 + 3) % 8], pal: PALS[(n * 3 + 1) % 8], seed: 1000 + n * 37 });
+
+/* ------------------------------------------------------------------ content
+   Row names, captions and buttons use the app's own words. */
+const CW = [
+  { art: { kind: "planet", pal: "violet", seed: 11 }, p: .42, title: "Alterity", meta: "2026   ·   1h 52m   ·   Sci-Fi, Drama   ·   * to remove", plot: "A signal from the far side of the moon pulls an engineer into a world that mirrors her own." },
+  { art: { kind: "city", pal: "arctic", seed: 23 }, p: .64, cap: "S1:E4", title: "Northline", meta: "Resume  S1:E4   ·   * to remove", plot: "A night-shift crew on the last train north keeps meeting passengers who never boarded." },
+  { art: { kind: "sea", pal: "dusk", seed: 37 }, p: .2, title: "Paper Moons", meta: "2024   ·   1h 38m   ·   Drama   ·   * to remove", plot: "Two old friends drive the coast one last summer, chasing a film they never finished." },
+  { art: { kind: "profile", pal: "ember", seed: 41 }, p: .78, cap: "S2:E7" },
+  { art: { kind: "forest", pal: "jade", seed: 53 }, p: .5 },
+  { art: { kind: "road", pal: "rose", seed: 67 }, p: .3, cap: "S1:E2" },
+  { art: { kind: "peaks", pal: "gold", seed: 71 }, p: .66 },
+  { art: { kind: "streaks", pal: "teal", seed: 83 }, p: .24 },
+  { art: { kind: "profile", pal: "arctic", seed: 97 }, p: .55, cap: "S3:E1" },
+];
+const ROW1 = [0, 1, 2, 3, 4, 5, 6, 7, 8].map(i => ({ art: auto(i + 10) }));
+const ROW2 = [0, 1, 2, 3, 4, 5, 6, 7, 8].map(i => ({ art: auto(i + 30) }));
+
+/* ------------------------------------------------------------------ build DOM */
+function posterItem(parent, x, item, opts = {}) {
+  const el = html(parent, `<div class="pi" style="left:${x}px"><div class="card"><div class="ring"></div><div class="base"></div></div></div>`);
+  const card = el.firstElementChild, base = card.children[1];
+  if (item.name) {
+    base.style.background = opts.seeAll ? "var(--pill)" : "var(--pill-on)";
+    html(card, `<div class="name">${item.name}</div>`);
+    if (item.cap) html(card, `<div class="cap2">${item.cap}</div>`);
+  } else {
+    base.innerHTML = art(item.art, 120, 180);
+    if (item.cap) html(card, `<div class="band">${item.cap}</div>`);
+    if (item.p) html(card, `<div class="track"><div class="fillbar" style="width:${item.p * 120}px"></div></div>`);
+  }
+  return { el, card, ring: card.firstElementChild, fill: card.querySelector(".fillbar"), p: item.p || 0 };
+}
+function header(scr, withSparkle = true) {
+  html(scr, `<div class="logo">${wordmark()}</div>`);
+  if (withSparkle) html(scr, `<div class="hsparkle tint spark-img"></div>`);
+}
+function imgEl(parent, src, x, y, w, h, extra = "") { return html(parent, `<img alt="" src="../src/images/${src}" style="position:absolute;left:${x}px;top:${y}px;width:${w}px;height:${h}px;${extra}">`); }
+
+// Dull "before" screen: the raw provider names ARAN+ tidies up.
+const dull = $("#dull");
+html(dull, `<div class="top"><b>VOD</b><span>LIVE</span><span>SERIES</span><span>SETTINGS</span><span style="margin-left:auto;margin-right:36px;color:#6e6e74">ALL &gt; MOVIES</span></div>`);
+const side = html(dull, `<div class="side"></div>`);
+["EN | ACTION ★", "|IN| ACTION", "IN ✪ PUNJABI", "EN | NEW RELEASES", "FR ◉ CINEMA", "EN ✪ COMEDY MOVIES", "VOD | 4K UHD", "EN | DRAMA ★", "|IN| BOLLYWOOD HD", "EN | THRILLER ★", "EN ✪ SCI-FI", "EN | FAMILY"].forEach((n, i) => html(side, `<div class="row${i === 0 ? " sel" : ""}">${n}</div>`));
+const dullList = html(html(dull, `<div class="list"></div>`), `<div style="position:absolute;left:0;top:0;width:860px"></div>`);
+["EN ★ Alterity - 2026", "EN ★ Northline S01 - 2025", "EN ★ Paper Moons - 2024"].concat(Array(14).fill("")).forEach((n, i) => {
+  const w = 220 + ((i * 97) % 300);
+  html(dullList, `<div class="item"><div class="ph">N/A</div>${n || `<div class="bar" style="width:${w}px"></div>`}</div>`);
+});
+
+// Home: hero banner, tab bar and poster rows.
+const home = $("#home");
+html(home, `<div class="fill" style="background:var(--plum)"></div>`);
+const backdrops = html(home, `<div style="position:absolute;left:340px;top:0;width:940px;height:529px;overflow:hidden;isolation:isolate"></div>`);
+const bdEls = CW.slice(0, 3).map(c => html(backdrops, `<div class="fill" style="opacity:0">${art(c.art, 320, 180)}</div>`));
+bdEls.forEach(el => { const s = el.firstElementChild; s.setAttribute("width", "940"); s.setAttribute("height", "529"); });
+imgEl(home, "fade_left.png", 340, 0, 440, 540);
+imgEl(home, "fade_bottom.png", 320, 280, 960, 260);
+html(home, `<div style="position:absolute;left:0;top:528px;width:1280px;height:192px;background:var(--plum)"></div>`);
+imgEl(home, "fade_top.png", 0, 0, 1280, 140);
+header(home);
+const tabHL = html(home, `<div class="tabHL"></div>`);
+const tabsEl = html(home, `<div class="tabs"></div>`);
+const tabEls = ["Home", "Movies", "Series", "Categories", "Search"].map(n => html(tabsEl, `<div class="tab">${n}</div>`));
+const hero = html(home, `<div class="hero"><div class="t"></div><div class="m"></div><div class="pl"></div></div>`);
+const rowsClip = html(home, `<div class="rowsClip"></div>`);
+const rowlist = html(rowsClip, `<div class="rowlist"></div>`);
+const homeRows = [["Continue Watching", CW], ["New Releases  ·  Movies", ROW1], ["New Releases  ·  Series", ROW2]].map(([label, items], ri) => {
+  const row = html(rowlist, `<div class="rowL" style="top:${ri * 226}px"><div class="lab">${label}</div></div>`);
+  return items.map((it, i) => posterItem(row, i * 130, it));
+});
+
+// Categories tab.
+const cats = $("#cats");
+header(cats);
+html(cats, `<div class="heading">Categories</div>`);
+const CAT_ROWS = [
+  ["New releases", [["New Releases", "Movies"], ["New Releases", "Series"], ["Trending", "Movies"], ["Box Office", "Movies"], ["Just Added", "Series"], ["Trending", "Series"]]],
+  ["English movies", [["Action", "Movies"], ["Comedy", "Movies"], ["Drama", "Movies"], ["Sci-Fi", "Movies"], ["Thriller", "Movies"], ["Family", "Movies"]]],
+  ["Hindi movies", [["Bollywood", "Movies"], ["Hindi Action", "Movies"], ["Hindi Comedy", "Movies"], ["Hindi Drama", "Movies"], ["Hindi Thriller", "Movies"], ["Hindi Romance", "Movies"]]],
+  ["Punjabi", [["Punjabi", "Movies"], ["Punjabi Comedy", "Movies"], ["Punjabi", "Series"], ["Punjabi Drama", "Movies"], ["Punjabi Romance", "Movies"], ["Punjabi Action", "Movies"]]],
+];
+const catTiles = CAT_ROWS.map(([label, tiles], ri) => {
+  const y = 104 + ri * 140;
+  html(cats, `<div style="position:absolute;left:48px;top:${y}px;font:500 21px/1.2 var(--display);color:#EEE8FF">${label}</div>`);
+  return tiles.map(([nm, cp], i) => {
+    const el = html(cats, `<div class="ct" style="left:${48 + i * 220}px;top:${y + 34}px"><div class="card"><div class="ring"></div><div class="base"><div class="accent"></div></div><div class="nm">${nm}</div><div class="cp">${cp}</div></div></div>`);
+    return { card: el.firstElementChild, ring: el.querySelector(".ring"), base: el.querySelector(".base") };
+  });
+});
+
+// Search tab: keyboard, symbols, results.
+const search = $("#search");
+imgEl(search, "fade_top.png", 0, 0, 1280, 140);
+header(search);
+html(search, `<div class="heading" style="top:26px">Search</div>`);
+const kb = html(search, `<div class="kb"><div class="box"></div><div class="pad"></div></div>`);
+const kbBox = kb.firstElementChild, kbPad = kb.children[1];
+const kFocus = html(kbPad, `<div class="kfocus"></div>`);
+const KEYS = ["abcdef", "ghijkl", "mnopqr", "stuvwx", "yz1234", "567890"];
+const keyPos = {};
+KEYS.forEach((row, r) => [...row].forEach((ch, c) => { const x = 10 + c * 69, y = 12 + r * 54; keyPos[ch] = [x, y]; html(kbPad, `<div class="key" style="left:${x}px;top:${y}px">${ch}</div>`); }));
+[["space", 10, 133], ["⌫", 148, 133], ["clear", 286, 133]].forEach(([l, x, w]) => html(kbPad, `<div class="key" style="left:${x}px;top:${12 + 6 * 54}px;width:${w}px;font-size:${l === "⌫" ? 24 : 19}px">${l}</div>`));
+["&", "'", "-", ":", ".", ",", "!", "?", "(", ")", "+", "#", "@", "/"].forEach((s, i) => html(search, `<div class="sym" style="left:${36 + (i % 7) * 59}px;top:${560 + Math.floor(i / 7) * 48}px">${s}</div>`));
+const results = html(search, `<div class="results"></div>`);
+const resRows = [
+  ["Categories", [["Comedy", "Movies"], ["Comedy", "Series"], ["Hindi Comedy", "Movies"], ["Punjabi Comedy", "Movies"], ["Romantic Comedy", "Movies"], ["Stand-Up Comedy", "Series"]].map(([name, cap]) => ({ name, cap }))],
+  ["Movies", [50, 51, 52, 53, 54, 55].map(n => ({ art: auto(n) }))],
+  ["Series", [60, 61, 62, 63, 64, 65].map(n => ({ art: auto(n) }))],
+].map(([label, items], ri) => {
+  const row = html(results, `<div class="rowL" style="top:${ri * 244}px;width:752px"><div class="lab">${label}</div></div>`);
+  return { row, items: items.map((it, i) => posterItem(row, i * 130, it)) };
+});
+
+// Player: the video, our own controls and the Up next card.
+const player = $("#player");
+html(player, `<div class="fill" style="background:#000"></div>`);
+const video = html(player, `<div class="fill" style="transform-origin:62% 50%">${art({ kind: "city", pal: "arctic", seed: 24, sunX: .8, sunY: .5, lit: .42 }, 320, 180)}</div>`);
+video.firstElementChild.setAttribute("width", "1280"); video.firstElementChild.setAttribute("height", "720");
+const controls = html(player, `<div class="fill"></div>`);
+imgEl(controls, "fade_top.png", 0, 0, 1280, 140);
+imgEl(controls, "fade_bottom.png", 0, 430, 1280, 290);
+html(controls, `<div class="pl-btn" style="left:48px;top:30px;width:120px;height:44px;padding:0;background:var(--plum);color:var(--ink)">‹&nbsp;&nbsp;Back</div>`);
+html(controls, `<div style="position:absolute;left:188px;top:30px;height:44px;display:flex;align-items:center;font:500 22px/1 var(--display);color:var(--ink);white-space:pre">Northline   ·   S1:E4  Episode 4</div>`);
+html(controls, `<div style="position:absolute;left:48px;top:558px;width:56px;height:56px;border-radius:50%;background:var(--lavender)"><div class="tint" style="position:absolute;left:16px;top:16px;width:24px;height:24px;background:var(--plum);-webkit-mask-image:url(../src/images/icon_pause.png);mask-image:url(../src/images/icon_pause.png)"></div></div>`);
+const elapsedEl = html(controls, `<div style="position:absolute;left:120px;top:574px;width:96px;text-align:right;font:800 17px/1.2 var(--body);color:var(--ink);font-variant-numeric:tabular-nums"></div>`);
+html(controls, `<div style="position:absolute;left:228px;top:584px;width:896px;height:5px;background:rgba(201,184,255,.25)"></div>`);
+const barFill = html(controls, `<div style="position:absolute;left:228px;top:584px;height:5px;background:var(--lavender)"></div>`);
+const knob = html(controls, `<div style="position:absolute;top:577.5px;width:18px;height:18px;border-radius:50%;background:var(--ink)"></div>`);
+const remainEl = html(controls, `<div style="position:absolute;left:1136px;top:574px;width:100px;font:800 17px/1.2 var(--body);color:var(--ink-2);font-variant-numeric:tabular-nums"></div>`);
+let bx = 48;
+["Audio & subtitles", "Episodes", "Next episode", "Restart"].forEach(l => { const b = html(controls, `<div class="pl-btn" style="left:${bx}px;top:636px">${l.replace("&", "&amp;")}</div>`); bx += b.offsetWidth + 14; });
+const upnext = html(player, `<div class="upnext"><div class="sp tint spark-img"></div><div class="ey">UP NEXT</div><div class="tt">S1:E5  Episode 5</div><div class="hn"></div></div>`);
+const upHint = upnext.querySelector(".hn");
+
+// Stage captions.
+const capsEl = $("#caps");
+const CAPS = [
+  { a: 6.1, b: 10.55, eb: "Home", h: "Posters, not lists.", p: "A big backdrop for whatever you land on." },
+  { a: 10.75, b: 14.55, eb: "Continue Watching", h: "Right where you left off.", p: "Series roll on to the next episode." },
+  { a: 14.75, b: 18.95, eb: "Categories", h: "Every category, tidied.", p: "New releases first, then your languages." },
+  { a: 19.15, b: 23.55, eb: "Search", h: "Results as you type.", p: "Movies, series and categories." },
+  { a: 23.75, b: 27.95, eb: "Player", h: "Up next, on its own.", p: "A countdown rolls you into the next episode." },
+].map(c => ({ ...c, el: html(capsEl, `<div class="cap"><div class="eb"><i class="tint spark-img"></i>${c.eb}</div><h2>${c.h}</h2><p>${c.p}</p></div>`) }));
+
+// Hook and brand captions.
+const hookCap = $("#hookCap");
+const hookWords = "Bored from the UI of your IPTV player?".split(" ").map((w, i) => html(hookCap, `<span${i === 0 ? ' class="bored"' : ""}>${w}</span>`));
+const brandMark = $("#brandMark");
+brandMark.innerHTML = wordmark()
+  + sparkSVG("var(--butter)", "left:-.5em;top:.06em;width:.44em;height:.44em")
+  + sparkSVG("#fff", "left:calc(100% + .1em);top:-.04em;width:.3em;height:.3em")
+  + sparkSVG("var(--lavender-light)", "left:66%;top:calc(100% - .02em);width:.24em;height:.24em");
+const brandSparks = [...brandMark.querySelectorAll("svg")];
+const burst = $("#burst");
+burst.innerHTML = sparkSVG("var(--lavender-light)", "left:-110px;top:-110px;width:220px;height:220px");
+
+// Feature list.
+const feats = $("#feats");
+const featCap = html(feats, `<div class="cap"><div class="eb"><i class="tint spark-img"></i>Plus</div><h2>The little things.</h2></div>`);
+const FEATS = ["Resume or play from start", "Audio & subtitles", "English subtitles online", "Seasons & episodes", "Search inside a category", "Flags files that won't play"];
+const featEls = FEATS.map((f, i) => html(feats, `<div class="fpill" style="top:${560 + i * 128}px">${f.replace("&", "&amp;")}</div>`));
+
+// Outro.
+const outro = $("#outro");
+const oMark = html(outro, `<div style="position:absolute;left:0;top:640px;width:1080px"><div class="wmWrap">${wordmark()}${sparkSVG("var(--butter)", "left:-.5em;top:.06em;width:.44em;height:.44em")}${sparkSVG("#fff", "left:calc(100% + .1em);top:-.04em;width:.3em;height:.3em")}${sparkSVG("var(--lavender-light)", "left:66%;top:calc(100% - .02em);width:.24em;height:.24em")}</div></div>`);
+const oSparks = [...oMark.querySelectorAll("svg")];
+const oTag = html(outro, `<div class="tag" style="position:absolute;left:0;top:1010px;width:1080px">IPTV, made for Roku.</div>`);
+const oTabs = html(outro, `<div class="otabs" style="top:1160px"></div>`);
+const oHL = html(oTabs, `<div class="otabHL"></div>`);
+const oTabEls = ["Home", "Movies", "Series", "Categories", "Search"].map(n => html(oTabs, `<div class="otab">${n}</div>`));
+const oSub = html(outro, `<div class="sub" style="position:absolute;left:0;top:1286px;width:1080px">Sign in with your Xtream Codes login.</div>`);
+
+// Film grain, made once.
+(() => {
+  const c = document.createElement("canvas"); c.width = c.height = 240;
+  const g = c.getContext("2d"), d = g.createImageData(240, 240), r = rng(7);
+  for (let i = 0; i < d.data.length; i += 4) { const v = Math.floor(r() * 255); d.data[i] = d.data[i + 1] = d.data[i + 2] = v; d.data[i + 3] = 255; }
+  g.putImageData(d, 0, 0);
+  $("#grain").style.backgroundImage = `url(${c.toDataURL()})`;
+})();
+
+/* ------------------------------------------------------------------ timeline */
+// Camera: which point of the TV screen (cx, cy) sits at stage x 540, y sy, and at what scale.
+const CAM = [
+  { t: 0, s: .78, cx: 640, cy: 360, sy: 1090 },
+  { t: 6, s: .79, cx: 640, cy: 360, sy: 1090 },
+  { t: 10.5, s: .81, cx: 640, cy: 360, sy: 1090 },
+  { t: 11.35, s: 1.86, cx: 308, cy: 548, sy: 1152 },
+  { t: 13.0, s: 1.86, cx: 314, cy: 548, sy: 1152 },
+  { t: 14.0, s: 1.86, cx: 320, cy: 548, sy: 1152 },
+  { t: 14.75, s: 1.35, cx: 430, cy: 46, sy: 960 },
+  { t: 15.75, s: 1.35, cx: 432, cy: 46, sy: 960 },
+  { t: 16.45, s: 1.4, cx: 410, cy: 384, sy: 1272 },
+  { t: 18.9, s: 1.4, cx: 430, cy: 384, sy: 1272 },
+  { t: 19.55, s: 1.55, cx: 248, cy: 340, sy: 1258 },
+  { t: 21.75, s: 1.55, cx: 252, cy: 340, sy: 1258 },
+  { t: 22.5, s: 1.45, cx: 820, cy: 340, sy: 1234 },
+  { t: 23.55, s: 1.45, cx: 836, cy: 340, sy: 1234 },
+  { t: 24.2, s: .78, cx: 640, cy: 360, sy: 1090 },
+  { t: 25.9, s: .8, cx: 640, cy: 360, sy: 1090 },
+  { t: 26.85, s: 1.55, cx: 990, cy: 578, sy: 1300 },
+  { t: 28.4, s: 1.62, cx: 990, cy: 578, sy: 1300 },
+];
+// Focus changes: [time, index]. Each item eases in or out over 0.2 s, like RowList.
+const focusAmt = (events, t, key) => {
+  let cur = -1;
+  for (let i = 0; i < events.length; i++) if (t >= events[i][0]) cur = i;
+  if (cur < 0) return 0;
+  const k = seg(t, events[cur][0], events[cur][0] + .2), is = events[cur][1] === key;
+  const was = cur > 0 && events[cur - 1][1] === key;
+  if (is && was) return 1;
+  if (is) return E.outCubic(k);
+  if (was) return 1 - E.outCubic(k);
+  return 0;
+};
+const current = (events, t) => { let c = null; for (const e of events) if (t >= e[0]) c = e; return c; };
+
+const HOME_FOCUS = [[0, "0:0"], [7.1, "0:1"], [8.75, "0:2"], [12.0, "0:3"], [13.25, "1:3"], [14.55, "nav"]];
+const HERO_EVENTS = [[-1, 0], [7.1, 1], [8.75, 2]];
+const TAB_EVENTS = [[0, 0, false], [14.55, 0, true], [14.95, 1, true], [15.2, 2, true], [15.45, 3, true]];
+const CAT_FOCUS = [[16.0, "0:0"], [16.7, "0:1"], [17.4, "1:1"], [18.1, "2:1"], [18.8, "3:1"]];
+const TYPED = [[19.85, "c"], [20.2, "o"], [20.55, "m"], [20.9, "e"], [21.25, "d"], [21.6, "y"]];
+const RES_FOCUS = [[22.75, "0:0"], [23.2, "0:1"]];
+const FEAT_FOCUS = [[29.1, 0], [29.5, 1], [29.9, 2], [30.3, 3], [30.7, 4], [31.1, 5]];
+
+const tabGeom = () => tabEls.map(el => [el.offsetLeft + 232, el.offsetWidth]);
+let TABG = null, OTABG = null;
+const fmt = s => { s = Math.max(0, Math.floor(s)); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); };
+
+function render(t) {
+  t = clamp(t, 0, DUR);
+  if (!TABG) TABG = tabGeom();
+  if (!OTABG) OTABG = oTabEls.map(el => [el.offsetLeft, el.offsetWidth]);
+
+  // Stage: a grey "before" world that blooms into the plum night.
+  const bloom = E.inOutCubic(seg(t, 2.75, 3.7));
+  setStyle($("#neutralBg"), { opacity: 1 - bloom });
+  const drift = Math.sin(t * .35);
+  setStyle($("#sglowA"), { opacity: lerp(.05, .24, bloom), transform: `translate(${drift * 30}px, ${Math.cos(t * .3) * 24}px)` });
+  setStyle($("#sglowB"), { opacity: lerp(.03, .17, bloom), transform: `translate(${-drift * 26}px, ${Math.sin(t * .27) * 30}px)` });
+
+  // Camera and TV.
+  const s = keyed(CAM, t, "s"), cx = keyed(CAM, t, "cx"), cy = keyed(CAM, t, "cy"), sy = keyed(CAM, t, "sy");
+  const tvIn = E.outCubic(seg(t, -.4, .5)), tvOut = E.inCubic(seg(t, 28.0, 28.55));
+  setStyle($("#tvCam"), { transform: `translate(${540 - cx * s}px, ${sy - cy * s + (1 - tvIn) * 60 + tvOut * 40}px) scale(${s})`, opacity: tvIn * (1 - tvOut) });
+  const bez = 1 - E.inOutCubic(seg(t, 10.65, 11.25)) + E.inOutCubic(seg(t, 23.6, 24.15));
+  setStyle($("#bezel"), { opacity: bez });
+  setStyle($("#stand"), { opacity: bez });
+  setStyle($("#gloss"), { opacity: bez });
+  setStyle($("#iglowA"), { opacity: .16 * bez });
+  setStyle($("#iglowB"), { opacity: .10 * bez });
+  setStyle($("#bezel"), { filter: `saturate(${lerp(0, 1, bloom)})` });
+
+  // Scrims keep captions clear when the camera is close.
+  setStyle($("#scrimTop"), { opacity: clamp((820 - (sy - cy * s)) / 80) });
+  setStyle($("#scrimFoot"), { opacity: .9 * (1 - bez) });
+  const bottom = sy + (720 - cy) * s;
+  setStyle($("#scrimBot"), { top: (bottom - 130) + "px", background: `linear-gradient(180deg, rgba(21,16,40,0) 0, var(--plum) 130px, var(--plum) 100%)`, opacity: 1 - bez });
+
+  // Before/after swap inside the TV.
+  const wipe = E.inOutCubic(seg(t, 2.85, 3.55));
+  setStyle($("#aran"), { clipPath: wipe >= 1 ? "none" : `circle(${wipe * 760}px at 50% 50%)` });
+  setStyle($("#dull"), { visibility: wipe >= 1 ? "hidden" : "visible", filter: `brightness(${1 - seg(t, 2.4, 2.9) * .35})` });
+  setStyle(dullList, { transform: `translateY(${-Math.max(0, t) * 18}px)` });
+  const fl = Math.sin(Math.PI * seg(t, 2.8, 3.6));
+  setStyle($("#flash"), { background: `radial-gradient(circle at 50% 50%, rgba(226,216,255,${.55 * fl}) 0, rgba(201,184,255,${.25 * fl}) 30%, rgba(201,184,255,0) 60%)` });
+  const bk = seg(t, 2.7, 3.55);
+  setStyle(burst, { left: "540px", top: (sy) + "px", opacity: Math.sin(Math.PI * bk), transform: `scale(${E.outCubic(bk) * 1.5}) rotate(${bk * 90}deg)` });
+
+  // Hook question.
+  hookWords.forEach((w, i) => {
+    const a = E.outCubic(seg(t, -.25 + i * .12, .2 + i * .12));
+    const out = E.inCubic(seg(t, 2.6, 2.95));
+    let tr = `translateY(${(1 - a) * 34 - out * 30}px)`;
+    if (i === 0) tr += ` rotate(${E.outBack(seg(t, 1.5, 2.1)) * 7}deg)`;
+    setStyle(w, { opacity: a * (1 - out), transform: tr });
+  });
+
+  // Brand reveal.
+  const bIn = seg(t, 3.15, 3.8), bOut = E.inCubic(seg(t, 5.65, 6.0));
+  setStyle(brandMark, { opacity: E.outCubic(bIn) * (1 - bOut), transform: `scale(${lerp(.72, 1, E.outBack(bIn)) - bOut * .05}) translateY(${-bOut * 30}px)` });
+  brandSparks.forEach((sp, i) => {
+    const k = seg(t, 3.5 + i * .14, 3.95 + i * .14);
+    const tw = 1 + Math.sin(t * 3 + i * 2) * .08;
+    setStyle(sp, { transform: `scale(${E.outBack(k) * tw}) rotate(${(1 - k) * -60}deg)`, opacity: k > 0 ? 1 : 0 });
+  });
+  const tagIn = E.outCubic(seg(t, 3.7, 4.15));
+  setStyle($("#brandTag"), { opacity: tagIn * (1 - bOut), transform: `translateY(${(1 - tagIn) * 24 - bOut * 30}px)` });
+
+  // Scene captions.
+  CAPS.forEach(c => {
+    const kids = c.el.children;
+    let any = false;
+    for (let i = 0; i < kids.length; i++) {
+      const a = E.outCubic(seg(t, c.a + i * .08, c.a + i * .08 + .45)), o = E.inCubic(seg(t, c.b - .3, c.b));
+      if (a * (1 - o) > 0) any = true;
+      setStyle(kids[i], { opacity: a * (1 - o), transform: `translateY(${(1 - a) * 34 - o * 26}px)` });
+    }
+    setStyle(c.el, { visibility: any ? "visible" : "hidden" });
+  });
+
+  // Which app screen is on: each fades and floats in, like the app.
+  const scr = (el, a, b) => { const i = E.outCubic(seg(t, a, a + .32)), o = seg(t, b, b + .2); setStyle(el, { opacity: i * (1 - o), transform: `translateY(${(1 - i) * 14}px)`, visibility: i * (1 - o) > 0 ? "visible" : "hidden" }); };
+  scr(home, -1, 15.75);
+  scr($("#cats"), 15.8, 19.05);
+  scr(search, 19.1, 23.75);
+  scr(player, 23.8, 99);
+
+  renderHome(t);
+  renderCats(t);
+  renderSearch(t);
+  renderPlayer(t);
+  renderFeats(t);
+  renderOutro(t);
+
+  setStyle($("#grain"), { backgroundPosition: `${Math.floor(t * 24) * 53 % 240}px ${Math.floor(t * 24) * 97 % 240}px` });
+  setStyle($("#fine"), { opacity: .85 * E.outCubic(seg(t, 3.6, 4.2)) });
+}
+
+function renderHome(t) {
+  if (t > 15.9) return;
+  // Hero for the focused Continue Watching title: floats up as it changes.
+  const he = current(HERO_EVENTS, t), idx = he[1], c = CW[idx];
+  setText(hero.children[0], c.title); setText(hero.children[1], c.meta); setText(hero.children[2], c.plot);
+  const hk = E.outCubic(seg(t, he[0], he[0] + .35));
+  setStyle(hero, { opacity: hk, transform: `translateY(${(1 - hk) * 14}px)` });
+  bdEls.forEach((el, i) => {
+    const onAt = HERO_EVENTS.find(e => e[1] === i)[0];
+    const next = HERO_EVENTS.find(e => e[0] > onAt);
+    const fin = i === 0 ? 1 : E.outQuad(seg(t, onAt + .25, onAt + .75));
+    const gone = next && t > next[0] + .8 ? 0 : 1;
+    const kb = 1.04 + .04 * seg(t, onAt, onAt + 6);
+    setStyle(el, { opacity: fin * gone, zIndex: i, transform: `scale(${kb})` });
+  });
+  // Feathered backdrop edges only show once the TV frame is gone.
+  const bez = 1 - E.inOutCubic(seg(t, 10.65, 11.25));
+  const f = (1 - bez) * 120;
+  setStyle(backdrops, { webkitMaskImage: f > 0 ? `linear-gradient(to left, transparent 0, #000 ${f}px), linear-gradient(to bottom, transparent 0, #000 ${f}px)` : "none", webkitMaskComposite: "source-in", maskComposite: "intersect" });
+
+  // Tab bar.
+  const te = current(TAB_EVENTS, t), prev = TAB_EVENTS[Math.max(0, TAB_EVENTS.indexOf(te) - 1)];
+  const k = E.outCubic(seg(t, te[0], te[0] + .22));
+  const [x0, w0] = TABG[prev[1]], [x1, w1] = TABG[te[1]];
+  setStyle(tabHL, { left: lerp(x0, x1, k) + "px", width: lerp(w0, w1, k) + "px", background: te[2] ? "var(--lavender)" : "var(--pill)", transform: te[2] ? "scale(1.06)" : "none" });
+  const lit = k < .5 ? prev[1] : te[1];
+  tabEls.forEach((el, i) => setStyle(el, { color: te[2] && i === lit ? "var(--plum)" : i === 0 ? "var(--ink)" : "var(--ink-3)" }));
+
+  // Rows: Down moves the next row to the top.
+  const down = E.outCubic(seg(t, 13.25, 13.55));
+  setStyle(rowlist, { transform: `translateY(${-226 * down}px)` });
+  homeRows.forEach((row, ri) => row.forEach((p, i) => {
+    const a = focusAmt(HOME_FOCUS, t, ri + ":" + i);
+    setStyle(p.card, { transform: `scale(${1 + .06 * a})` });
+    setStyle(p.ring, { opacity: a });
+    if (p.fill && ri === 0) setStyle(p.fill, { width: (p.p * 120 * (t < 10.6 ? 1 : E.outCubic(seg(t, 11.0 + i * .06, 11.7 + i * .06)))) + "px" });
+  }));
+}
+
+function renderCats(t) {
+  if (t < 15.6 || t > 19.4) return;
+  catTiles.forEach((row, ri) => row.forEach((tile, i) => {
+    const a = focusAmt(CAT_FOCUS, t, ri + ":" + i);
+    setStyle(tile.card, { transform: `scale(${1 + .05 * a})` });
+    setStyle(tile.ring, { opacity: a });
+    setStyle(tile.base, { background: a > .5 ? "var(--pill-on)" : "var(--pill)" });
+  }));
+}
+
+function renderSearch(t) {
+  if (t < 18.9 || t > 24.2) return;
+  let q = "", last = null;
+  for (const e of TYPED) if (t >= e[0]) { q += e[1]; last = e; }
+  const caret = Math.floor(t * 2.2) % 2 === 0 && t < 22.75 ? '<span class="caret"></span>' : "";
+  const box = (q ? q : '<span class="hint">Movies and series</span>') + caret;
+  if (kbBox.innerHTML !== box) kbBox.innerHTML = box;
+  // The key highlight glides to each letter just before it is pressed.
+  let from = "a", to = "a", mt = 0;
+  for (let i = 0; i < TYPED.length; i++) if (t >= TYPED[i][0] - .2) { from = i ? TYPED[i - 1][1] : "a"; to = TYPED[i][1]; mt = TYPED[i][0] - .2; }
+  const mk = E.outCubic(seg(t, mt, mt + .14));
+  const [fx, fy] = keyPos[from], [tx, ty] = keyPos[to];
+  const press = last && t - last[0] < .14 ? .9 : 1;
+  const kbFocused = t < 22.75;
+  setStyle(kFocus, { left: lerp(fx, tx, mk) + "px", top: lerp(fy, ty, mk) + "px", transform: `scale(${press})`, background: kbFocused ? "var(--lavender)" : "var(--pill-on)" });
+  kbPad.querySelectorAll(".key").forEach(k => setStyle(k, { color: kbFocused && k.textContent === to && mk > .5 ? "var(--plum)" : "var(--key)" }));
+  // Results fill in after the debounce.
+  resRows.forEach((r, ri) => {
+    const a = E.outCubic(seg(t, 20.9 + ri * .1, 21.25 + ri * .1));
+    setStyle(r.row, { opacity: a, transform: `translateY(${(1 - a) * 16}px)` });
+    r.items.forEach((p, i) => { const f = focusAmt(RES_FOCUS, t, ri + ":" + i); setStyle(p.card, { transform: `scale(${1 + .06 * f})` }); setStyle(p.ring, { opacity: f }); });
+  });
+}
+
+function renderPlayer(t) {
+  if (t < 23.6) return;
+  const kb = 1 + .08 * seg(t, 23.6, 28.6);
+  setStyle(video, { transform: `scale(${kb}) translateX(${-seg(t, 23.6, 28.6) * 16}px)` });
+  const cIn = E.outCubic(seg(t, 24.1, 24.4)), cOut = seg(t, 25.75, 26.05);
+  setStyle(controls, { opacity: cIn * (1 - cOut) });
+  const dur = 2532, pos = 2290 + (t - 23.8);
+  setText(elapsedEl, fmt(pos)); setText(remainEl, "-" + fmt(dur - pos));
+  const w = 896 * pos / dur;
+  setStyle(barFill, { width: w + "px" }); setStyle(knob, { left: (228 + w - 9) + "px" });
+  const u = E.outCubic(seg(t, 25.95, 26.35));
+  setStyle(upnext, { opacity: u, transform: `translateX(${(1 - u) * 28}px)` });
+  const left = Math.max(1, 8 - Math.floor(Math.max(0, t - 26.0)));
+  setText(upHint, `Starts in ${left}   ·   OK to play now`);
+}
+
+function renderFeats(t) {
+  const on = t > 28.1 && t < 32;
+  setStyle(feats, { visibility: on ? "visible" : "hidden" });
+  if (!on) return;
+  const out = E.inCubic(seg(t, 31.45, 31.8));
+  [...featCap.children].forEach((k, i) => { const a = E.outCubic(seg(t, 28.25 + i * .08, 28.7 + i * .08)); setStyle(k, { opacity: a * (1 - out), transform: `translateY(${(1 - a) * 34 - out * 26}px)` }); });
+  featEls.forEach((el, i) => {
+    const a = E.outCubic(seg(t, 28.5 + i * .09, 28.95 + i * .09));
+    const f = focusAmt(FEAT_FOCUS, t, i);
+    setStyle(el, { opacity: a * (1 - out), transform: `translateX(${(1 - a) * -60}px) scale(${1 + .06 * f})`, background: f > .5 ? "var(--lavender)" : "rgba(48,39,90,.85)", color: f > .5 ? "var(--plum)" : "var(--key)" });
+  });
+}
+
+function renderOutro(t) {
+  const on = t > 31.6;
+  setStyle(outro, { visibility: on ? "visible" : "hidden" });
+  if (!on) return;
+  const m = seg(t, 31.75, 32.4);
+  setStyle(oMark.firstElementChild, { opacity: E.outCubic(m), transform: `scale(${lerp(.7, 1, E.outBack(m))})` });
+  oSparks.forEach((sp, i) => { const k = seg(t, 32.1 + i * .14, 32.55 + i * .14); setStyle(sp, { transform: `scale(${E.outBack(k) * (1 + Math.sin(t * 3 + i * 2) * .08)}) rotate(${(1 - k) * -60}deg)`, opacity: k > 0 ? 1 : 0 }); });
+  const a1 = E.outCubic(seg(t, 32.35, 32.8)), a2 = E.outCubic(seg(t, 32.6, 33.05)), a3 = E.outCubic(seg(t, 32.85, 33.3));
+  setStyle(oTag, { opacity: a1, transform: `translateY(${(1 - a1) * 26}px)` });
+  setStyle(oTabs, { opacity: a2, transform: `translateY(${(1 - a2) * 26}px)`, left: ((1080 - oTabs.offsetWidth) / 2) + "px" });
+  setStyle(oSub, { opacity: a3, transform: `translateY(${(1 - a3) * 26}px)` });
+  const steps = [[33.2, 0], [33.55, 1], [33.9, 2], [34.25, 3], [34.6, 4]];
+  let cur = 0, prev = 0, st = 0;
+  steps.forEach((e, i) => { if (t >= e[0]) { cur = e[1]; prev = i ? steps[i - 1][1] : 0; st = e[0]; } });
+  const k = E.outCubic(seg(t, st, st + .22));
+  const [x0, w0] = OTABG[prev], [x1, w1] = OTABG[cur];
+  setStyle(oHL, { left: lerp(x0, x1, k) + "px", width: lerp(w0, w1, k) + "px" });
+  const lit = k < .5 ? prev : cur;
+  oTabEls.forEach((el, i) => setStyle(el, { color: i === lit ? "var(--plum)" : "var(--ink-3)" }));
+}
+
+/* ------------------------------------------------------------------ playback */
+const isRender = /[?&]render\b/.test(location.search);
+if (isRender) document.documentElement.classList.add("render");
+const frame = $("#frame"), stage = $("#stage");
+function fit() {
+  let sc = 1;
+  if (!isRender) {
+    const bar = $("#bar").offsetHeight + 14;
+    const availW = Math.max(160, document.documentElement.clientWidth - 32);
+    const availH = Math.max(280, window.innerHeight - 32 - bar);
+    sc = Math.min(availW / 1080, availH / 1920);
+  }
+  frame.style.width = 1080 * sc + "px"; frame.style.height = 1920 * sc + "px";
+  stage.style.transform = `scale(${sc})`;
+}
+window.addEventListener("resize", fit);
+
+let playing = !isRender, t0 = 0, startAt = 0, now = 0;
+const playBtn = $("#playBtn"), scrub = $("#scrub"), clock = $("#clock");
+const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+function show(t) { now = t; render(t); scrub.value = t.toFixed(2); clock.textContent = fmt(t); }
+function loop(ts) {
+  if (playing) show(Math.max(0, (ts - startAt) / 1000 + t0) % DUR);
+  requestAnimationFrame(loop);
+}
+function setPlaying(p) { playing = p; t0 = now; startAt = performance.now(); playBtn.textContent = p ? "Pause" : "Play"; }
+playBtn.addEventListener("click", () => setPlaying(!playing));
+scrub.addEventListener("input", () => { show(parseFloat(scrub.value)); t0 = now; startAt = performance.now(); });
+
+window.__seek = t => { render(t); return true; };
+window.__duration = DUR;
+const preload = ["glow.png", "sparkle.png", "icon_pause.png", "fade_left.png", "fade_bottom.png", "fade_top.png"].map(n => { const i = new Image(); i.src = "../src/images/" + n; return i.decode().catch(() => {}); });
+const nextFrame = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+Promise.all([document.fonts.ready, ...preload]).then(async () => {
+  fit(); TABG = null; OTABG = null;
+  if (isRender) {
+    // Show every scene once so masks and fonts are decoded before frames are captured.
+    for (const w of [1, 4.5, 8, 12, 15, 17, 21, 23, 26, 27.5, 30, 34]) { render(w); await nextFrame(); }
+    render(0); await nextFrame();
+    window.__ready = true;
+    return;
+  }
+  window.__ready = true;
+  if (reduce) { setPlaying(false); show(4.6); }
+  else { setPlaying(true); show(0); }
+  requestAnimationFrame(loop);
+});
+fit();
+render(0);
+})();
+</script>
