@@ -145,7 +145,7 @@ end sub
 sub buildMovieButtons()
     m.entry = ProgressFind("m:" + m.item.itemId)
     if m.entry <> invalid and ToInt(m.entry.pos) > 0 then
-        setButtons(["Resume from " + FormatClock(ToInt(m.entry.pos)), "Play from start"], ["resume", "restart"])
+        setButtons(["Resume from " + FormatClock(ToInt(m.entry.pos)), "Play from start", "Remove from Continue Watching"], ["resume", "restart", "forget"])
     else
         setButtons(["Play"], ["play"])
     end if
@@ -253,7 +253,7 @@ sub refreshSeriesProgress(pickSeason as Boolean)
         ' After an episode finishes, the entry points at the next one with no progress yet.
         verb = "Play "
         if ToInt(m.entry.pos) > 0 then verb = "Resume "
-        setButtons([verb + code, "Episodes"], ["resumeEpisode", "episodes"])
+        setButtons([verb + code, "Episodes", "Remove from Continue Watching"], ["resumeEpisode", "episodes", "forget"])
     else
         setButtons(["Play " + m.queue[0].code, "Episodes"], ["playFirst", "episodes"])
     end if
@@ -351,7 +351,22 @@ sub activateButton()
     else if action = "episodes" then
         enterZone("episodes")
         jumpToSavedEpisode()
+    else if action = "forget" then
+        forgetProgress()
     end if
+end sub
+
+' Takes this title off Continue Watching, and the buttons back to a plain Play.
+sub forgetProgress()
+    m.buttonIndex = 0
+    if m.kind = "movie" then
+        ProgressRemove("m:" + m.item.itemId)
+        buildMovieButtons()
+    else
+        ProgressRemove("s:" + m.item.itemId)
+        refreshSeriesProgress(false)
+    end if
+    styleButtons()
 end sub
 
 sub jumpToSavedEpisode()

@@ -316,6 +316,7 @@ sub showHero(item as Object)
     if item.caption <> "" then
         meta = "Resume  " + item.caption
     end if
+    if continueItem() <> invalid then meta = meta + "   ·   * to remove"
     m.heroMeta.color = "0xC3B8E6FF"
     if item.problem <> "" then
         meta = "Won't play on this " + DeviceWord() + " (" + item.problem + ")   ·   " + meta
@@ -520,7 +521,13 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
     if m.navFocused then return onNavKey(key, press)
     if not press then return false
     if key = "options" then
-        showAccountMenu()
+        ' On a Continue Watching poster, * offers to remove it; elsewhere it's the account menu.
+        item = continueItem()
+        if item <> invalid then
+            showContinueMenu(item)
+        else
+            showAccountMenu()
+        end if
         return true
     end if
 
@@ -562,6 +569,45 @@ function onNavKey(key as String, press as Boolean) as Boolean
     end if
     return true
 end function
+
+' --- Continue Watching ---------------------------------------------------------------
+
+' The focused poster when it's in the Continue Watching row, else invalid.
+function continueItem() as Dynamic
+    root = m.rows.content
+    focus = m.rows.rowItemFocused
+    if root = invalid or focus = invalid or focus.Count() < 2 or focus[0] <> 0 then return invalid
+    row = root.GetChild(0)
+    if row = invalid or not row.HasField("isContinue") then return invalid
+    return row.GetChild(focus[1])
+end function
+
+sub showContinueMenu(item as Object)
+    m.continueTarget = item
+    dialog = CreateObject("roSGNode", "StandardMessageDialog")
+    dialog.title = item.title
+    dialog.message = ["Remove it from Continue Watching? Where you stopped is forgotten."]
+    dialog.buttons = ["Remove from Continue Watching", "Keep it"]
+    dialog.ObserveField("buttonSelected", "onContinueButton")
+    dialog.ObserveField("wasClosed", "onDialogClosed")
+    m.top.GetScene().dialog = dialog
+end sub
+
+sub onContinueButton()
+    dialog = m.top.GetScene().dialog
+    if dialog = invalid then return
+    choice = dialog.buttonSelected
+    dialog.close = true
+    item = m.continueTarget
+    m.continueTarget = invalid
+    if choice <> 0 or item = invalid then return
+    if item.kind = "series" then
+        ProgressRemove("s:" + item.itemId)
+    else
+        ProgressRemove("m:" + item.itemId)
+    end if
+    refreshContinueWatching()
+end sub
 
 ' --- Account -----------------------------------------------------------------
 

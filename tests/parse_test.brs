@@ -263,6 +263,9 @@ sub Main()
     check("cw progress", Str(cw.GetChild(0).progress).Trim(), "0.2")
     ProgressRemove("m:1")
     checkInt("progress removed", ProgressList().Count(), 1)
+    ' Home removes a series poster by "s:" + its itemId (the series id).
+    ProgressRemove("s:" + cw.GetChild(1).itemId)
+    checkInt("progress series removed", ProgressList().Count(), 0)
     for i = 1 to 25
         ProgressPut({ k: "m:x" + i.ToStr(), kind: "movie", id: i.ToStr(), name: "", poster: "", bd: "", ext: "mp4", pos: 60, dur: 100 })
     end for
