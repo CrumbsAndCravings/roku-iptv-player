@@ -10,24 +10,34 @@ sub work()
     owner = FieldStr(creds, "server") + " " + FieldStr(creds, "username")
     lastQuery = m.top.query
 
-    ' A library saved in the last day is ready at once.
-    index = LoadSearchIndex(SearchCachePath(), owner, NowSeconds(), 86400)
-    if index <> invalid then
-        report(1, 1, index)
-        if lastQuery <> "" then publish(index, lastQuery)
-        while true
-            msg = Wait(0, port)
-            if type(msg) = "roSGNodeEvent" then
-                if msg.GetField() = "stop" then return
-                ' Typing queues several queries; only the latest matters.
-                if m.top.query <> lastQuery then
-                    lastQuery = m.top.query
-                    publish(index, lastQuery)
-                end if
-            end if
-        end while
+    ' The library is kept on the Roku and searched straight away. Once it's a day old, a
+    ' fresh copy loads slowly in the background while searches keep using the saved
+    ' one, and replaces it when complete. Only the very first load makes you wait.
+    live = LoadSearchIndex(SearchCachePath(), owner)
+    refreshing = live <> invalid
+    if refreshing then
+        report(1, 1, live)
+        if lastQuery <> "" then publish(live, lastQuery)
+        if NowSeconds() - live.savedAt < 86400 then
+            answerQueries(port, live, lastQuery)
+            return
+        end if
+        building = NewSearchIndex()
+    else
+        live = NewSearchIndex()
+        building = live
     end if
-    index = NewSearchIndex()
+
+    ' Gentle on the provider, which stopped answering after bursts of requests: at most
+    ' one request a second for the first load (two at a time) and one every two seconds
+    ' for a background refresh, none while a video plays, and a stop after three
+    ' failures in a row. Each list is parsed and dropped before the next.
+    maxInFlight = 2
+    spacingMs = 1000
+    if refreshing then
+        maxInFlight = 1
+        spacingMs = 2000
+    end if
 
     ' Xtream has no search call, so we index every list. Series come in one request for
     ' the whole library (about 5 MB in 3 seconds for 7,000 series on one provider),
@@ -54,27 +64,25 @@ sub work()
     jobs.Append(lists.vod)
     total = jobs.Count()
     done = 0
-    report(done, total, index, total = 0)
-    if lastQuery <> "" then publish(index, lastQuery)
+    if not refreshing then
+        report(done, total, live, total = 0)
+        if lastQuery <> "" then publish(live, lastQuery)
+    end if
 
-    ' Gentle on the provider: two lists at a time, started a moment apart, none while a
-    ' video plays, and a stop after three failures in a row. Bursts of requests made
-    ' one provider stop answering for a while, and while it sulks videos don't start
-    ' either. Each list is parsed and dropped before the next, so memory stays low.
     inflight = {}
     failures = 0
     failedLists = 0
     stopped = false
-    saved = false
+    complete = false
     sinceStart = CreateObject("roTimespan")
     pauseMs = 0
     while true
-        if inflight.Count() < 2 and jobs.Count() > 0 and sinceStart.TotalMilliseconds() >= pauseMs then
+        if inflight.Count() < maxInFlight and jobs.Count() > 0 and sinceStart.TotalMilliseconds() >= pauseMs then
             sinceStart.Mark()
             if m.global.playing = true then
                 pauseMs = 2000
             else
-                pauseMs = 250
+                pauseMs = spacingMs
                 job = jobs.Shift()
                 action = "get_vod_streams"
                 if job.kind = "series" then action = "get_series"
@@ -114,9 +122,9 @@ sub work()
                 if msg.GetResponseCode() = 200 then data = ParseJson(msg.GetString())
                 if IsArr(data) then
                     if entry.all then
-                        IndexAdd(index, data, entry.kind, seriesAllowed)
+                        IndexAdd(building, data, entry.kind, seriesAllowed)
                     else
-                        IndexAdd(index, data, entry.kind)
+                        IndexAdd(building, data, entry.kind)
                     end if
                 else if msg.GetResponseCode() <> 200 or entry.all then
                     failed = true
@@ -128,7 +136,7 @@ sub work()
             ' Typing queues several queries; only the latest matters.
             if m.top.query <> lastQuery then
                 lastQuery = m.top.query
-                publish(index, lastQuery)
+                publish(live, lastQuery)
             end if
         else
             ' Give up on downloads that have hung.
@@ -164,12 +172,39 @@ sub work()
                 stopped = true
                 total = done + inflight.Count()
             end if
-            report(done, total, index, stopped)
             finished = (jobs.Count() = 0 and inflight.Count() = 0)
-            ' Keep the library for next time (a few broken categories don't spoil it).
-            if finished and not stopped and failedLists <= 3 and not saved then saved = SaveSearchIndex(index, SearchCachePath(), owner, NowSeconds())
-            ' Refresh an open search as more of the library arrives.
-            if lastQuery <> "" and (done MOD 4 = 0 or finished or wasAll) then publish(index, lastQuery)
+            if finished and not complete then
+                complete = true
+                ' Keep the library (a few broken categories don't spoil it). A refresh
+                ' that stopped early keeps the saved one and tries again next time.
+                if not stopped and failedLists <= 3 then
+                    SaveSearchIndex(building, SearchCachePath(), owner, NowSeconds())
+                    live = building
+                end if
+            end if
+            if not refreshing then
+                report(done, total, live, stopped)
+                ' Refresh an open search as more of the library arrives.
+                if lastQuery <> "" and (done MOD 4 = 0 or finished or wasAll) then publish(live, lastQuery)
+            else if finished then
+                report(1, 1, live)
+                if lastQuery <> "" then publish(live, lastQuery)
+            end if
+        end if
+    end while
+end sub
+
+' Searches a ready library until the screen goes away.
+sub answerQueries(port as Object, index as Object, lastQuery as String)
+    while true
+        msg = Wait(0, port)
+        if type(msg) = "roSGNodeEvent" then
+            if msg.GetField() = "stop" then return
+            ' Typing queues several queries; only the latest matters.
+            if m.top.query <> lastQuery then
+                lastQuery = m.top.query
+                publish(index, lastQuery)
+            end if
         end if
     end while
 end sub

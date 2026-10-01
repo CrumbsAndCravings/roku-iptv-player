@@ -5,7 +5,7 @@
 ' records[i]  kind letter, id, ext, poster URL, title joined by Chr(30); "-" for blanks
 
 function NewSearchIndex() as Object
-    return { names: [], records: [], seen: {} }
+    return { names: [], records: [], seen: {}, savedAt: 0 }
 end function
 
 function searchSeparator() as String
@@ -157,8 +157,9 @@ end sub
 ' --- Keeping the index between launches ---------------------------------------------
 '
 ' Loading a whole library from the provider takes minutes, so a finished index is
-' saved and reused for a day. The file is a header line (format, owner, time saved,
-' count), then every name, then every record, one per line.
+' saved and searched straight away on later launches (SearchTask refreshes it in the
+' background once it's a day old). The file is a header line (format, owner, time
+' saved, count), then every name, then every record, one per line.
 
 function searchFileFormat() as String
     return "aranplus-search-1"
@@ -177,18 +178,17 @@ function SaveSearchIndex(index as Object, path as String, owner as String, saved
     return WriteAsciiFile(path, lines.Join(Chr(10)))
 end function
 
-' The saved index for `owner` when it is at most maxAge seconds old, else invalid.
-function LoadSearchIndex(path as String, owner as String, now as Integer, maxAge as Integer) as Dynamic
+' The saved index for `owner` (with savedAt set), or invalid.
+function LoadSearchIndex(path as String, owner as String) as Dynamic
     text = ReadAsciiFile(path)
     if text = "" then return invalid
     lines = text.Split(Chr(10))
     header = lines[0].Split(Chr(9))
     if header.Count() < 4 or header[0] <> searchFileFormat() or header[1] <> owner then return invalid
-    age = now - header[2].ToInt()
-    if age < 0 or age > maxAge then return invalid
     count = header[3].ToInt()
     if count <= 0 or lines.Count() <> 1 + count * 2 then return invalid
     index = NewSearchIndex()
+    index.savedAt = header[2].ToInt()
     for i = 1 to count
         index.names.Push(lines[i])
         index.records.Push(lines[count + i])

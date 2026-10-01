@@ -169,14 +169,14 @@ sub Main()
     check("short query prefix first", IndexSearch(short, "th", 40).GetChild(0).GetChild(0).title, "The Show")
     checkInt("longer query anywhere", IndexSearch(short, "the", 40).GetChild(0).GetChildCount(), 2)
 
-    ' Saved between launches, for the same login and for a day.
+    ' Saved between launches, for the same login.
     path = "tmp:/search-test.txt"
     check("index saved", SaveSearchIndex(short, path, "http://a.b jane", 1000).ToStr(), "true")
-    back = LoadSearchIndex(path, "http://a.b jane", 1500, 86400)
+    back = LoadSearchIndex(path, "http://a.b jane")
     checkInt("index loaded", back.names.Count(), 3)
+    checkInt("index saved time", back.savedAt, 1000)
     check("index loaded search", IndexSearch(back, "big", 40).GetChild(0).GetChild(0).title, "Big Thing")
-    check("index other login", ToStr(LoadSearchIndex(path, "http://a.b joe", 1500, 86400) = invalid), "true")
-    check("index too old", ToStr(LoadSearchIndex(path, "http://a.b jane", 1000 + 86401, 86400) = invalid), "true")
+    check("index other login", ToStr(LoadSearchIndex(path, "http://a.b joe") = invalid), "true")
 
     ' A big library: thousands of movie matches must not crowd out the series, and the
     ' best match counts even when it was indexed last.
