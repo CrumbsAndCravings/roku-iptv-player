@@ -292,7 +292,7 @@ sub showHero(item as Object)
     end if
     m.heroMeta.color = "0xC3B8E6FF"
     if item.problem <> "" then
-        meta = "Won't play on this TV (" + item.problem + ")   ·   " + meta
+        meta = "Won't play on this " + DeviceWord() + " (" + item.problem + ")   ·   " + meta
         m.heroMeta.color = "0xFFD98AFF"
     end if
     m.heroMeta.text = meta

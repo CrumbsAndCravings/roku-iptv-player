@@ -206,7 +206,7 @@ sub showUnplayable()
     m.video.control = "stop"
     m.video.visible = false
     m.spinner.visible = false
-    m.errorTitle.text = "Your TV can't play this file"
+    m.errorTitle.text = "Your " + DeviceWord() + " can't play this file"
     m.errorDetail.text = UnplayableText(m.check.blocked, item.ext) + Chr(10) + Chr(10) + fileLine(item)
     m.errorHint.text = "OK to try anyway   ·   Back to return"
     m.errorBox.visible = true
@@ -514,9 +514,9 @@ function diagnosis() as String
     if m.check.blocked <> "" then
         lines.Push(UnplayableText(m.check.blocked, item.ext))
     else if m.check.warning <> "" then
-        lines.Push("This TV may not fully support " + m.check.warning + ".")
+        lines.Push("This " + DeviceWord() + " may not fully support " + m.check.warning + ".")
     else if FieldStr(item, "videoCodec") <> "" then
-        lines.Push("This TV says it supports these codecs, so the stream itself is the likely problem.")
+        lines.Push("This " + DeviceWord() + " says it supports these codecs, so the stream itself is the likely problem.")
     end if
 
     lines.Push(streamLine(item))

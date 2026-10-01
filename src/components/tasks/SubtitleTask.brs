@@ -66,7 +66,7 @@ function osError(res as Object) as String
     if FieldStr(res, "error") <> "" then return res.error
     message = serverMessage(res.data)
     code = res.code
-    if code < 0 or code = 0 then return "Couldn't reach OpenSubtitles. Check the TV's internet connection."
+    if code < 0 or code = 0 then return "Couldn't reach OpenSubtitles. Check the internet connection."
     said = "OpenSubtitles said HTTP " + code.ToStr()
     if message <> "" then said = said + ": " + message
     if code = 406 or code = 429 then return said + ". Downloads reset within a day."

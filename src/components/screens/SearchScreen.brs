@@ -199,7 +199,7 @@ sub onResultFocused()
         return
     end if
     text = item.title
-    if item.problem <> "" then text = text + "   ·   Won't play on this TV"
+    if item.problem <> "" then text = text + "   ·   Won't play on this " + DeviceWord()
     m.focusTitle.text = text
 end sub
 

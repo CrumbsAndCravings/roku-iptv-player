@@ -138,7 +138,7 @@ sub updateSeriesCompat()
     else if blockedCount = total then
         m.compat.text = reason
     else
-        m.compat.text = blockedCount.ToStr() + " of " + total.ToStr() + " episodes won't play on this TV. They're marked in the list."
+        m.compat.text = blockedCount.ToStr() + " of " + total.ToStr() + " episodes won't play on this " + DeviceWord() + ". They're marked in the list."
     end if
 end sub
 
