@@ -25,7 +25,7 @@ function LoadCreds() as Dynamic
     creds = ParseJson(raw)
     if not IsAA(creds) then return invalid
     if FieldStr(creds, "server") = "" or FieldStr(creds, "username") = "" then return invalid
-    return { server: FieldStr(creds, "server"), username: FieldStr(creds, "username"), password: FieldStr(creds, "password") }
+    return { server: FieldStr(creds, "server"), username: FieldStr(creds, "username"), password: FieldStr(creds, "password"), userAgent: FieldStr(creds, "userAgent") }
 end function
 
 sub SaveCreds(creds as Object)

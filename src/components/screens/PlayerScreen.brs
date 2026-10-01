@@ -214,6 +214,8 @@ sub loadStream()
     content = CreateObject("roSGNode", "ContentNode")
     content.url = StreamUrl(m.global.creds, streamKind(), item.id, item.ext)
     content.title = m.titleLabel.text
+    userAgent = FieldStr(m.global.creds, "userAgent")
+    if userAgent <> "" then content.HttpHeaders = ["User-Agent: " + userAgent]
     if m.attempt = 0 then
         fmt = StreamFormatFor(item.ext)
         if fmt <> "" then content.streamFormat = fmt
@@ -826,6 +828,7 @@ end function
 sub runOsTask(request as Object, callback as String)
     if m.osTask <> invalid then m.osTask.UnobserveField("result")
     request.videoUrl = currentStreamUrl()
+    request.userAgent = FieldStr(m.global.creds, "userAgent")
     m.osTask = CreateObject("roSGNode", "SubtitleTask")
     m.osTask.request = request
     m.osTask.ObserveField("result", callback)

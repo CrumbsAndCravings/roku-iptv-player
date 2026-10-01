@@ -226,21 +226,34 @@ function BriefText(body as String, limit as Integer) as String
     return text
 end function
 
+' How ARAN+ introduces itself when a provider turns away requests that say "Roku".
+function AppUserAgent() as String
+    return "ARANplus/0.4.3"
+end function
+
 ' True when Cloudflare, rather than the IPTV server itself, answered.
 function IsCloudflare(headers as Dynamic) as Boolean
     return Instr(1, LCase(FieldStr(headers, "server")), "cloudflare") > 0 or FieldStr(headers, "cf-ray") <> ""
+end function
+
+' What kind of Cloudflare refusal it was: a browser check (it needs JavaScript, so no TV
+' app can pass it), a numbered error, or a plain block.
+function CloudflareKind(headers as Dynamic, body as String) as String
+    text = BriefText(body, 4000)
+    lower = LCase(text)
+    if LCase(FieldStr(headers, "cf-mitigated")) = "challenge" then return " (browser check)"
+    if Instr(1, lower, "just a moment") > 0 or Instr(1, LCase(body), "challenge-platform") > 0 then return " (browser check)"
+    found = CreateObject("roRegex", "(?:error code:?|error)\s*(1\d{3})", "i").Match(text)
+    if found.Count() > 1 then return " (error " + found[1] + ")"
+    if Instr(1, lower, "you have been blocked") > 0 then return " (blocked)"
+    return ""
 end function
 
 ' Sums up a failed response, like: HTTP 403 from nginx: "Forbidden". A photo of the
 ' screen then shows who answered and what they said.
 function HttpDetail(code as Integer, headers as Dynamic, body as String) as String
     detail = "HTTP " + code.ToStr()
-    if IsCloudflare(headers) then
-        detail = detail + " from Cloudflare"
-        cfCode = CreateObject("roRegex", "(?:error code:?|error)\s*(1\d{3})", "i").Match(BriefText(body, 4000))
-        if cfCode.Count() > 1 then detail = detail + " (error " + cfCode[1] + ")"
-        return detail
-    end if
+    if IsCloudflare(headers) then return detail + " from Cloudflare" + CloudflareKind(headers, body)
     software = CreateObject("roRegex", "[/ (]", "").Split(FieldStr(headers, "server"))
     if software.Count() > 0 and software[0] <> "" then detail = detail + " from " + software[0]
 

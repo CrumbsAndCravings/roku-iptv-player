@@ -1,10 +1,12 @@
 ' Blocking JSON GET for task threads.
 
-function fetchJson(url as String) as Object
+' userAgent replaces Roku's own when set (see AppUserAgent).
+function fetchJson(url as String, userAgent = "" as String) as Object
     http = CreateObject("roUrlTransfer")
     port = CreateObject("roMessagePort")
     http.SetMessagePort(port)
     http.SetUrl(url)
+    if userAgent <> "" then http.AddHeader("User-Agent", userAgent)
     http.SetCertificatesFile("common:/certs/ca-bundle.crt")
     http.InitClientCertificates()
     http.EnableEncodings(true)

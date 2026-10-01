@@ -14,7 +14,7 @@ sub work()
     for each kind in ["vod", "series"]
         action = "get_vod_categories"
         if kind = "series" then action = "get_series_categories"
-        res = fetchJson(ApiUrl(creds, action, invalid))
+        res = fetchJson(ApiUrl(creds, action, invalid), FieldStr(creds, "userAgent"))
         if res.ok then
             for each category in ParseCategories(res.data)
                 jobs.Push({ kind: kind, id: category.id })
@@ -38,6 +38,7 @@ sub work()
             http = CreateObject("roUrlTransfer")
             http.SetMessagePort(port)
             http.SetUrl(ApiUrl(creds, action, { category_id: job.id }))
+            if FieldStr(creds, "userAgent") <> "" then http.AddHeader("User-Agent", FieldStr(creds, "userAgent"))
             http.SetCertificatesFile("common:/certs/ca-bundle.crt")
             http.InitClientCertificates()
             http.EnableEncodings(true)

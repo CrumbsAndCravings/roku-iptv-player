@@ -6,6 +6,7 @@ sub work()
     req = m.top.request
     mode = FieldStr(req, "mode")
     m.account = req.account
+    m.videoAgent = FieldStr(req, "userAgent")
     m.accountChanged = false
     if mode = "login" then
         result = osCheck()
@@ -197,6 +198,7 @@ function rangeBytes(url as String, range as String, path as String) as Dynamic
     http.SetUrl(url)
     http.SetCertificatesFile("common:/certs/ca-bundle.crt")
     http.InitClientCertificates()
+    if m.videoAgent <> "" then http.AddHeader("User-Agent", m.videoAgent)
     http.AddHeader("Range", range)
     DeleteFile(path)
     if not http.AsyncGetToFile(path) then return invalid
