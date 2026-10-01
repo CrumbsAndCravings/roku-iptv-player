@@ -12,8 +12,10 @@ function searchSeparator() as String
     return Chr(30)
 end function
 
-' Adds a get_vod_streams or get_series response. kind is "vod" or "series".
-sub IndexAdd(index as Object, data as Dynamic, kind as String)
+' Adds a get_vod_streams or get_series response. kind is "vod" or "series". With
+' `allowed` (category id -> true), titles in other categories are left out: the
+' whole-library answer also holds the adult categories that ParseCategories hides.
+sub IndexAdd(index as Object, data as Dynamic, kind as String, allowed = invalid as Dynamic)
     if not IsArr(data) then return
     letter = "m"
     idField = "stream_id"
@@ -25,7 +27,7 @@ sub IndexAdd(index as Object, data as Dynamic, kind as String)
     end if
     sep = searchSeparator()
     for each raw in data
-        if IsAA(raw) and ToInt(raw.is_adult) <> 1 then
+        if IsAA(raw) and ToInt(raw.is_adult) <> 1 and inCategories(raw, allowed) then
             id = FieldStr(raw, idField)
             key = letter + id
             if id <> "" and not index.seen.DoesExist(key) then
@@ -37,6 +39,12 @@ sub IndexAdd(index as Object, data as Dynamic, kind as String)
         end if
     end for
 end sub
+
+function inCategories(raw as Object, allowed as Dynamic) as Boolean
+    if not IsAA(allowed) then return true
+    category = FieldStr(raw, "category_id")
+    return category = "" or allowed.DoesExist(category)
+end function
 
 function orDash(text as String) as String
     if text = "" then return "-"

@@ -155,6 +155,13 @@ sub Main()
     checkInt("search empty query", IndexSearch(index, "  ", 40).GetChildCount(), 0)
     checkInt("search limit", IndexSearch(index, "bat", 2).GetChild(0).GetChildCount(), 2)
 
+    ' The whole-library series answer also holds categories the app hides.
+    whole = NewSearchIndex()
+    IndexAdd(whole, [{ name: "Kept Show", series_id: 1, category_id: "10" }, { name: "Hidden Show", series_id: 2, category_id: "99" }, { name: "Loose Show", series_id: 3 }], "series", { "10": true })
+    checkInt("index allowed categories", whole.names.Count(), 2)
+    checkInt("index allowed search", IndexSearch(whole, "hidden", 40).GetChildCount(), 0)
+    checkInt("index no filter", IndexSearch(whole, "show", 40).GetChild(0).GetChildCount(), 2)
+
     ' A big library: thousands of movie matches must not crowd out the series, and the
     ' best match counts even when it was indexed last.
     big = NewSearchIndex()
