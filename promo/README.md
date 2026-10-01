@@ -1,12 +1,13 @@
 # ARAN+ promo
 
-A 35 second vertical (1080x1920) promo for ARAN+, made from the app's own look: the
+A 38 second vertical (1080x1920) promo for ARAN+, made from the app's own look: the
 Fredoka and Nunito fonts in `src/fonts`, the glow, sparkle, fade and icon images in
 `src/images`, and the colours, layouts and wording of the real screens (Home, Continue
 Watching, Categories, Search and the player).
 
-- `index.html` plays the promo in a browser. Open it from this folder so it can reach `../src`.
-- `aranplus-promo.mp4` is the rendered video, silent, 30 fps.
+- `index.html` plays the promo in a browser, with a Sound button. Serve the repo root over HTTP (for example `python3 -m http.server` there, then open `/promo/`), since browsers drop the glow and sparkle masks on `file://` pages.
+- `aranplus-promo.mp4` is the rendered video: 38 seconds, 30 fps, with sound.
+- `soundtrack.cjs` synthesizes the music and UI sounds in code, timed to cues the page exposes (`window.__sound`), so there is no third-party audio. `soundtrack.mp3` is its output, used by the page.
 - `render.cjs` renders the video again after a change:
 
 ```sh

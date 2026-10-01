@@ -1,7 +1,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>ARAN+ Promo</title>
-<meta name="description" content="A 35 second vertical promo for ARAN+, the cinematic IPTV player for Roku.">
+<meta name="description" content="A 38 second vertical promo for ARAN+, the cinematic IPTV player for Roku.">
 <style>
 /* Vertical 1080x1920 stage. Every colour, font and asset comes from the ARAN+ app:
    the plum night, lavender focus, bubblegum progress and butter sparkles. */
@@ -37,8 +37,9 @@ body { margin: 0; background: var(--plum-deep); color: var(--ink); font-family: 
 #app { height: 100%; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding-block: 16px; padding-inline: 16px; }
 #frame { position: relative; overflow: hidden; border-radius: 14px; box-shadow: 0 30px 80px rgba(0,0,0,.55), 0 0 0 1px rgba(201,184,255,.12); max-width: 100%; }
 #stage { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; transform-origin: 0 0; overflow: hidden; background: var(--plum); }
-#bar { display: flex; align-items: center; gap: 12px; width: min(100%, 420px); }
-#bar button { appearance: none; border: 0; border-radius: 4px; background: var(--pill); color: var(--ink); font: 500 15px/1 var(--display); height: 34px; padding: 0 14px; cursor: pointer; min-width: 74px; }
+#bar { display: flex; align-items: center; gap: 10px; width: min(100%, 480px); }
+#bar button { appearance: none; border: 0; border-radius: 4px; background: var(--pill); color: var(--ink); font: 500 15px/1 var(--display); height: 34px; padding: 0 14px; cursor: pointer; min-width: 74px; white-space: nowrap; }
+#bar button[aria-pressed="true"] { background: var(--lavender); color: var(--plum); }
 #bar button:hover { background: var(--pill-on); }
 #bar button:focus-visible, #scrub:focus-visible { outline: 3px solid var(--lavender); outline-offset: 2px; }
 #scrub { flex: 1; min-width: 0; accent-color: var(--lavender); }
@@ -162,7 +163,11 @@ svg.spark { position: absolute; overflow: visible; }
 #outro { left: 0; top: 0; width: 1080px; height: 1920px; text-align: center; }
 #outro .wmWrap { position: relative; display: inline-block; font-size: 210px; }
 #outro .tag { font: 600 66px/1.1 var(--display); color: var(--ink); }
-#outro .sub { font: 600 36px/1.3 var(--body); color: var(--ink-2); }
+.ocard { position: absolute; left: 72px; top: 1166px; width: 936px; box-sizing: border-box; padding: 42px 48px 44px 58px; border-radius: 9px; background: rgba(48,39,90,.85); text-align: left; overflow: hidden; }
+.ocard .acc { position: absolute; left: 0; top: 0; bottom: 0; width: 9px; background: var(--pink); }
+.ocard .sp { position: absolute; right: 42px; top: 44px; width: 40px; height: 40px; background: var(--butter); }
+.ocard .h { font: 600 58px/1.1 var(--display); color: var(--ink); }
+.ocard .b { margin-top: 18px; font: 600 37px/1.36 var(--body); color: var(--ink-2); }
 .otabs { position: absolute; display: flex; gap: 22px; }
 .otab { position: relative; height: 60px; padding: 0 34px; min-width: 140px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; font: 500 28px/1 var(--display); color: var(--ink-3); white-space: nowrap; z-index: 1; }
 .otabHL { position: absolute; top: 0; height: 60px; border-radius: 6px; background: var(--lavender); }
@@ -214,9 +219,11 @@ svg.spark { position: absolute; overflow: visible; }
       <div id="fine" class="abs">Titles and artwork shown are illustrative.</div>
     </div>
   </div>
+  <audio id="music" preload="none" loop></audio>
   <div id="bar">
     <button id="playBtn" type="button">Pause</button>
-    <input id="scrub" type="range" min="0" max="35" step="0.01" value="0" aria-label="Position in the promo">
+    <button id="soundBtn" type="button" aria-pressed="false">Sound off</button>
+    <input id="scrub" type="range" min="0" max="38" step="0.01" value="0" aria-label="Position in the promo">
     <span id="clock">0:00</span>
   </div>
 </main>
@@ -224,7 +231,7 @@ svg.spark { position: absolute; overflow: visible; }
 <script>
 (() => {
 "use strict";
-const DUR = 35;
+const DUR = 38;
 const $ = (s, r = document) => r.querySelector(s);
 const html = (el, s) => { el.insertAdjacentHTML("beforeend", s); return el.lastElementChild; };
 const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
@@ -540,13 +547,13 @@ const featEls = FEATS.map((f, i) => html(feats, `<div class="fpill" style="top:$
 
 // Outro.
 const outro = $("#outro");
-const oMark = html(outro, `<div style="position:absolute;left:0;top:640px;width:1080px"><div class="wmWrap">${wordmark()}${sparkSVG("var(--butter)", "left:-.5em;top:.06em;width:.44em;height:.44em")}${sparkSVG("#fff", "left:calc(100% + .1em);top:-.04em;width:.3em;height:.3em")}${sparkSVG("var(--lavender-light)", "left:66%;top:calc(100% - .02em);width:.24em;height:.24em")}</div></div>`);
+const oMark = html(outro, `<div style="position:absolute;left:0;top:590px;width:1080px"><div class="wmWrap">${wordmark()}${sparkSVG("var(--butter)", "left:-.5em;top:.06em;width:.44em;height:.44em")}${sparkSVG("#fff", "left:calc(100% + .1em);top:-.04em;width:.3em;height:.3em")}${sparkSVG("var(--lavender-light)", "left:66%;top:calc(100% - .02em);width:.24em;height:.24em")}</div></div>`);
 const oSparks = [...oMark.querySelectorAll("svg")];
-const oTag = html(outro, `<div class="tag" style="position:absolute;left:0;top:1010px;width:1080px">IPTV, made for Roku.</div>`);
-const oTabs = html(outro, `<div class="otabs" style="top:1160px"></div>`);
+const oTag = html(outro, `<div class="tag" style="position:absolute;left:0;top:900px;width:1080px">IPTV, made for Roku.</div>`);
+const oTabs = html(outro, `<div class="otabs" style="top:1030px"></div>`);
 const oHL = html(oTabs, `<div class="otabHL"></div>`);
 const oTabEls = ["Home", "Movies", "Series", "Categories", "Search"].map(n => html(oTabs, `<div class="otab">${n}</div>`));
-const oSub = html(outro, `<div class="sub" style="position:absolute;left:0;top:1286px;width:1080px">Sign in with your Xtream Codes login.</div>`);
+const oCard = html(outro, `<div class="ocard"><div class="acc"></div><div class="sp tint spark-img"></div><div class="h">Just a player.</div><div class="b">ARAN+ doesn't sell IPTV or playlists.<br>Sign in with your own provider's login.</div></div>`);
 
 // Film grain, made once.
 (() => {
@@ -600,6 +607,20 @@ const CAT_FOCUS = [[16.0, "0:0"], [16.7, "0:1"], [17.4, "1:1"], [18.1, "2:1"], [
 const TYPED = [[19.85, "c"], [20.2, "o"], [20.55, "m"], [20.9, "e"], [21.25, "d"], [21.6, "y"]];
 const RES_FOCUS = [[22.75, "0:0"], [23.2, "0:1"]];
 const FEAT_FOCUS = [[29.1, 0], [29.5, 1], [29.9, 2], [30.3, 3], [30.7, 4], [31.1, 5]];
+const OUTRO_TABS = [[33.0, 1], [33.3, 2], [33.6, 3], [33.9, 4]];
+
+// Sound cues, read by render.cjs to time the soundtrack to these same moments.
+const SOUND = { duration: DUR, sections: { bloom: 3.15, drums: 6.0, breakdown: 26.0, final: 31.75 }, cues: [] };
+const cue = (t, type) => SOUND.cues.push({ t, type });
+cue(0, "hook"); cue(1.5, "droop"); cue(2.15, "riser"); cue(3.15, "bloom");
+[3.5, 3.64, 3.78, 32.1, 32.24, 32.38].forEach(t => cue(t, "sparkle"));
+[HOME_FOCUS.slice(1), TAB_EVENTS.slice(2), CAT_FOCUS.slice(1), RES_FOCUS, FEAT_FOCUS, OUTRO_TABS].forEach(list => list.forEach(e => cue(e[0], "tick")));
+TYPED.forEach(e => cue(e[0], "key"));
+cue(15.75, "select");
+[10.55, 14.1, 15.8, 18.95, 21.85, 23.6, 26.1, 27.9, 31.4].forEach(t => cue(t, "whoosh"));
+cue(26.0, "chime"); cue(27.0, "count"); cue(31.75, "hit"); cue(33.6, "card");
+SOUND.cues.sort((a, b) => a.t - b.t);
+window.__sound = SOUND;
 
 const tabGeom = () => tabEls.map(el => [el.offsetLeft + 232, el.offsetWidth]);
 let TABG = null, OTABG = null;
@@ -692,7 +713,7 @@ function render(t) {
   renderOutro(t);
 
   setStyle($("#grain"), { backgroundPosition: `${Math.floor(t * 24) * 53 % 240}px ${Math.floor(t * 24) * 97 % 240}px` });
-  setStyle($("#fine"), { opacity: .85 * E.outCubic(seg(t, 3.6, 4.2)) });
+  setStyle($("#fine"), { opacity: .85 * E.outCubic(seg(t, 3.6, 4.2)) * (1 - E.inOutCubic(seg(t, 37.45, 38))) });
 }
 
 function renderHome(t) {
@@ -804,11 +825,12 @@ function renderOutro(t) {
   const m = seg(t, 31.75, 32.4);
   setStyle(oMark.firstElementChild, { opacity: E.outCubic(m), transform: `scale(${lerp(.7, 1, E.outBack(m))})` });
   oSparks.forEach((sp, i) => { const k = seg(t, 32.1 + i * .14, 32.55 + i * .14); setStyle(sp, { transform: `scale(${E.outBack(k) * (1 + Math.sin(t * 3 + i * 2) * .08)}) rotate(${(1 - k) * -60}deg)`, opacity: k > 0 ? 1 : 0 }); });
-  const a1 = E.outCubic(seg(t, 32.35, 32.8)), a2 = E.outCubic(seg(t, 32.6, 33.05)), a3 = E.outCubic(seg(t, 32.85, 33.3));
+  const a1 = E.outCubic(seg(t, 32.35, 32.8)), a2 = E.outCubic(seg(t, 32.6, 33.05)), a3 = E.outCubic(seg(t, 33.6, 34.15));
+  setStyle(outro, { opacity: 1 - E.inOutCubic(seg(t, 37.45, 38)) });
   setStyle(oTag, { opacity: a1, transform: `translateY(${(1 - a1) * 26}px)` });
   setStyle(oTabs, { opacity: a2, transform: `translateY(${(1 - a2) * 26}px)`, left: ((1080 - oTabs.offsetWidth) / 2) + "px" });
-  setStyle(oSub, { opacity: a3, transform: `translateY(${(1 - a3) * 26}px)` });
-  const steps = [[33.2, 0], [33.55, 1], [33.9, 2], [34.25, 3], [34.6, 4]];
+  setStyle(oCard, { opacity: a3, transform: `translateY(${(1 - a3) * 34}px)` });
+  const steps = [[32.6, 0]].concat(OUTRO_TABS);
   let cur = 0, prev = 0, st = 0;
   steps.forEach((e, i) => { if (t >= e[0]) { cur = e[1]; prev = i ? steps[i - 1][1] : 0; st = e[0]; } });
   const k = E.outCubic(seg(t, st, st + .22));
@@ -835,17 +857,28 @@ function fit() {
 }
 window.addEventListener("resize", fit);
 
-let playing = !isRender, t0 = 0, startAt = 0, now = 0;
-const playBtn = $("#playBtn"), scrub = $("#scrub"), clock = $("#clock");
+let playing = !isRender, t0 = 0, startAt = 0, now = 0, soundOn = false;
+const playBtn = $("#playBtn"), soundBtn = $("#soundBtn"), music = $("#music"), scrub = $("#scrub"), clock = $("#clock");
+if (!isRender) music.src = "soundtrack.mp3";
 const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 function show(t) { now = t; render(t); scrub.value = t.toFixed(2); clock.textContent = fmt(t); }
 function loop(ts) {
-  if (playing) show(Math.max(0, (ts - startAt) / 1000 + t0) % DUR);
+  if (playing) {
+    if (soundOn && !music.paused && music.readyState >= 2) { show(music.currentTime % DUR); t0 = now; startAt = ts; }
+    else show(Math.max(0, (ts - startAt) / 1000 + t0) % DUR);
+  }
   requestAnimationFrame(loop);
 }
-function setPlaying(p) { playing = p; t0 = now; startAt = performance.now(); playBtn.textContent = p ? "Pause" : "Play"; }
+function syncMusic() {
+  if (!soundOn) { music.pause(); return; }
+  try { music.currentTime = now; } catch (e) {}
+  if (playing) music.play().catch(() => setSound(false)); else music.pause();
+}
+function setSound(on) { soundOn = on; soundBtn.textContent = on ? "Sound on" : "Sound off"; soundBtn.setAttribute("aria-pressed", String(on)); syncMusic(); }
+function setPlaying(p) { playing = p; t0 = now; startAt = performance.now(); playBtn.textContent = p ? "Pause" : "Play"; syncMusic(); }
 playBtn.addEventListener("click", () => setPlaying(!playing));
-scrub.addEventListener("input", () => { show(parseFloat(scrub.value)); t0 = now; startAt = performance.now(); });
+soundBtn.addEventListener("click", () => setSound(!soundOn));
+scrub.addEventListener("input", () => { show(parseFloat(scrub.value)); t0 = now; startAt = performance.now(); if (soundOn) { try { music.currentTime = now; } catch (e) {} } });
 
 window.__seek = t => { render(t); return true; };
 window.__duration = DUR;
@@ -855,7 +888,7 @@ Promise.all([document.fonts.ready, ...preload]).then(async () => {
   fit(); TABG = null; OTABG = null;
   if (isRender) {
     // Show every scene once so masks and fonts are decoded before frames are captured.
-    for (const w of [1, 4.5, 8, 12, 15, 17, 21, 23, 26, 27.5, 30, 34]) { render(w); await nextFrame(); }
+    for (const w of [1, 4.5, 8, 12, 15, 17, 21, 23, 26, 27.5, 30, 34, 36]) { render(w); await nextFrame(); }
     render(0); await nextFrame();
     window.__ready = true;
     return;
