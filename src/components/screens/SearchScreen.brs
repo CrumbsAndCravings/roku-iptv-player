@@ -151,11 +151,17 @@ end function
 function isIndexing() as Boolean
     status = m.task.status
     if not IsAA(status) then return true
+    if status.stopped = true then return false
     return ToInt(status.total) = 0 or ToInt(status.done) < ToInt(status.total)
 end function
 
 sub onStatus()
     status = m.task.status
+    stopped = IsAA(status) and status.stopped = true
+    if stopped and ToInt(status.total) = 0 then
+        m.status.text = "Your provider isn't answering, so search can't load your library. Try again later."
+        return
+    end if
     if not IsAA(status) or ToInt(status.total) = 0 then
         m.status.text = "Getting your library ready for search…"
         return
@@ -163,7 +169,9 @@ sub onStatus()
     done = ToInt(status.done)
     total = ToInt(status.total)
     titles = ToInt(status.titles)
-    if done < total then
+    if stopped then
+        m.status.text = "Searching " + titles.ToStr() + " titles. Your provider stopped answering, so the rest wait until you open ARAN+ again."
+    else if done < total then
         m.status.text = "Loading your library: " + done.ToStr() + " of " + total.ToStr() + " lists (" + titles.ToStr() + " titles so far)"
     else
         m.status.text = "Searching all " + titles.ToStr() + " titles"

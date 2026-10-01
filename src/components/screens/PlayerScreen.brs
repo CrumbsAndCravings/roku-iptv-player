@@ -120,6 +120,8 @@ sub init()
 end sub
 
 sub onPlayback()
+    ' Search indexing waits while a video plays.
+    m.global.playing = true
     m.playback = m.top.playback
     m.kind = m.playback.kind
     m.index = ToInt(m.playback.index)
@@ -898,6 +900,7 @@ end sub
 
 sub close()
     m.closing = true
+    m.global.playing = false
     m.autoSubTimer.control = "stop"
     if m.osTask <> invalid then m.osTask.UnobserveField("result")
     if m.probeTask <> invalid then m.probeTask.UnobserveField("result")

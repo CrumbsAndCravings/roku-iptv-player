@@ -5,7 +5,7 @@ sub init()
     m.stack = m.top.FindNode("stack")
     m.screens = []
     m.screenCount = 0
-    m.global.AddFields({ creds: {} })
+    m.global.AddFields({ creds: {}, playing: false })
     m.global.AddField("search", "node", false)
     ' v0.1 kept Continue Watching here; its only entries came from a failed play.
     RegDelete("watch", "items")

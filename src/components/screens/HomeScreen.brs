@@ -41,6 +41,9 @@ sub init()
     m.infoTargets = {}
     m.rowQueue = []
     m.inFlight = 0
+    ' Rows already loaded this session, by "kind:categoryId", so switching tabs and
+    ' coming back doesn't ask the provider again.
+    m.rowCache = {}
     m.plan = []
     m.planIndex = 0
     m.focusedItem = invalid
@@ -184,12 +187,18 @@ sub appendRows(root as Object, count as Integer)
     while added < count and m.planIndex < m.plan.Count()
         entry = m.plan[m.planIndex]
         m.planIndex = m.planIndex + 1
-        row = root.CreateChild("ContentNode")
-        row.title = entry.title
-        for i = 0 to 7
-            MakeItem(row, { placeholder: true })
-        end for
-        queueRow({ mode: "row", kind: entry.kind, categoryId: entry.categoryId, title: entry.title, limit: 40 }, row)
+        cached = m.rowCache[entry.kind + ":" + entry.categoryId]
+        if cached <> invalid then
+            cached.title = entry.title
+            root.AppendChild(cached)
+        else
+            row = root.CreateChild("ContentNode")
+            row.title = entry.title
+            for i = 0 to 7
+                MakeItem(row, { placeholder: true })
+            end for
+            queueRow({ mode: "row", kind: entry.kind, categoryId: entry.categoryId, title: entry.title, limit: 40 }, row)
+        end if
         added = added + 1
     end while
 end sub
@@ -201,17 +210,18 @@ sub onRowLoaded(event as Object)
     key = FieldStr(result.request, "taskKey")
     placeholder = m.pendingRows[key]
     m.pendingRows.Delete(key)
+    loaded = result.content
+    if result.ok and loaded <> invalid and loaded.GetChildCount() > 0 then m.rowCache[FieldStr(result.request, "kind") + ":" + FieldStr(result.request, "categoryId")] = loaded
     if result.request.generation <> m.generation or placeholder = invalid then return
 
     root = m.rows.content
     index = indexOfRow(root, placeholder)
     if index < 0 then return
-    loaded = result.content
     if result.ok and loaded <> invalid and loaded.GetChildCount() > 0 then
         root.ReplaceChild(loaded, index)
-    else if IsRefusalCode(ToInt(result.code)) then
-        ' The server is saying no. Asking for every other category would look like a
-        ' flood and could get this connection blocked for longer, so stop here.
+    else if not result.ok then
+        ' The server is saying no or not answering. Asking for every other category would
+        ' look like a flood and could keep this connection blocked longer, so stop here.
         root.RemoveChildIndex(index)
         m.rowQueue = []
         m.planIndex = m.plan.Count()

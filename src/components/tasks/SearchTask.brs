@@ -33,57 +33,59 @@ sub work()
     total = jobs.Count()
     done = 0
     lastQuery = m.top.query
-    report(done, total, index)
+    report(done, total, index, total = 0)
     if lastQuery <> "" then publish(index, lastQuery)
 
+    ' Gentle on the provider: one list at a time, a pause between lists, and none while a
+    ' video plays. Bursts of requests made this provider stop answering for a while (the
+    ' Samsung app saw it too), and while it sulks, videos don't start either. Each list
+    ' is parsed and dropped before the next, so memory stays low on big catalogs.
     inflight = {}
-    refusals = 0
+    failures = 0
+    stopped = false
+    sinceLast = CreateObject("roTimespan")
+    pauseMs = 0
     while true
-        ' Three downloads at a time; each list is parsed and dropped before the next,
-        ' so memory stays low even for very large catalogs.
-        while inflight.Count() < 3 and jobs.Count() > 0
-            job = jobs.Shift()
-            action = "get_vod_streams"
-            if job.kind = "series" then action = "get_series"
-            http = CreateObject("roUrlTransfer")
-            http.SetMessagePort(port)
-            http.SetUrl(ApiUrl(creds, action, { category_id: job.id }))
-            if FieldStr(creds, "userAgent") <> "" then http.AddHeader("User-Agent", FieldStr(creds, "userAgent"))
-            http.SetCertificatesFile("common:/certs/ca-bundle.crt")
-            http.InitClientCertificates()
-            http.EnableEncodings(true)
-            if http.AsyncGetToString() then
-                identity = http.GetIdentity()
-                inflight[identity.ToStr()] = { http: http, kind: job.kind, clock: CreateObject("roTimespan") }
+        if inflight.Count() = 0 and jobs.Count() > 0 and sinceLast.TotalMilliseconds() >= pauseMs then
+            sinceLast.Mark()
+            if m.global.playing = true then
+                pauseMs = 2000
             else
-                done = done + 1
+                pauseMs = 500
+                job = jobs.Shift()
+                action = "get_vod_streams"
+                if job.kind = "series" then action = "get_series"
+                http = CreateObject("roUrlTransfer")
+                http.SetMessagePort(port)
+                http.SetUrl(ApiUrl(creds, action, { category_id: job.id }))
+                if FieldStr(creds, "userAgent") <> "" then http.AddHeader("User-Agent", FieldStr(creds, "userAgent"))
+                http.SetCertificatesFile("common:/certs/ca-bundle.crt")
+                http.InitClientCertificates()
+                http.EnableEncodings(true)
+                if http.AsyncGetToString() then
+                    identity = http.GetIdentity()
+                    inflight[identity.ToStr()] = { http: http, kind: job.kind, clock: CreateObject("roTimespan") }
+                else
+                    done = done + 1
+                end if
             end if
-        end while
+        end if
 
-        msg = Wait(1000, port)
+        msg = Wait(250, port)
+        failed = false
+        finishedOne = false
         if type(msg) = "roUrlEvent" then
             identity = msg.GetSourceIdentity()
             key = identity.ToStr()
             entry = inflight[key]
             if entry <> invalid then
                 inflight.Delete(key)
-                code = msg.GetResponseCode()
-                if code = 200 then IndexAdd(index, ParseJson(msg.GetString()), entry.kind)
-                done = done + 1
-                ' A server that keeps saying no may be counting requests; stop asking.
-                if IsRefusalCode(code) then
-                    refusals = refusals + 1
+                finishedOne = true
+                if msg.GetResponseCode() = 200 then
+                    IndexAdd(index, ParseJson(msg.GetString()), entry.kind)
                 else
-                    refusals = 0
+                    failed = true
                 end if
-                if refusals >= 3 and jobs.Count() > 0 then
-                    jobs.Clear()
-                    total = done + inflight.Count()
-                end if
-                finished = (jobs.Count() = 0 and inflight.Count() = 0)
-                report(done, total, index)
-                ' Refresh an open search as more of the library arrives.
-                if lastQuery <> "" and (done MOD 8 = 0 or finished) then publish(index, lastQuery)
             end if
         else if type(msg) = "roSGNodeEvent" then
             if msg.GetField() = "stop" then return
@@ -95,10 +97,30 @@ sub work()
                 if inflight[key].clock.TotalSeconds() > 45 then
                     inflight[key].http.AsyncCancel()
                     inflight.Delete(key)
-                    done = done + 1
-                    report(done, total, index)
+                    finishedOne = true
+                    failed = true
                 end if
             end for
+        end if
+
+        if finishedOne then
+            done = done + 1
+            sinceLast.Mark()
+            ' A provider that keeps failing may be counting requests; stop asking.
+            if failed then
+                failures = failures + 1
+            else
+                failures = 0
+            end if
+            if failures >= 3 and jobs.Count() > 0 then
+                jobs.Clear()
+                stopped = true
+                total = done + inflight.Count()
+            end if
+            report(done, total, index, stopped)
+            finished = (jobs.Count() = 0 and inflight.Count() = 0)
+            ' Refresh an open search as more of the library arrives.
+            if lastQuery <> "" and (done MOD 4 = 0 or finished) then publish(index, lastQuery)
         end if
     end while
 end sub
@@ -109,6 +131,6 @@ sub publish(index as Object, query as String)
     m.top.results = results
 end sub
 
-sub report(done as Integer, total as Integer, index as Object)
-    m.top.status = { done: done, total: total, titles: index.names.Count() }
+sub report(done as Integer, total as Integer, index as Object, stopped = false as Boolean)
+    m.top.status = { done: done, total: total, titles: index.names.Count(), stopped: stopped }
 end sub
