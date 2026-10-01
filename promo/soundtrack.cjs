@@ -3,8 +3,9 @@
 // cue that promo/index.html exposes as window.__sound, so picture and sound stay in step.
 //
 // Every part is rendered as its own stem and mixed to a measured level, then reverb and
-// a dotted-eighth echo are added and the mix is softly limited. render.cjs calls this
-// and then normalises loudness with ffmpeg.
+// a dotted-eighth echo are added and the mix is softly limited. The voiceover (from
+// voiceover.py) sits on top, with the music ducking while someone speaks. render.cjs
+// calls this and then normalises loudness with ffmpeg.
 
 const fs = require("fs");
 
@@ -37,7 +38,7 @@ function setBq(f, type, freq, q) {
 }
 function bq(f, x) { const y = f.b0 * x + f.b1 * f.x1 + f.b2 * f.x2 - f.a1 * f.y1 - f.a2 * f.y2; f.x2 = f.x1; f.x1 = x; f.y2 = f.y1; f.y1 = y; return y; }
 
-function makeSoundtrack(sound, outFile) {
+function makeSoundtrack(sound, outFile, vo) {
   const { duration, sections: S, cues } = sound;
   const N = Math.ceil(duration * SR);
   const stem = () => [new Float32Array(N), new Float32Array(N)];
@@ -260,6 +261,41 @@ function makeSoundtrack(sound, outFile) {
     for (let c = 0; c < 2; c++) for (let i = 0; i < N; i++) stems[name][c][i] *= g;
     report[name] = level;
   }
+  // Voiceover: gently compressed, set well above the music, which ducks under it.
+  let duck = null;
+  if (vo) {
+    const v = new Float32Array(N);
+    v.set(vo.subarray(0, N));
+    let env = 0;
+    for (let i = 0; i < N; i++) {
+      const x = Math.abs(v[i]);
+      env += (x > env ? .02 : .0004) * (x - env);
+      const over = env > db(-24) ? Math.pow(env / db(-24), 1 / 3 - 1) : 1; // 3:1 above -24 dBFS
+      v[i] *= over;
+    }
+    let s2 = 0, n2 = 0;
+    for (let i = 0; i < N; i++) if (Math.abs(v[i]) > db(-40)) { s2 += v[i] * v[i]; n2++; }
+    const g = db(-15) / Math.sqrt(s2 / Math.max(1, n2));
+    const st = get("voice");
+    for (let i = 0; i < N; i++) { st[0][i] = v[i] * g * Math.SQRT1_2; st[1][i] = v[i] * g * Math.SQRT1_2; }
+    report.voice = -15;
+    // Music drops about 8 dB while the voice is active: 60 ms down, 450 ms back up.
+    duck = new Float32Array(N);
+    let e2 = 0, gd = 1;
+    const low = db(-8), down = 1 - Math.exp(-1 / (.06 * SR)), up = 1 - Math.exp(-1 / (.45 * SR));
+    for (let i = 0; i < N; i++) {
+      e2 = Math.max(Math.abs(v[i]) * g, e2 * Math.exp(-1 / (.12 * SR)));
+      const target = e2 > db(-32) ? low : 1;
+      gd += (target - gd) * (target < gd ? down : up);
+      duck[i] = gd;
+    }
+    const UI = new Set(["tick", "key", "chime", "sparkle"]);
+    for (const name in stems) {
+      if (name === "voice") continue;
+      const depth = UI.has(name) ? .5 : 1;
+      for (let c = 0; c < 2; c++) for (let i = 0; i < N; i++) stems[name][c][i] *= 1 - depth * (1 - duck[i]);
+    }
+  }
   // Sidechain: the pads breathe with the kick.
   { const kicks = []; const k = stems.kick;
     for (let i = 1; i < N; i++) if (Math.abs(k[0][i]) > .05 && Math.abs(k[0][i - 1]) <= .05 && (!kicks.length || i - kicks[kicks.length - 1] > SR * .1)) kicks.push(i);
@@ -272,7 +308,7 @@ function makeSoundtrack(sound, outFile) {
     }
   }
 
-  const SEND_VERB = { pad: .35, arp: .3, clap: .2, shimmer: .7, sparkle: .7, chime: .6, droop: .3, clock: .25, tick: .15, key: .08, whoosh: .3, crash: .25, riser: .3 };
+  const SEND_VERB = { voice: .06, pad: .35, arp: .3, clap: .2, shimmer: .7, sparkle: .7, chime: .6, droop: .3, clock: .25, tick: .15, key: .08, whoosh: .3, crash: .25, riser: .3 };
   const SEND_ECHO = { arp: .32, sparkle: .25, chime: .2 };
   const mix = stem(), vin = stem(), ein = stem();
   for (const name in stems) for (let c = 0; c < 2; c++) {

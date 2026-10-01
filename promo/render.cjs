@@ -3,6 +3,7 @@
 // Needs Playwright (with Chromium) and ffmpeg.
 //   STILLS=1.5,6,12   renders PNGs at those times instead of the video
 //   AUDIO_ONLY=1      only rebuilds promo/soundtrack.mp3
+//   REMUX=1           rebuilds the soundtrack and swaps it into the existing MP4
 //   WORKERS=3         browser pages rendering frames in parallel
 const { chromium } = require("playwright");
 const { spawn } = require("child_process");
@@ -47,7 +48,16 @@ async function openPage(browser) {
 async function soundtrack(sound) {
   const wav = path.join(os.tmpdir(), "aranplus-soundtrack.wav");
   const m4a = path.join(os.tmpdir(), "aranplus-soundtrack.m4a"), mp3 = path.join(__dirname, "soundtrack.mp3");
-  const info = makeSoundtrack(sound, wav);
+  // The voiceover comes from voiceover.py as FLAC; decode it to 48 kHz mono floats.
+  let vo = null;
+  const flac = path.join(__dirname, "voiceover.flac");
+  if (fs.existsSync(flac)) {
+    const raw = path.join(os.tmpdir(), "aranplus-vo.f32");
+    await run(["-i", flac, "-f", "f32le", "-ac", "1", "-ar", "48000", raw], { quiet: true });
+    const b = fs.readFileSync(raw);
+    vo = new Float32Array(b.buffer, b.byteOffset, b.length / 4);
+  }
+  const info = makeSoundtrack(sound, wav, vo);
   console.log(`soundtrack: ${info.bpm.toFixed(1)} bpm, breakdown in bar ${info.bars.breakdown}`);
   // Two-pass loudness normalisation to -14 LUFS, -1.5 dBTP.
   const target = "I=-14:TP=-1.5:LRA=11";
@@ -80,7 +90,16 @@ async function soundtrack(sound) {
 
   const sound = await first.evaluate(() => window.__sound);
   const m4a = await soundtrack(sound);
-  if (process.env.AUDIO_ONLY) { await browser.close(); server.close(); return; }
+  if (process.env.AUDIO_ONLY || process.env.REMUX) {
+    await browser.close(); server.close();
+    if (process.env.REMUX) {
+      const tmpOut = out.replace(/\.mp4$/, ".remux.mp4");
+      await run(["-i", out, "-i", m4a, "-map", "0:v", "-map", "1:a", "-c", "copy", "-movflags", "+faststart", "-t", String(sound.duration), tmpOut], { quiet: true });
+      fs.renameSync(tmpOut, out);
+      console.log("new soundtrack in " + out);
+    }
+    return;
+  }
 
   const frames = Math.round(sound.duration * fps);
   const per = Math.ceil(frames / workers);
