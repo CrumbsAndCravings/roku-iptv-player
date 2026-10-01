@@ -121,26 +121,46 @@ sub onCategories(event as Object)
     showTab(m.tab)
 end sub
 
+' Which category rows each tab shows. Categories in languages you don't watch are left
+' out (search still finds their titles), names are tidied ("EN | ACTION ★" -> "Action"),
+' and categories of new releases come first.
 function buildPlan(tabIndex as Integer) as Object
+    langs = LanguagePrefs()
+    year = CreateObject("roDateTime").GetYear()
+    vod = OrganizeCategories(m.categories.vod, langs, year)
+    series = OrganizeCategories(m.categories.series, langs, year)
     plan = []
-    vod = m.categories.vod
-    series = m.categories.series
     if tabIndex = 0 then
-        ' Home mixes the provider's first few movie and series categories.
-        for i = 0 to 5
-            if i < vod.Count() then plan.Push({ kind: "vod", categoryId: vod[i].id, title: vod[i].name + "  ·  Movies" })
-            if i < series.Count() then plan.Push({ kind: "series", categoryId: series[i].id, title: series[i].name + "  ·  Series" })
+        ' Newest everything: new-release categories first, then the rest, movies and
+        ' series taking turns, up to 18 rows.
+        newest = TakeTurns(planEntries(vod, "vod", true), planEntries(series, "series", true))
+        rest = TakeTurns(planEntries(vod, "vod", false), planEntries(series, "series", false))
+        newest.Append(rest)
+        for each entry in newest
+            if plan.Count() >= 18 then exit for
+            if entry.kind = "series" then
+                entry.title = entry.label + "  ·  Series"
+            else
+                entry.title = entry.label + "  ·  Movies"
+            end if
+            plan.Push(entry)
         end for
     else if tabIndex = 1 then
-        for each category in vod
-            plan.Push({ kind: "vod", categoryId: category.id, title: category.name })
-        end for
+        plan = planEntries(vod, "vod", invalid)
     else
-        for each category in series
-            plan.Push({ kind: "series", categoryId: category.id, title: category.name })
-        end for
+        plan = planEntries(series, "series", invalid)
     end if
     return plan
+end function
+
+' Plan entries for organized categories of one kind; with wantNew true or false, only
+' the categories of new releases or only the others.
+function planEntries(list as Object, kind as String, wantNew as Dynamic) as Object
+    entries = []
+    for each category in list
+        if wantNew = invalid or category.isNew = wantNew then entries.Push({ kind: kind, categoryId: category.id, label: category.label, title: category.label })
+    end for
+    return entries
 end function
 
 sub showTab(tabIndex as Integer)

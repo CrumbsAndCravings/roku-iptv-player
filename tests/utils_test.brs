@@ -130,6 +130,48 @@ sub Main()
         end if
     end for
 
+    ' Provider categories
+    c = ClassifyCategory("EN | ACTION ★", 2026)
+    check("cat en tag", c.lang, "en")
+    check("cat en label", c.label, "Action")
+    c = ClassifyCategory("|IN| BOLLYWOOD 2024", 2026)
+    check("cat bollywood", c.lang, "hi")
+    check("cat bollywood label", c.label, "Bollywood 2024")
+    check("cat old year not new", c.isNew.ToStr(), "false")
+    check("cat punjabi", ClassifyCategory("PUNJABI MOVIES", 2026).lang, "pa")
+    check("cat punjabi label", ClassifyCategory("PUNJABI MOVIES", 2026).label, "Punjabi")
+    check("cat arabic tag", ClassifyCategory("AR | AFLAM", 2026).lang, "other")
+    check("cat tamil", ClassifyCategory("TAMIL MOVIES", 2026).lang, "other")
+    check("cat urdu", ClassifyCategory("PAKISTANI DRAMAS", 2026).lang, "other")
+    check("cat hindi dubbed", ClassifyCategory("SOUTH INDIAN HINDI DUBBED", 2026).lang, "hi")
+    check("cat south indian", ClassifyCategory("SOUTH INDIAN MOVIES", 2026).lang, "other")
+    check("cat no language", ClassifyCategory("ACTION", 2026).lang, "")
+    check("cat platform label", ClassifyCategory("NETFLIX MOVIES", 2026).label, "Netflix")
+    check("cat sci-fi", ClassifyCategory("SCI-FI & FANTASY", 2026).label, "Sci-Fi & Fantasy")
+    check("cat sci-fi not finnish", ClassifyCategory("SCI-FI & FANTASY", 2026).lang, "")
+    check("cat new releases", ClassifyCategory("NEW RELEASES 2026", 2026).isNew.ToStr(), "true")
+    check("cat last year new", ClassifyCategory("MOVIES 2025", 2026).isNew.ToStr(), "true")
+    check("cat in theaters", ClassifyCategory("IN THEATERS NOW", 2026).isNew.ToStr(), "true")
+    check("cat in theaters not hindi", ClassifyCategory("IN THEATERS NOW", 2026).lang, "")
+    c = ClassifyCategory("EN - KIDS", 2026)
+    check("cat kids", c.kids.ToStr(), "true")
+    check("cat kids label", c.label, "Kids")
+    check("cat hindi prefix", ClassifyCategory("IN | ACTION", 2026).label, "Hindi Action")
+    check("cat uk top 10", ClassifyCategory("|UK| TOP 10 THIS WEEK", 2026).isNew.ToStr(), "true")
+    check("cat 4k label", ClassifyCategory("4K UHD MOVIES", 2026).label, "4K UHD")
+    check("cat platform split", ClassifyCategory("EN | NETFLIX | DRAMA", 2026).label, "Netflix · Drama")
+    langs = ["en", "hi", "pa"]
+    check("cat wanted unknown", CategoryWanted({ lang: "" }, langs).ToStr(), "true")
+    check("cat wanted other", CategoryWanted({ lang: "other" }, langs).ToStr(), "false")
+    check("cat wanted all", CategoryWanted({ lang: "other" }, []).ToStr(), "true")
+    organized = OrganizeCategories([{ id: "1", name: "AR | ACTION" }, { id: "2", name: "EN | DRAMA" }, { id: "3", name: "IN | COMEDY" }, { id: "4", name: "NEW RELEASES" }, { id: "5", name: "HORROR" }], langs, 2026)
+    ids = []
+    for each entry in organized
+        ids.Push(entry.id)
+    end for
+    check("cat organized order", ids.Join(","), "4,2,5,3")
+    check("cat take turns", TakeTurns([1, 2, 3], ["a"]).Count().ToStr(), "4")
+
     ' Audio and subtitle tracks, shaped like the Video node's availableAudioTracks / availableSubtitleTracks
     check("Language 3-letter", LanguageName("hin"), "Hindi")
     check("Language 2-letter", LanguageName("EN"), "English")

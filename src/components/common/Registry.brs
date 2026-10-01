@@ -76,3 +76,16 @@ function BuiltInCreds() as Dynamic
     if creds.server = "" or creds.username = "" or creds.password = "" then return invalid
     return creds
 end function
+
+' Languages whose categories to show, like ["en", "hi", "pa"]; empty means all of them.
+' A personal build sets them in src/source/account.json ("languages").
+function LanguagePrefs() as Object
+    raw = RegRead("prefs", "languages")
+    if raw <> invalid then
+        saved = ParseJson(raw)
+        if IsArr(saved) then return saved
+    end if
+    builtIn = Field(ParseJson(ReadAsciiFile("pkg:/source/account.json")), "languages")
+    if IsArr(builtIn) then return builtIn
+    return []
+end function

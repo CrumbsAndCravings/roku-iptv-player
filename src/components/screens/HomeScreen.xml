@@ -72,5 +72,6 @@
   <script type="text/brightscript" uri="pkg:/components/common/Compat.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Progress.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Pills.brs" />
+  <script type="text/brightscript" uri="pkg:/components/common/Categories.brs" />
   <script type="text/brightscript" uri="pkg:/components/screens/HomeScreen.brs" />
 </component>
