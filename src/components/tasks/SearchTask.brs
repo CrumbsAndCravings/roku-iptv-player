@@ -28,6 +28,7 @@ sub work()
     if lastQuery <> "" then publish(index, lastQuery)
 
     inflight = {}
+    refusals = 0
     while true
         ' Three downloads at a time; each list is parsed and dropped before the next,
         ' so memory stays low even for very large catalogs.
@@ -57,8 +58,19 @@ sub work()
             entry = inflight[key]
             if entry <> invalid then
                 inflight.Delete(key)
-                if msg.GetResponseCode() = 200 then IndexAdd(index, ParseJson(msg.GetString()), entry.kind)
+                code = msg.GetResponseCode()
+                if code = 200 then IndexAdd(index, ParseJson(msg.GetString()), entry.kind)
                 done = done + 1
+                ' A server that keeps saying no may be counting requests; stop asking.
+                if IsRefusalCode(code) then
+                    refusals = refusals + 1
+                else
+                    refusals = 0
+                end if
+                if refusals >= 3 and jobs.Count() > 0 then
+                    jobs.Clear()
+                    total = done + inflight.Count()
+                end if
                 finished = (jobs.Count() = 0 and inflight.Count() = 0)
                 report(done, total, index)
                 ' Refresh an open search as more of the library arrives.

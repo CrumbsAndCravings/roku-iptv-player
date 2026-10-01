@@ -98,6 +98,7 @@ end sub
 
 sub loadCategories()
     m.failed = false
+    m.lastError = ""
     m.status.text = "Loading your library…"
     m.categories = { vod: invalid, series: invalid }
     startTask({ mode: "categories", kind: "vod" }, "onCategories")
@@ -160,7 +161,8 @@ sub showTab(tabIndex as Integer)
     if root.GetChildCount() = 0 then
         m.failed = true
         if m.lastError <> "" then
-            m.status.text = "Couldn't load your library. " + m.lastError + " Press OK to try again."
+            showLoadError()
+            return
         else
             m.status.text = "Your provider didn't list anything here."
         end if
@@ -207,6 +209,17 @@ sub onRowLoaded(event as Object)
     loaded = result.content
     if result.ok and loaded <> invalid and loaded.GetChildCount() > 0 then
         root.ReplaceChild(loaded, index)
+    else if IsRefusalCode(ToInt(result.code)) then
+        ' The server is saying no. Asking for every other category would look like a
+        ' flood and could get this connection blocked for longer, so stop here.
+        root.RemoveChildIndex(index)
+        m.rowQueue = []
+        m.planIndex = m.plan.Count()
+        m.lastError = result.error
+        if root.GetChildCount() = 0 then
+            showLoadError()
+            return
+        end if
     else
         ' Empty or failed category: drop it and pull in the next one instead.
         root.RemoveChildIndex(index)
@@ -515,4 +528,13 @@ end sub
 
 sub onDialogClosed()
     restoreFocus()
+end sub
+
+sub showLoadError()
+    m.failed = true
+    text = "Couldn't load your library. " + m.lastError
+    if Instr(1, m.lastError, "refused") > 0 then text = text + " The trial may have ended, or the provider may be blocking your internet connection for a while."
+    m.status.text = text + " Press OK to try again."
+    clearHero()
+    focusNav()
 end sub

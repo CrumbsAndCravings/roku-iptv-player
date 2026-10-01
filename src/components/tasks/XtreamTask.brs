@@ -43,11 +43,11 @@ function runAuth(creds as Object) as Object
         ' The address shows typos (a missing port, http vs https) at a glance.
         text = res.error + Chr(10) + "Address: " + creds.server
         code = ToInt(res.code)
-        if cloudflareRefused(res) then
-            if triedApp then text = text + Chr(10) + "Asking again as ARAN+ instead of as a Roku didn't get through either."
+        if triedApp and cloudflareRefused(res) then text = text + Chr(10) + "Asking again as ARAN+ instead of as a Roku got the same answer."
+        if flagged(res, "cfBlock") then
             text = text + Chr(10) + "Only the provider can allow it, or give you another address."
-        else if code = 401 or code = 403 then
-            text = text + Chr(10) + "Often a typo in the login, a trial that isn't active yet or only works in certain apps, or a block on this network."
+        else if IsRefusalCode(code) then
+            text = text + Chr(10) + "Often a typo in the login, a trial that has ended or only works in certain apps, or a block on your internet connection after too many attempts."
         else if code = 404 then
             text = text + Chr(10) + "Nothing here answers as an Xtream server. The address may be missing a port like :8080; pasting the whole M3U link into Server fills it in."
         end if
@@ -58,9 +58,15 @@ function runAuth(creds as Object) as Object
 end function
 
 function cloudflareRefused(res as Object) as Boolean
-    if res.ok or res.cloudflare = invalid or res.cloudflare <> true then return false
+    if res.ok or not flagged(res, "cloudflare") then return false
     code = ToInt(res.code)
     return code = 401 or code = 403 or code = 503
+end function
+
+function flagged(res as Object, key as String) as Boolean
+    value = res[key]
+    if type(value) = "Boolean" or type(value) = "roBoolean" then return value
+    return false
 end function
 
 function runCategories(kind as String) as Object

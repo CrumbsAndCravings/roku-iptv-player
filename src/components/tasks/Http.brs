@@ -23,16 +23,17 @@ function fetchJson(url as String, userAgent = "" as String) as Object
     if code < 0 then return { ok: false, error: "Couldn't reach the server (" + msg.GetFailureReason() + ")." }
     if code <> 200 then
         headers = msg.GetResponseHeaders()
-        detail = HttpDetail(code, headers, msg.GetString())
-        blocked = IsCloudflare(headers)
-        if blocked and (code = 401 or code = 403) then
-            text = "The provider's firewall blocked this Roku: " + detail + "."
-        else if code = 401 or code = 403 then
-            text = "The server refused the login: " + detail + "."
+        body = msg.GetString()
+        detail = HttpDetail(code, headers, body)
+        blocked = IsCloudflareBlock(headers, body)
+        if blocked then
+            text = "Cloudflare, the provider's firewall, turned this Roku away: " + detail + "."
+        else if IsRefusalCode(code) then
+            text = "The server refused the request: " + detail + "."
         else
             text = "The server answered " + detail + "."
         end if
-        return { ok: false, code: code, cloudflare: blocked, error: text }
+        return { ok: false, code: code, cloudflare: IsCloudflare(headers), cfBlock: blocked, error: text }
     end if
 
     data = ParseJson(msg.GetString())

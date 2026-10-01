@@ -235,10 +235,20 @@ end function
 
 ' How ARAN+ introduces itself when a provider turns away requests that say "Roku".
 function AppUserAgent() as String
-    return "ARANplus/0.4.4"
+    return "ARANplus/0.4.5"
 end function
 
-' True when Cloudflare, rather than the IPTV server itself, answered.
+' True when Cloudflare itself turned the request away, with one of its own pages.
+function IsCloudflareBlock(headers as Dynamic, body as String) as Boolean
+    return IsCloudflare(headers) and CloudflareKind(headers, body) <> ""
+end function
+
+' Statuses that mean "not you, not now", where asking again only makes it worse.
+function IsRefusalCode(code as Integer) as Boolean
+    return code = 401 or code = 403 or code = 429
+end function
+
+' True when the answer passed through Cloudflare (it may still come from the provider).
 function IsCloudflare(headers as Dynamic) as Boolean
     return Instr(1, LCase(FieldStr(headers, "server")), "cloudflare") > 0 or FieldStr(headers, "cf-ray") <> ""
 end function
@@ -260,9 +270,16 @@ end function
 ' screen then shows who answered and what they said.
 function HttpDetail(code as Integer, headers as Dynamic, body as String) as String
     detail = "HTTP " + code.ToStr()
-    if IsCloudflare(headers) then return detail + " from Cloudflare" + CloudflareKind(headers, body)
-    software = CreateObject("roRegex", "[/ (]", "").Split(FieldStr(headers, "server"))
-    if software.Count() > 0 and software[0] <> "" then detail = detail + " from " + software[0]
+    if IsCloudflare(headers) then
+        kind = CloudflareKind(headers, body)
+        if kind <> "" then return detail + " from Cloudflare" + kind
+        ' Every answer from a site behind Cloudflare carries its name, so without one of
+        ' Cloudflare's own pages this most likely came from the provider's server.
+        detail = detail + " via Cloudflare"
+    else
+        software = CreateObject("roRegex", "[/ (]", "").Split(FieldStr(headers, "server"))
+        if software.Count() > 0 and software[0] <> "" then detail = detail + " from " + software[0]
+    end if
 
     trimmed = body.Trim()
     said = ""
