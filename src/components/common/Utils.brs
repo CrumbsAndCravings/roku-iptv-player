@@ -235,7 +235,7 @@ end function
 
 ' How ARAN+ introduces itself when a provider turns away requests that say "Roku".
 function AppUserAgent() as String
-    return "ARANplus/0.4.6"
+    return "ARANplus/0.4.7"
 end function
 
 ' True when Cloudflare itself turned the request away, with one of its own pages.

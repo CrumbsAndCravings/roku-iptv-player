@@ -13,6 +13,8 @@ sub init()
     creds = LoadCreds()
     if creds = invalid then
         resetTo("LoginScreen")
+        ' A personal build with a login inside signs in by itself at launch.
+        if BuiltInCreds() <> invalid then m.screens.Peek().autoSignIn = true
     else
         m.global.creds = creds
         resetTo("HomeScreen")

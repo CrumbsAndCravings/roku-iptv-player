@@ -9,6 +9,8 @@ sub init()
     m.labels = ["SERVER", "USERNAME", "PASSWORD"]
     m.hints = ["e.g. http://line.example.com:8080", "", ""]
     m.values = ["", "", ""]
+    builtIn = BuiltInCreds()
+    if builtIn <> invalid then m.values = [builtIn.server, builtIn.username, builtIn.password]
     m.index = 0
     m.busy = false
     m.task = invalid
@@ -166,4 +168,8 @@ sub onAuthResult(event as Object)
     else
         m.status.text = result.error
     end if
+end sub
+
+sub onAutoSignIn()
+    if m.top.autoSignIn and not m.busy then submit()
 end sub

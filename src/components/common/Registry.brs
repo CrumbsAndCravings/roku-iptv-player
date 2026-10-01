@@ -65,3 +65,13 @@ end function
 sub SaveOsAccount(account as Object)
     RegWrite("opensubtitles", "account", FormatJson(account))
 end sub
+
+' A login built into this package (src/source/account.json, which git ignores), so a
+' personal build can sign in by itself. invalid when there isn't one.
+function BuiltInCreds() as Dynamic
+    data = ParseJson(ReadAsciiFile("pkg:/source/account.json"))
+    if not IsAA(data) then return invalid
+    creds = { server: NormalizeServer(FieldStr(data, "server")), username: FieldStr(data, "username"), password: FieldStr(data, "password") }
+    if creds.server = "" or creds.username = "" or creds.password = "" then return invalid
+    return creds
+end function

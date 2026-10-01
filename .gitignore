@@ -3,3 +3,5 @@ build/
 out/
 .DS_Store
 .env
+# A personal login baked into a build; never commit it.
+src/source/account.json

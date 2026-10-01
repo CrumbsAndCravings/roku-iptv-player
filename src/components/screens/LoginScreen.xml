@@ -3,6 +3,7 @@
   <interface>
     <field id="action" type="assocarray" alwaysNotify="true" />
     <field id="takeFocus" type="boolean" alwaysNotify="true" onChange="onTakeFocus" />
+    <field id="autoSignIn" type="boolean" onChange="onAutoSignIn" />
   </interface>
   <children>
     <Rectangle width="1280" height="720" color="0x151028FF" />
