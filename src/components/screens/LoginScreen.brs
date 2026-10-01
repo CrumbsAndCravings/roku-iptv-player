@@ -117,8 +117,8 @@ sub onKeyboardButton()
     if dialog = invalid then return
     if dialog.buttonSelected = 0 then
         text = dialog.text
-        if m.editing = 0 and Instr(1, LCase(text), "username=") > 0 then
-            link = ParseProviderLink(text)
+        link = ParseProviderLink(text)
+        if m.editing = 0 and link.username <> "" then
             m.values[0] = link.server
             if link.username <> "" then m.values[1] = link.username
             if link.password <> "" then m.values[2] = link.password

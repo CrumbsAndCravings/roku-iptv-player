@@ -182,10 +182,18 @@ function NormalizeServer(raw as String) as String
     return server
 end function
 
-' Pulls server, username and password out of a pasted get.php / player_api.php link.
+' Pulls server, username and password out of a pasted link: get.php or player_api.php
+' with ?username=&password=, or a path like /playlist/<user>/<pass>/m3u_plus (also
+' /live/, /movie/ and /series/ stream links).
 function ParseProviderLink(raw as String) as Object
     text = raw.Trim()
     result = { server: NormalizeServer(text), username: "", password: "" }
+    path = CreateObject("roRegex", "^[a-z]+://[^/?]+/(playlist|live|movie|series)/([^/?]+)/([^/?]+)", "i").Match(text)
+    if path.Count() > 3 then
+        result.username = path[2].DecodeUriComponent()
+        result.password = path[3].DecodeUriComponent()
+        return result
+    end if
     question = Instr(1, text, "?")
     if question = 0 then return result
     query = Mid(text, question + 1)
@@ -238,7 +246,7 @@ end function
 
 ' How ARAN+ introduces itself when a provider turns away requests that say "Roku".
 function AppUserAgent() as String
-    return "ARANplus/0.4.12"
+    return "ARANplus/0.4.13"
 end function
 
 ' A plain desktop web browser, for providers whose servers only answer browsers (a
