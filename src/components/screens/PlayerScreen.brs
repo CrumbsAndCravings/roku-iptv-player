@@ -79,6 +79,11 @@ sub init()
     m.holdTimer.ObserveField("fire", "onHoldTick")
     m.commitTimer.ObserveField("fire", "commitSeek")
     m.autoSubTimer.ObserveField("fire", "autoSubtitles")
+    m.toast = m.top.FindNode("toast")
+    m.toastText = m.top.FindNode("toastText")
+    m.toastText.font = MakeFont("Nunito-SemiBold", 18)
+    m.toastTimer = m.top.FindNode("toastTimer")
+    m.toastTimer.ObserveField("fire", "hideToast")
 
     m.playback = invalid
     m.kind = "movie"
@@ -115,6 +120,7 @@ sub init()
     m.subCursor = 0
     m.episodeCursor = 0
     m.audioPrefDone = false
+    m.audioChecked = false
     m.subPrefDone = false
     resetOnline()
 end sub
@@ -168,6 +174,7 @@ sub startItem(startAt as Integer)
     resetProbe()
     m.introShown = false
     m.audioPrefDone = false
+    m.audioChecked = false
     m.subPrefDone = false
     resetOnline()
     cancelSeek()
@@ -314,6 +321,10 @@ sub onState()
     if state = "playing" then
         m.started = true
         onTracksChanged()
+        if not m.audioChecked then
+            m.audioChecked = true
+            checkAudioPlayable()
+        end if
         if m.pendingSubtitle <> "" then
             m.video.subtitleTrack = m.pendingSubtitle
             m.video.globalCaptionMode = "On"
@@ -910,6 +921,7 @@ sub close()
     m.countdown.control = "stop"
     m.hideTimer.control = "stop"
     m.video.control = "stop"
+    m.toastTimer.control = "stop"
     m.top.action = { name: "close" }
 end sub
 
@@ -1094,6 +1106,8 @@ end sub
 
 sub updateTracksNote()
     notes = []
+    playing = LCase(ToStr(m.video.audioFormat))
+    if playing <> "" then notes.Push("Audio now: " + CodecLabel(playing) + ".")
     state = m.online.state
     if LoadOsAccount() = invalid then
         notes.Push("To search online, connect OpenSubtitles: on the home screen press * and choose Online subtitles.")
@@ -1160,6 +1174,36 @@ sub onTracksChanged()
             end if
         end if
     end if
+end sub
+
+' Some files' audio is in a format this Roku can't play through the TV (DTS is the usual
+' one), which plays the picture in silence. Switch to a track it can play, or say why.
+sub checkAudioPlayable()
+    options = AudioOptions(m.video.availableAudioTracks)
+    current = OptionIndex(options, "id", ToStr(m.video.audioTrack))
+    format = ""
+    if current >= 0 then format = options[current].format
+    if format = "" then format = LCase(ToStr(m.video.audioFormat))
+    if format = "" or canDecode("audio", format, "") then return
+    for each option in options
+        if option.format <> "" and canDecode("audio", option.format, "") then
+            m.video.audioTrack = option.id
+            showToast("Switched to " + option.label + ", because this " + DeviceWord() + " can't play " + CodecLabel(format) + " audio.")
+            return
+        end if
+    end for
+    showToast("No sound? This file's audio is " + CodecLabel(format) + ", which this " + DeviceWord() + " can't play. Your provider may have another version of this title.")
+end sub
+
+sub showToast(text as String)
+    m.toastText.text = text
+    m.toast.visible = true
+    m.toastTimer.control = "stop"
+    m.toastTimer.control = "start"
+end sub
+
+sub hideToast()
+    m.toast.visible = false
 end sub
 
 sub openTracks()

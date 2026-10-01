@@ -128,9 +128,17 @@ end function
 function CodecFields(info as Dynamic) as Object
     video = Field(info, "video")
     audio = Field(info, "audio")
+    videoCodec = FieldStr(video, "codec_name")
+    videoProfile = FieldStr(video, "profile")
+    ' MKV files often carry their poster as a picture "video" stream, and some providers
+    ' report that instead of the film (MJPEG Baseline). The real codec is then unknown.
+    if IsPictureCodec(videoCodec) then
+        videoCodec = ""
+        videoProfile = ""
+    end if
     return {
-        videoCodec: FieldStr(video, "codec_name")
-        videoProfile: FieldStr(video, "profile")
+        videoCodec: videoCodec
+        videoProfile: videoProfile
         audioCodec: FieldStr(audio, "codec_name")
     }
 end function
@@ -255,4 +263,9 @@ function CleanEpisodeTitle(raw as String, seriesName as String, prefix as Object
     title = title.Trim()
     if Left(title, 1) = "-" then title = Mid(title, 2)
     return title.Trim()
+end function
+
+function IsPictureCodec(codec as String) as Boolean
+    c = LCase(codec)
+    return c = "mjpeg" or c = "png" or c = "bmp" or c = "gif" or c = "webp" or c = "tiff"
 end function

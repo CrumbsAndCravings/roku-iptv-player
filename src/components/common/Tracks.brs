@@ -47,7 +47,10 @@ function AudioOptions(tracks as Dynamic) as Object
         if id <> "" then
             number = options.Count() + 1
             language = FieldStr(track, "Language")
-            options.Push({ id: id, label: TrackLabel(language, FieldStr(track, "Name"), "Track " + number.ToStr()), language: LCase(language) })
+            format = LCase(FieldStr(track, "Format"))
+            label = TrackLabel(language, FieldStr(track, "Name"), "Track " + number.ToStr())
+            if format <> "" then label = label + " · " + CodecLabel(format)
+            options.Push({ id: id, label: label, language: LCase(language), format: format })
         end if
     end for
     return options

@@ -108,10 +108,10 @@ end sub
 
 function CompatLine(check as Object, ext as String) as String
     if check.blocked <> "" then
-        if IsUnsupportedContainer(ext) then return "Won't play on this TV: Roku devices can't play " + UCase(ext) + " files."
-        return "Won't play on this TV: its hardware can't decode " + check.blocked + "."
+        if IsUnsupportedContainer(ext) then return "Won't play on this " + DeviceWord() + ": Roku devices can't play " + UCase(ext) + " files."
+        return "Won't play on this " + DeviceWord() + ": it can't decode " + check.blocked + "."
     end if
-    if check.warning <> "" then return "May not play fully on this TV: it doesn't support " + check.warning + "."
+    if check.warning <> "" then return "May not play fully on this " + DeviceWord() + ": it doesn't support " + check.warning + "."
     return ""
 end function
 

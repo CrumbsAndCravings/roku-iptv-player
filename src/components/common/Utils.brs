@@ -246,7 +246,7 @@ end function
 
 ' How ARAN+ introduces itself when a provider turns away requests that say "Roku".
 function AppUserAgent() as String
-    return "ARANplus/0.4.15"
+    return "ARANplus/0.4.16"
 end function
 
 ' A plain desktop web browser, for providers whose servers only answer browsers (a
@@ -431,7 +431,19 @@ function UnplayableText(blocked as String, ext as String) as String
     if IsUnsupportedContainer(ext) then
         return "This is an " + UCase(ext) + " file. Roku devices can't play " + UCase(ext) + " files, so no Roku app can play this one. Your provider may have another version of this title."
     end if
-    return "This file uses " + blocked + ", which this TV's hardware can't decode, so no app on this TV can play it. Most current Roku streaming sticks can, and this app would run on one plugged into the TV."
+    if DeviceWord() = "TV" then
+        return "This file uses " + blocked + ", which this TV's hardware can't decode, so no app on this TV can play it. Most current Roku streaming sticks can, and this app would run on one plugged into the TV."
+    end if
+    return "This file uses " + blocked + ", which this Roku can't decode, so no app on it can play this file. Your provider may have another version of this title."
+end function
+
+' "TV" on a Roku TV, "Roku" on a streaming stick or box, for messages.
+function DeviceWord() as String
+    if m.deviceWord = invalid then
+        m.deviceWord = "Roku"
+        if CreateObject("roDeviceInfo").GetModelType() = "TV" then m.deviceWord = "TV"
+    end if
+    return m.deviceWord
 end function
 
 ' Maps provider codec names to the names roDeviceInfo.CanDecodeVideo/Audio expects.
