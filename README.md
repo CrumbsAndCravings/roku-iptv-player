@@ -98,6 +98,11 @@ tests/                        brs interpreter tests
 
 The Xtream endpoints used are `player_api.php` with `get_vod_categories`, `get_series_categories`, `get_vod_streams`, `get_series`, `get_vod_info` and `get_series_info`, and streams play from `/movie/…` and `/series/…`.
 
+## Docs
+
+- [`docs/features.md`](docs/features.md): every feature with its exact rules, where the code is, and a checklist for bringing the Samsung app level.
+- [`docs/samsung-plan.md`](docs/samsung-plan.md): the original plan for the Samsung (Tizen) version.
+
 ## Roadmap
 
 - **Live TV and sports:** a Live tab with favourite channels and a "Live now" sports row for tournaments, plus a simple guide.
