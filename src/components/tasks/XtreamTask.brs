@@ -24,7 +24,18 @@ end sub
 
 function runAuth(creds as Object) as Object
     res = fetchJson(ApiUrl(creds, "", invalid))
-    if not res.ok then return res
+    if not res.ok then
+        ' The address shows typos (a missing port, http vs https) at a glance.
+        text = res.error + Chr(10) + "Address: " + creds.server
+        code = ToInt(res.code)
+        if res.cloudflare <> invalid and res.cloudflare = true then
+            text = text + Chr(10) + "Only the provider can allow it, or give you another address."
+        else if code = 401 or code = 403 then
+            text = text + Chr(10) + "Often a typo in the login, a trial that isn't active yet or only works in certain apps, or a block on this network."
+        end if
+        res.error = text
+        return res
+    end if
     return ParseAuth(res.data)
 end function
 

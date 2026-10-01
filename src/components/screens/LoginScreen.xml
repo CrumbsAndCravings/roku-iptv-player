@@ -17,7 +17,7 @@
       text="Enter the Xtream Codes login your provider sent you. You only need to do this once." />
     <Group id="fields" translation="[96, 290]" />
     <Group id="submit" translation="[96, 540]" />
-    <Label id="status" translation="[96, 606]" width="560" wrap="true" maxLines="2" color="0xFF9ECFFF" />
+    <Label id="status" translation="[96, 598]" width="636" wrap="true" maxLines="5" color="0xFF9ECFFF" />
 
     <Group translation="[740, 290]">
       <Poster width="444" height="298" uri="pkg:/images/card.9.png" blendColor="0x1E1736FF" />

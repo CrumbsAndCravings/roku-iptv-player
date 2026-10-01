@@ -214,6 +214,48 @@ function ApiUrl(creds as Object, action as String, params as Dynamic) as String
     return url
 end function
 
+' --- HTTP errors ------------------------------------------------------------
+
+' One short line from an error page: scripts, tags and extra spaces removed.
+function BriefText(body as String, limit as Integer) as String
+    text = CreateObject("roRegex", "<(script|style)[^>]*>.*?</(script|style)>", "is").ReplaceAll(body, " ")
+    text = CreateObject("roRegex", "<[^>]*>", "s").ReplaceAll(text, " ")
+    text = CreateObject("roRegex", "&nbsp;", "i").ReplaceAll(text, " ")
+    text = CreateObject("roRegex", "\s+", "").ReplaceAll(text, " ").Trim()
+    if Len(text) > limit then text = Left(text, limit - 1).Trim() + "…"
+    return text
+end function
+
+' True when Cloudflare, rather than the IPTV server itself, answered.
+function IsCloudflare(headers as Dynamic) as Boolean
+    return Instr(1, LCase(FieldStr(headers, "server")), "cloudflare") > 0 or FieldStr(headers, "cf-ray") <> ""
+end function
+
+' Sums up a failed response, like: HTTP 403 from nginx: "Forbidden". A photo of the
+' screen then shows who answered and what they said.
+function HttpDetail(code as Integer, headers as Dynamic, body as String) as String
+    detail = "HTTP " + code.ToStr()
+    if IsCloudflare(headers) then
+        detail = detail + " from Cloudflare"
+        cfCode = CreateObject("roRegex", "(?:error code:?|error)\s*(1\d{3})", "i").Match(BriefText(body, 4000))
+        if cfCode.Count() > 1 then detail = detail + " (error " + cfCode[1] + ")"
+        return detail
+    end if
+    software = CreateObject("roRegex", "[/ (]", "").Split(FieldStr(headers, "server"))
+    if software.Count() > 0 and software[0] <> "" then detail = detail + " from " + software[0]
+
+    trimmed = body.Trim()
+    said = ""
+    if Left(trimmed, 1) = "{" then
+        data = ParseJson(trimmed)
+        said = FirstText([Field(data, "message"), Field(data, "error")])
+    end if
+    if said = "" then said = trimmed
+    said = BriefText(said, 70)
+    if said = "" then return detail + ", no reason given"
+    return detail + ": " + Chr(34) + said + Chr(34)
+end function
+
 ' kind is "movie", "series" or "live"
 function StreamUrl(creds as Object, kind as String, id as String, ext as String) as String
     return creds.server + "/" + kind + "/" + creds.username.EncodeUriComponent() + "/" + creds.password.EncodeUriComponent() + "/" + id + "." + ext

@@ -1,7 +1,7 @@
 sub init()
     m.top.FindNode("heading").font = MakeFont("Fredoka-SemiBold", 44)
     m.top.FindNode("intro").font = MakeFont("Nunito-SemiBold", 21)
-    m.top.FindNode("status").font = MakeFont("Nunito-ExtraBold", 19)
+    m.top.FindNode("status").font = MakeFont("Nunito-ExtraBold", 17)
     m.top.FindNode("tipsHeading").font = MakeFont("Fredoka-Medium", 22)
     m.top.FindNode("tips").font = MakeFont("Nunito-SemiBold", 18)
     m.status = m.top.FindNode("status")
@@ -139,7 +139,7 @@ function nextEmptyField() as Integer
 end function
 
 sub submit()
-    creds = { server: NormalizeServer(m.values[0]), username: m.values[1].Trim(), password: m.values[2] }
+    creds = { server: NormalizeServer(m.values[0]), username: m.values[1].Trim(), password: m.values[2].Trim() }
     if creds.server = "" or creds.username = "" or creds.password = "" then
         m.status.text = "Fill in the server, username and password first."
         m.index = nextEmptyField()
