@@ -11,6 +11,18 @@ sub init()
     RegDelete("watch", "items")
 
     creds = LoadCreds()
+    ' A personal build with a different login inside replaces the saved login (and its
+    ' Continue Watching, which belongs to the old provider). Online subtitles stay.
+    builtIn = BuiltInCreds()
+    if builtIn <> invalid then
+        stamp = builtIn.server + " " + builtIn.username
+        if ToStr(RegRead("account", "builtIn")) <> stamp then
+            RegDelete("account", "creds")
+            RegDelete("progress", "items")
+            RegWrite("account", "builtIn", stamp)
+            creds = invalid
+        end if
+    end if
     if creds = invalid then
         resetTo("LoginScreen")
         ' A personal build with a login inside signs in by itself at launch.
