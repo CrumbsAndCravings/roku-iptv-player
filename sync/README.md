@@ -25,10 +25,11 @@ free plan.
 1. **Make a free Cloudflare account** at https://dash.cloudflare.com/sign-up. When it
    asks for a workers.dev subdomain, pick any name; it becomes part of your
    service's address.
-2. **Create the Worker.** Go to **Workers & Pages**, then **Create**, then **Create
-   Worker**. Name it `aranplus-sync` and press **Deploy**. Then press **Edit code**,
-   replace everything with the contents of [`worker.js`](worker.js), and press
-   **Deploy** again.
+2. **Create the Worker.** Go to **Workers & Pages**, then **Create**. Skip **Import a
+   repository** (it wants GitHub, which isn't needed) and pick **Start with Hello
+   World!** instead. Name it `aranplus-sync` and press **Deploy**. Then press **Edit
+   code**, replace everything with the contents of [`worker.js`](worker.js) (open
+   it on GitHub and press **Raw** to copy it cleanly), and press **Deploy** again.
 3. **Create the storage.** Go to **Storage & Databases**, then **KV**, then
    **Create**. Name it `aranplus`.
 4. **Connect the storage to the Worker.** Open the `aranplus-sync` Worker, then
