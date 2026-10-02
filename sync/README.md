@@ -36,8 +36,9 @@ free plan.
    **Settings**, then **Bindings**, then **Add**, then **KV namespace**. Variable
    name: `ARANPLUS` (exactly). Namespace: `aranplus`. Save or deploy.
 5. **Add the key.** Still in the Worker's **Settings**, open **Variables and
-   Secrets**, then **Add**. Type: **Secret**. Name: `SYNC_KEY`. Value: your key (you
-   were given it privately; it's in your personal `account.json` under `sync.key`).
+   Secrets**, then **Add**. Type: **Secret**. Name: `SYNC_KEY`. Value: a long random
+   password you make up (30+ characters; a password manager's "generate" button is
+   ideal). Every app build needs the same key in its `account.json` under `sync.key`.
    Save or deploy.
 6. **Check it.** Open `https://aranplus-sync.<your-subdomain>.workers.dev/` in a
    browser. It should say `{"ok":true,"service":"aranplus-sync"}`.
