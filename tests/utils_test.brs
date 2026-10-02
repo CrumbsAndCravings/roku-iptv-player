@@ -130,6 +130,9 @@ sub Main()
         end if
     end for
 
+    check("sync space text", SyncSpaceText({ server: "HTTP://Host.Example:80/", username: "Jane" }), "http://host.example" + Chr(10) + "Jane")
+    check("sync space https port", SyncSpaceText({ server: "https://host.example:443", username: "j" }), "https://host.example" + Chr(10) + "j")
+    check("sync space other port kept", SyncSpaceText({ server: "host.example:8080", username: "j" }), "http://host.example:8080" + Chr(10) + "j")
     check("commas small", Commas(12), "12")
     check("commas thousands", Commas(1234), "1,234")
     check("commas millions", Commas(1234567), "1,234,567")

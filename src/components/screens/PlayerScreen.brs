@@ -265,6 +265,12 @@ sub saveProgress()
         return
     end if
     ProgressPut(entryFor(m.index, position, duration))
+    ' Share the spot with other devices every 5 minutes too, not only when leaving.
+    if m.syncClock = invalid then m.syncClock = CreateObject("roTimespan")
+    if m.syncClock.TotalSeconds() >= 300 then
+        m.syncClock.Mark()
+        m.top.action = { name: "syncNow" }
+    end if
 end sub
 
 function entryFor(index as Integer, position as Integer, duration as Integer) as Object

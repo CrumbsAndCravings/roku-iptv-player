@@ -6,5 +6,6 @@
   </children>
   <script type="text/brightscript" uri="pkg:/components/common/Utils.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Registry.brs" />
+  <script type="text/brightscript" uri="pkg:/components/common/Progress.brs" />
   <script type="text/brightscript" uri="pkg:/components/MainScene.brs" />
 </component>

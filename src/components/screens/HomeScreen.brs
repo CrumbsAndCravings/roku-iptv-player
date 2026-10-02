@@ -53,6 +53,8 @@ sub init()
     m.rows.ObserveField("rowItemFocused", "onRowItemFocused")
     m.rows.ObserveField("rowItemSelected", "onRowItemSelected")
     m.heroTimer.ObserveField("fire", "onHeroTimer")
+    ' Another device changed Continue Watching.
+    m.global.ObserveFieldScoped("syncedAt", "onSyncedElsewhere")
 
     loadCategories()
 end sub
@@ -396,6 +398,8 @@ end sub
 
 sub onTakeFocus()
     if m.tab = 0 and m.rows.content <> invalid then refreshContinueWatching()
+    ' Pick up what other devices watched (at most once a minute).
+    m.top.action = { name: "syncSoon" }
     restoreFocus()
 end sub
 
@@ -607,6 +611,7 @@ sub onContinueButton()
         ProgressRemove("m:" + item.itemId)
     end if
     refreshContinueWatching()
+    m.top.action = { name: "syncNow" }
 end sub
 
 ' --- Account -----------------------------------------------------------------
@@ -642,4 +647,8 @@ sub showLoadError()
     m.status.text = text + " Press OK to try again."
     clearHero()
     focusNav()
+end sub
+
+sub onSyncedElsewhere()
+    if m.tab = 0 and m.rows.content <> invalid and m.rows.content.GetChildCount() > 0 then refreshContinueWatching()
 end sub

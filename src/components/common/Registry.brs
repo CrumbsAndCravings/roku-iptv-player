@@ -35,6 +35,7 @@ end sub
 sub ClearAccount()
     RegDelete("account", "creds")
     RegDelete("progress", "items")
+    RegDelete("progress", "removed")
     RegDelete("opensubtitles", "account")
     DeleteFile(SearchCachePath())
 end sub
@@ -88,4 +89,24 @@ function LanguagePrefs() as Object
     builtIn = Field(ParseJson(ReadAsciiFile("pkg:/source/account.json")), "languages")
     if IsArr(builtIn) then return builtIn
     return []
+end function
+
+' Where Continue Watching syncs to: { url, key } from a personal build's account.json
+' ("sync"), or invalid when there's no sync service.
+function SyncConfig() as Dynamic
+    sync = Field(ParseJson(ReadAsciiFile("pkg:/source/account.json")), "sync")
+    url = FieldStr(sync, "url")
+    key = FieldStr(sync, "key")
+    if url = "" or key = "" then return invalid
+    if Right(url, 1) = "/" then url = Left(url, Len(url) - 1)
+    return { url: url, key: key }
+end function
+
+' This login's list on the sync service: 16 hex digits of SHA-256(SyncSpaceText).
+function SyncSpace(creds as Object) as String
+    bytes = CreateObject("roByteArray")
+    bytes.FromAsciiString(SyncSpaceText(creds))
+    digest = CreateObject("roEVPDigest")
+    digest.Setup("sha256")
+    return LCase(Left(digest.Process(bytes), 16))
 end function

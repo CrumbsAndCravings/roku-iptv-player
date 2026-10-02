@@ -1,6 +1,6 @@
 # ARAN+ feature reference
 
-Every feature of ARAN+ for Roku as of **v0.4.24** (commit `8d861e1`). Each feature lists what it does, the exact rules and numbers, why it works that way, and where the Roku code lives. Use it as the checklist and spec for bringing the Samsung app ([CrumbsAndCravings/Samsung-IPTV-Player](https://github.com/CrumbsAndCravings/Samsung-IPTV-Player)) up to the same level.
+Every feature of ARAN+ for Roku as of **v0.4.25** (sync added after commit `8d861e1`). Each feature lists what it does, the exact rules and numbers, why it works that way, and where the Roku code lives. Use it as the checklist and spec for bringing the Samsung app ([CrumbsAndCravings/Samsung-IPTV-Player](https://github.com/CrumbsAndCravings/Samsung-IPTV-Player)) up to the same level.
 
 - **Build plan for Samsung:** [`samsung-plan.md`](samsung-plan.md). That plan covers parity with Roku v0.4.1; everything added since then is in this document, marked **New since 0.4.1**.
 - **User-facing summary:** [`../README.md`](../README.md).
@@ -58,6 +58,7 @@ Every feature of ARAN+ for Roku as of **v0.4.24** (commit `8d861e1`). Each featu
 | Subtitles | OpenSubtitles search, download, auto mode, timing nudges | Has |
 | Continue Watching | Row, progress, resume, next episode | Has |
 | Continue Watching | Remove a title (Home poster menu, details button) | Missing |
+| Continue Watching | **Sync between devices** through a small Cloudflare Worker (§9.4) | Missing |
 | Look | Sharp 3 to 5 px corners, posters 10 px apart, badges on the poster | Missing (Samsung is still rounded) |
 
 ## 2. Signing in
@@ -355,7 +356,32 @@ Unchanged since 0.4.1; see `samsung-plan.md` §7.6. Samsung has it. Two points:
 - **On Home:** `*` on a Continue Watching poster asks "Remove it from Continue Watching? Where you stopped is forgotten.", with **Remove from Continue Watching** and **Keep it**. The hero shows "* to remove" on those posters.
 - **On Details:** a **Remove from Continue Watching** button whenever the title has an entry. For a series it removes the whole show. Buttons go back to plain Play.
 - Removal is `ProgressRemove(key)`; Home refreshes the row when it regains focus.
+- Each removal is also recorded with its time in registry `progress/removed` (`[{ k, at }]`, newest first, at most 100), so sync can pass it on.
 - Code: `screens/HomeScreen.brs` (`continueItem`, `showContinueMenu`), `screens/DetailsScreen.brs` (`forgetProgress`).
+
+### 9.4 Sync between devices (new)
+- **Service:** a Cloudflare Worker on the free plan, with code, tests and setup steps in [`../sync/`](../sync/README.md).
+  - It stores one list per provider login in KV and merges on every request.
+  - Every request needs `Authorization: Bearer <SYNC_KEY>`.
+  - CORS is open, so a web app can call it too.
+- **One list per login:** the `space` is the first 16 hex digits of SHA-256 of `SyncSpaceText(creds)`: the server in lower case without a default port (`:80` for http, `:443` for https), a newline, then the username.
+  - Every device signed in to the same provider account shares one list.
+  - A different provider never mixes in.
+  - **Every platform must build this text exactly the same way.**
+- **Merging:** for each title (`k`), the newest change wins, whether an entry (`at`) or a removal (`removed[].at`); a removal wins a tie. `MergeProgress(local, localRemoved, remote)` on the device mirrors `merge` in the Worker, and both are tested.
+- **What's kept:** the server keeps the 50 newest entries and 30 days of removals; devices keep their 20 newest entries and 100 removals.
+- **One round:** `POST /v1/progress?space=…` with `{ entries, removed }` returns the merged state. The device then merges that into its *current* lists, never a blind replace, so a save made while the request was out isn't lost.
+- **When the Roku syncs:**
+  - at launch and sign-in;
+  - right away after leaving a video or removing a title;
+  - every 5 minutes while a video plays;
+  - when Home regains focus, at most once a minute.
+  - A round already running queues one more forced round.
+- **Writes:** a few dozen on a busy day; the free KV plan allows 1,000.
+- **Home** redraws Continue Watching only when a round changed the list (`m.global.syncedAt`).
+- **Setup on a device:** `"sync": { "url": "https://aranplus-sync.<sub>.workers.dev", "key": "…" }` in the git-ignored `account.json`. With no `sync`, nothing changes.
+- **Code:** `common/Progress.brs` (`ProgressRemovedList`, `MergeProgress`, `ProgressSave`), `common/Utils.brs` (`SyncSpaceText`), `common/Registry.brs` (`SyncConfig`, `SyncSpace`), `tasks/SyncTask.*`, `MainScene.brs` (`requestSync`, `onSynced`), `sync/worker.js`.
+- **Samsung/iPhone:** port `SyncSpaceText` and `MergeProgress` with their tests, compute SHA-256 with Web Crypto (`crypto.subtle.digest`), and sync at the same moments.
 
 ## 10. Look and feel
 - **Palette:**
@@ -402,9 +428,12 @@ Unchanged since 0.4.1; see `samsung-plan.md` §7.6. Samsung has it. Two points:
 | Player prefs (`prefs/player`) | `{ audio: lang, subtitles: lang \| "off" \| "online" }` |
 | Language prefs (`prefs/languages`) | `["en", "hi", "pa"]` |
 | OpenSubtitles (`opensubtitles/account`) | `{ apiKey, username, password, token, baseUrl }` |
+| Removals (`progress/removed`) | `[{ k, at }]`, newest first, at most 100 |
+| Sync settings (personal `account.json`) | `"sync": { "url", "key" }` |
+| Sync service | see [`../sync/README.md`](../sync/README.md) |
 | Library worker fields | `query` → `results` (ContentNode rows: Categories, Movies, Series; tagged `forQuery`); `status` `{ done, total, titles, stopped }`; `browse` `{ kind, categoryId, query }` → `browsed` (ContentNode with `total`, `forKey`, `loading`); `countsRequest` → `counts` `{ "vod:123": 104 }`; `stop` |
 | Item fields (ContentNode) | `ItemDefaults()` in `common/Utils.brs`; new ones are `categoryId` and `listKind` (`vod`/`series`) for category and See-all cards; `kind` is also `category` or `seeAll` |
-| Scene actions | `signedIn`, `signOut`, `openDetails`, `play`, `close`, `openSearch`, `openSubtitleSetup`, **`openCategory`** `{ kind, categoryId, title }`, **`openCategories`** `{ lists: { vod, series, langs } }` |
+| Scene actions | `signedIn`, `signOut`, `openDetails`, `play`, `close`, `openSearch`, `openSubtitleSetup`, **`openCategory`** `{ kind, categoryId, title }`, **`openCategories`** `{ lists: { vod, series, langs } }`, **`syncNow`**, **`syncSoon`** |
 
 ## 13. Lessons and gotchas
 
@@ -442,7 +471,7 @@ Suggested order, most useful first:
 4. **Stored library:** save, load at any age, refresh in the background daily, swap when complete. Store category IDs, dates added and years, and category counts. Index only wanted languages.
 5. **Categories tab, See all tiles and category page with search inside.**
 6. **Categories row in search results.**
-7. **Continue Watching removal:** a menu on the poster (Samsung has no `*` key, so use a long-press of OK, or a button on the hero), plus the details button.
+7. **Continue Watching removal and sync** (§9.3, §9.4): a menu on the poster (Samsung has no `*` key, so use a long-press of OK, or a button on the hero), plus the details button.
 8. **Left/Right season switching** in the episode list.
 9. **Refusal explanations** (`HttpDetail` wording, address line, hints) and the stop-after-refusal rules on Home.
 10. **Built-in personal login** with the switch-on-change stamp.

@@ -367,6 +367,7 @@ sub forgetProgress()
         refreshSeriesProgress(false)
     end if
     styleButtons()
+    m.top.action = { name: "syncNow" }
 end sub
 
 sub jumpToSavedEpisode()

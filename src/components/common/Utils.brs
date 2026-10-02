@@ -246,7 +246,7 @@ end function
 
 ' How ARAN+ introduces itself when a provider turns away requests that say "Roku".
 function AppUserAgent() as String
-    return "ARANplus/0.4.24"
+    return "ARANplus/0.4.25"
 end function
 
 ' A plain desktop web browser, for providers whose servers only answer browsers (a
@@ -523,6 +523,17 @@ function SplitTitle(name as String) as Object
         year = found[2]
     end if
     return { title: title, year: year }
+end function
+
+' The text behind a login's sync "space": the server in lower case without a default
+' port, a newline, then the username. Every device signed in to the same provider
+' account gets the same text, so the same Continue Watching list. The space itself is
+' the first 16 hex digits of its SHA-256 (SyncSpace in Registry.brs).
+function SyncSpaceText(creds as Object) as String
+    server = LCase(NormalizeServer(FieldStr(creds, "server")))
+    if Left(server, 7) = "http://" and Right(server, 3) = ":80" then server = Left(server, Len(server) - 3)
+    if Left(server, 8) = "https://" and Right(server, 4) = ":443" then server = Left(server, Len(server) - 4)
+    return server + Chr(10) + FieldStr(creds, "username")
 end function
 
 ' 1234567 -> "1,234,567"

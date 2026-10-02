@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  One round with the sync service (sync/worker.js): sends this Roku's Continue Watching
+  and removals, gets back the merged list from every device.
+  request { url, key, space, entries, removed } -> result { ok, state | error }
+-->
+<component name="SyncTask" extends="Task">
+  <interface>
+    <field id="request" type="assocarray" />
+    <field id="result" type="assocarray" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/components/common/Utils.brs" />
+  <script type="text/brightscript" uri="pkg:/components/tasks/SyncTask.brs" />
+</component>

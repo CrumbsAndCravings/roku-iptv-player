@@ -5,7 +5,10 @@ sub init()
     m.stack = m.top.FindNode("stack")
     m.screens = []
     m.screenCount = 0
-    m.global.AddFields({ creds: {}, playing: false })
+    m.global.AddFields({ creds: {}, playing: false, syncedAt: 0 })
+    m.syncTask = invalid
+    m.syncAgain = false
+    m.syncClock = invalid
     m.global.AddField("search", "node", false)
     ' v0.1 kept Continue Watching here; its only entries came from a failed play.
     RegDelete("watch", "items")
@@ -19,6 +22,7 @@ sub init()
         if ToStr(RegRead("account", "builtIn")) <> stamp then
             RegDelete("account", "creds")
             RegDelete("progress", "items")
+            RegDelete("progress", "removed")
             RegWrite("account", "builtIn", stamp)
             creds = invalid
         end if
@@ -30,6 +34,7 @@ sub init()
     else
         m.global.creds = creds
         resetTo("HomeScreen")
+        requestSync(true)
     end if
 end sub
 
@@ -124,6 +129,7 @@ sub onAction(event as Object)
     if name = "signedIn" then
         m.global.creds = action.creds
         resetTo("HomeScreen")
+        requestSync(true)
     else if name = "signOut" then
         stopSearch()
         ClearAccount()
@@ -152,7 +158,54 @@ sub onAction(event as Object)
         screen.playback = action.playback
         screen.takeFocus = true
     else if name = "close" then
+        ' Leaving a video: share where it stopped.
         popScreen()
+        requestSync(true)
+    else if name = "syncNow" then
+        requestSync(true)
+    else if name = "syncSoon" then
+        requestSync(false)
+    end if
+end sub
+
+' --- Sync ------------------------------------------------------------------------------
+'
+' Continue Watching is shared with your other devices through the sync service
+' (sync/worker.js) when a personal build has one: at launch and sign-in, after a video
+' and after a removal (right away), and when Home comes back (at most once a minute).
+' Each round sends this Roku's list and removals and folds in everyone else's.
+
+sub requestSync(force as Boolean)
+    config = SyncConfig()
+    creds = m.global.creds
+    if config = invalid or FieldStr(creds, "server") = "" then return
+    if m.syncTask <> invalid then
+        if force then m.syncAgain = true
+        return
+    end if
+    if not force and m.syncClock <> invalid and m.syncClock.TotalSeconds() < 60 then return
+    if m.syncClock = invalid then m.syncClock = CreateObject("roTimespan")
+    m.syncClock.Mark()
+    m.syncTask = CreateObject("roSGNode", "SyncTask")
+    m.syncTask.request = { url: config.url, key: config.key, space: SyncSpace(creds), entries: ProgressList(), removed: ProgressRemovedList() }
+    m.syncTask.ObserveField("result", "onSynced")
+    m.syncTask.control = "RUN"
+end sub
+
+sub onSynced(event as Object)
+    result = event.GetData()
+    m.syncTask.UnobserveField("result")
+    m.syncTask = invalid
+    if IsAA(result) and result.ok = true then
+        before = FormatJson(ProgressList())
+        merged = MergeProgress(ProgressList(), ProgressRemovedList(), result.state)
+        ProgressSave(merged.entries, merged.removed)
+        ' Home redraws Continue Watching only when another device changed it.
+        if FormatJson(merged.entries) <> before then m.global.syncedAt = NowSeconds()
+    end if
+    if m.syncAgain then
+        m.syncAgain = false
+        requestSync(true)
     end if
 end sub
 

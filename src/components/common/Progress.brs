@@ -41,12 +41,86 @@ sub ProgressPut(entry as Object)
     RegWrite("progress", "items", FormatJson(list))
 end sub
 
+' Takes a title off Continue Watching and remembers when, so the removal reaches other
+' devices through sync instead of their older copy bringing it back.
 sub ProgressRemove(key as String)
     list = []
     for each item in ProgressList()
         if FieldStr(item, "k") <> key then list.Push(item)
     end for
     RegWrite("progress", "items", FormatJson(list))
+    removed = [{ k: key, at: NowSeconds() }]
+    for each gone in ProgressRemovedList()
+        if gone.k <> key and removed.Count() < 100 then removed.Push(gone)
+    end for
+    RegWrite("progress", "removed", FormatJson(removed))
+end sub
+
+' Titles taken off Continue Watching: [{ k, at }], newest first.
+function ProgressRemovedList() as Object
+    raw = RegRead("progress", "removed")
+    if raw = invalid then return []
+    list = ParseJson(raw)
+    if not IsArr(list) then return []
+    clean = []
+    for each gone in list
+        if IsAA(gone) and FieldStr(gone, "k") <> "" then clean.Push({ k: FieldStr(gone, "k"), at: ToInt(gone.at) })
+    end for
+    return clean
+end function
+
+' Folds the synced state ({ entries, removed } from the sync service) into this
+' device's lists. For each title the newest change wins, an entry or a removal;
+' removals win ties. Returns { entries (newest first, at most ProgressMax()), removed }.
+function MergeProgress(local as Object, localRemoved as Object, remote as Dynamic) as Object
+    best = {}
+    for each source in [local, Field(remote, "entries")]
+        if IsArr(source) then
+            for each entry in source
+                key = FieldStr(entry, "k")
+                if key <> "" then
+                    known = best[key]
+                    if known = invalid or ToInt(entry.at) > ToInt(known.at) then best[key] = entry
+                end if
+            end for
+        end if
+    end for
+    gone = {}
+    for each source in [localRemoved, Field(remote, "removed")]
+        if IsArr(source) then
+            for each removal in source
+                key = FieldStr(removal, "k")
+                if key <> "" and (gone[key] = invalid or ToInt(removal.at) > gone[key]) then gone[key] = ToInt(removal.at)
+            end for
+        end if
+    end for
+
+    kept = []
+    for each key in best
+        entry = best[key]
+        if gone[key] = invalid or ToInt(entry.at) > gone[key] then kept.Push({ order: 0 - ToInt(entry.at), entry: entry })
+    end for
+    kept.SortBy("order")
+    entries = []
+    for each item in kept
+        if entries.Count() < ProgressMax() then entries.Push(item.entry)
+    end for
+
+    removals = []
+    for each key in gone
+        removals.Push({ order: 0 - gone[key], k: key, at: gone[key] })
+    end for
+    removals.SortBy("order")
+    removed = []
+    for each item in removals
+        if removed.Count() < 100 then removed.Push({ k: item.k, at: item.at })
+    end for
+    return { entries: entries, removed: removed }
+end function
+
+sub ProgressSave(entries as Object, removed as Object)
+    RegWrite("progress", "items", FormatJson(entries))
+    RegWrite("progress", "removed", FormatJson(removed))
 end sub
 
 function ProgressFraction(entry as Dynamic) as Float

@@ -266,6 +266,23 @@ sub Main()
     ' Home removes a series poster by "s:" + its itemId (the series id).
     ProgressRemove("s:" + cw.GetChild(1).itemId)
     checkInt("progress series removed", ProgressList().Count(), 0)
+    check("removal remembered for sync", ProgressRemovedList()[0].k, "s:55")
+    checkInt("removals both kept", ProgressRemovedList().Count(), 2)
+
+    ' Sync merges: the newest change per title wins; removals win ties.
+    mine = [{ k: "m:1", at: 100, pos: 10 }, { k: "m:2", at: 300, pos: 20 }]
+    theirs = { entries: [{ k: "m:1", at: 200, pos: 99 }, { k: "m:3", at: 50, pos: 5 }, { k: "m:4", at: 400, pos: 1 }], removed: [{ k: "m:3", at: 60 }] }
+    merged = MergeProgress(mine, [{ k: "m:2", at: 250 }, { k: "m:4", at: 400 }], theirs)
+    keys = []
+    for each entry in merged.entries
+        keys.Push(entry.k)
+    end for
+    check("merge keeps newest per title, newest first", keys.Join(","), "m:2,m:1")
+    checkInt("merge newer copy wins", ToInt(merged.entries[1].pos), 99)
+    check("merge removal beats older entry", boolText(merged.entries.Count() = 2), "true")
+    checkInt("merge removals kept", merged.removed.Count(), 3)
+    check("merge removals newest first", merged.removed[0].k, "m:4")
+    checkInt("merge nothing remote", MergeProgress(mine, [], invalid).entries.Count(), 2)
     for i = 1 to 25
         ProgressPut({ k: "m:x" + i.ToStr(), kind: "movie", id: i.ToStr(), name: "", poster: "", bd: "", ext: "mp4", pos: 60, dur: 100 })
     end for
