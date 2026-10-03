@@ -1,6 +1,6 @@
 # ARAN+ feature reference
 
-Every feature of ARAN+ for Roku as of **v0.5.1** (sync added after commit `8d861e1`; the helper on a computer at home, §15, in 0.5.0, with its faster reading in 0.5.1). Each feature lists what it does, the exact rules and numbers, why it works that way, and where the Roku code lives. Use it as the checklist and spec for bringing the Samsung app ([CrumbsAndCravings/Samsung-IPTV-Player](https://github.com/CrumbsAndCravings/Samsung-IPTV-Player)) up to the same level.
+Every feature of ARAN+ for Roku as of **v0.5.2** (sync added after commit `8d861e1`; the helper on a computer at home, §15, in 0.5.0, and its whole-film playlists in 0.5.2). Each feature lists what it does, the exact rules and numbers, why it works that way, and where the Roku code lives. Use it as the checklist and spec for bringing the Samsung app ([CrumbsAndCravings/Samsung-IPTV-Player](https://github.com/CrumbsAndCravings/Samsung-IPTV-Player)) up to the same level.
 
 - **Build plan for Samsung:** [`samsung-plan.md`](samsung-plan.md). That plan covers parity with Roku v0.4.1; everything added since then is in this document, marked **New since 0.4.1**.
 - **User-facing summary:** [`../README.md`](../README.md).
@@ -434,7 +434,7 @@ Unchanged since 0.4.1; see `samsung-plan.md` §7.6. Samsung has it. Two points:
 | Sync settings (personal `account.json`) | `"sync": { "url", "key" }` |
 | Helper settings (personal `account.json`) | `"transcoder": { "url", "key" }`, copied from the helper's own `personal.json` (§15) |
 | Titles that need the helper (`helper/titles`) | `["m:<id>", "e:<id>", …]`, newest first, at most 200; cleared on sign-out |
-| Helper requests (`HelperTask`) | `request { mode: "info" \| "lastError" \| "stop", url }` → `result { ok, info \| said \| error }` |
+| Helper requests (`HelperTask`) | `request { mode: "info" \| "hash" \| "start" \| "lastError" \| "stop", url }` → `result { ok, info \| hash \| started \| said \| error }` |
 | Sync service | see [`../sync/README.md`](../sync/README.md) |
 | Library worker fields | `query` → `results` (ContentNode rows: Categories, Movies, Series; tagged `forQuery`); `status` `{ done, total, titles, stopped }`; `browse` `{ kind, categoryId, query }` → `browsed` (ContentNode with `total`, `forKey`, `loading`); `countsRequest` → `counts` `{ "vod:123": 104 }`; `stop` |
 | Item fields (ContentNode) | `ItemDefaults()` in `common/Utils.brs`; new ones are `categoryId` and `listKind` (`vod`/`series`) for category and See-all cards; `kind` is also `category` or `seeAll` |
@@ -487,7 +487,7 @@ Suggested order, most useful first:
 The helper on a computer at home (§15) needs no port: Samsung has it, and the Roku came second.
 
 ## 15. The helper on a computer at home
-New in 0.5.0. The helper is a small Node program in the Samsung repo (`helper/aranplus-helper.mjs`) that runs on a Windows computer at home and uses FFmpeg to convert what a TV can't play, while you watch. The Samsung TV takes it as one MPEG-TS stream (`/v1/stream`); Roku plays no endless MPEG-TS, so the Roku takes HLS (`/v1/hls/index.m3u8`). The plan this followed is the Samsung repo's `docs/roku-helper-plan.md`.
+New in 0.5.0; since 0.5.2 for the helper on the Samsung repo's `claude/eloquent-babbage-g1bhzg` branch (helper 1.2, which also serves the iPhone app). The helper is a small Node program in the Samsung repo (`helper/aranplus-helper.mjs`) that runs on a Windows computer at home and uses FFmpeg to convert what a TV can't play, while you watch. The Samsung TV takes it as one MPEG-TS stream (`/v1/stream`); Roku plays no endless MPEG-TS, so the Roku takes HLS (`/v1/hls/start`). The plan this followed is the Samsung repo's `docs/roku-helper-plan.md`.
 
 ### 15.1 Setup
 - The helper reads the provider login from its own `personal.json` and, on its first run, writes `"transcoder": { "url": "http://<this computer>:8090", "key": "<random>" }` there.
@@ -507,42 +507,47 @@ New in 0.5.0. The helper is a small Node program in the Samsung repo (`helper/ar
 With a helper set up, "Won't play" is never shown: `containerProblem` (tasks) and `WontPlay(check)` (Compat.brs, for Home and Details) return nothing, `showUnplayable` isn't reached, and Details says "This TV can't play this file itself, so the helper on your computer converts it while you watch." ("Roku" on a stick, `DeviceWord`).
 
 ### 15.3 What the Roku asks for
-- First `GET /v1/info?key&kind&id&ext&start[&hash=1][&audio]`: `{ duration, video { codec, width, height }, audio [{ codec, channels, language, plan }], videoPlan, hash }` (`ParseHelperInfo`). Asked once per title; the helper caches it for 6 hours.
-  - `start` is where the stream will start: from the beginning, the helper keeps the connection that read the file's start open for 20 s, and the stream carries on with it.
-  - `hash=1` (with online subtitles set up) asks for the file's OpenSubtitles fingerprint, read in the same requests (§15.7).
-- **How the helper reads the provider** (helper 1.1 and later): FFmpeg never asks the provider itself, since opening an AVI costs it six requests and a provider takes a moment to start each one. The helper reads the file on one connection at a time and hands FFmpeg the bytes: from the beginning, the first 4 MB and then the rest of the same connection; from anywhere else, through a local address that answers from a memory cache of the file's start and index. Timed against a fake provider taking 2 s per request: from the beginning 1 request (2 with the fingerprint), a first resume 3, each later jump 1.
-- Then the content node: `url` from `HelperHlsUrl`, `streamFormat = "hls"`, no `playStart` and no `HttpHeaders` (the helper speaks to the provider, as a desktop browser by default).
-  - `video`: `copy` only when the helper's plan is `copy` (H.264, HEVC, MPEG-2) and `CanDecodeVideo` says yes; otherwise `convert` (DivX and Xvid always).
-  - `height`: the screen's height (`GetDisplaySize().h`), 720 if unknown, at most 1080 (`HelperHeight`). The helper scales converted pictures down to it, keeping the shape.
-  - `audio`: `aac` (every track as stereo AAC) unless `CanDecodeAudio` says yes to both AC-3 and E-AC-3 (`HelperAudio`). Otherwise the helper keeps AAC, AC-3 and E-AC-3 and turns DTS and TrueHD into AC-3.
-  - `track`: the helper's track in the language of `prefs/player.audio` goes first (`HelperTrack`, matched through `LanguageName`, so `en` finds `eng`).
-  - `start`: the resume point (5 s early, as for direct play) or the jump target.
-- The helper answers with a small master playlist once two 6-second segments exist (up to 45 s), naming the session's own growing EVENT playlist, `s/<session>/index.m3u8`. Roku re-reads that one, so re-reading never restarts FFmpeg; the 32-hex-digit session name stands in for the key. An identical request gets the running session back.
+Three requests, in order, through `HelperTask` (each answer is dropped if the title has changed since):
+
+1. `GET /v1/info?key&kind&id&ext`: `{ duration, video { codec, width, height }, audio [{ codec, channels, language, title, plan }], videoPlan }` (`ParseHelperInfo`). Once per title; the helper keeps it for 6 hours.
+2. With online subtitles set up, `GET /v1/hash?key&kind&id&ext`: `{ hash, size }`, the file's OpenSubtitles fingerprint (`ParseHelperHash`). Once per title, and before the stream, since the helper stops its FFmpeg to read it. Without it the search goes on by title.
+3. `GET /v1/hls/start?key&kind&id&ext&start&vod=1&format=ts&video&height[&hevc=0][&a=<n>]` (`HelperStartUrl`), answered once the first piece is ready (up to a minute; the task waits 100 s): `{ session, url, vod, start, from, duration, video, audioTrack, audioPlan, ... }` (`ParseHelperStart`).
+   - `start`: the resume point (5 s early, as for direct play), the jump target, or where the stream got to.
+   - `video`: `copy` only when the helper's plan is `copy` (H.264, HEVC, MPEG-2) and `CanDecodeVideo` says yes; otherwise `convert`. `hevc=0` when this Roku can't decode HEVC.
+   - `height`: the screen's height (`GetDisplaySize().h`), 720 if unknown, at most 1080 (`HelperHeight`).
+   - `a`: the sound track in the language of `prefs/player.audio` (`HelperTrack`, matched through `LanguageName`, so `en` finds `eng`), or the one picked in the Audio column. The stream carries that one track.
+
+**The whole film's playlist** (`vod: true`, every file of known length with a picture): `url` is `/v1/hls/s/<session>/index.m3u8` on the helper, a VOD playlist listing the whole film in 6-second MPEG-TS pieces from 0, with `#EXT-X-START` at `from`. The helper makes each piece when Roku asks for it, from FFmpeg runs that keep the film's own timestamps, so the stream's clock is the film's (`start: 0`). The picture is always H.264 and the sound stereo AAC. The content node: that address, `streamFormat = "hls"`, `playStart = from`, no `HttpHeaders` (the helper speaks to the provider). The session's random name stands in for the key.
+
+**A growing playlist** (`vod: false`: files of unknown length, or sound alone): the helper's older kind, from `start`, whose clock starts there (`start: <s>`).
+
+**How the helper reads the provider:** FFmpeg reads the provider's files through the helper, which keeps the start and the end of each file (where its index is) and the provider's redirect, so a jump costs one request to the provider instead of four or five. Timed here against a fake provider taking 2 s per request: describing a file 2.2 s (1 request), its fingerprint 2.0 s (1), a start from 5:00 3.5 s, a jump forward or back 3.6 s (1).
 
 ### 15.4 Position, length and jumps
-- The helper's segments start at timestamp 0 where the stream starts, so `positionSecs()` is `m.offset` (the `start` asked for) plus `m.video.position`. `durationSecs()` is the helper's `duration` (the stream only lists what's converted so far). `onPosition`, `saveProgress`, `markFinished`, `renderBar`, the jump preview and `jumpBy` all use them.
-- **Jumps** (`seekTo`): a target inside what Roku has listed, with two segments' margin (`HelperSeekInside`), is a plain `m.video.seek`; anything else, including any jump back before `m.offset`, opens the helper's stream again at the target (a few seconds).
-- **To check on the device:** whether Roku's `position` for this EVENT playlist counts from 0 (assumed, and what the helper's timestamps say), what `duration` it reports for it, and that it starts at the first segment (the playlist carries `#EXT-X-START:TIME-OFFSET=0`).
+- `positionSecs()` is `m.offset` plus `m.video.position`: 0 plus Roku's for a whole film's playlist, the stream's start plus Roku's for a growing one. `durationSecs()` is the helper's `duration`. `onPosition`, `saveProgress`, `markFinished`, `renderBar`, the jump preview and `jumpBy` all use them.
+- **Jumps** (`seekTo`): in a whole film's playlist, a plain `m.video.seek`; the helper makes the piece asked for (FFmpeg starts again there when it's far from where it was, a few seconds). In a growing one, a target inside what Roku has listed, with two pieces' margin (`HelperSeekInside`), is a plain seek; anything else starts the helper's stream again there.
+- **Sound tracks:** the Audio column lists the file's tracks from `/v1/info` (`HelperAudioOptions`); choosing another starts the stream again with it, from where you were, and saves the language (`chooseHelperTrack`).
+- **To check on the device:** that Roku starts a whole film's playlist at `playStart`, and that its `position` there is the film's time (the pieces' timestamps are).
 
 ### 15.5 Errors and the end
-- A helper stream that fails after it played opens again from where it got to, twice at most (a minute of playing resets the count). One that never played is asked for once more: Roku may stop waiting before the helper is ready, and the helper hands the same request its running session.
-- A "finished" more than 60 s before the helper's duration (`HelperEndedEarly`) isn't the end: the helper's FFmpeg was stopped (another device, or a pause longer than 2 minutes) or the provider dropped. The helper marks a stopped session's playlist complete, so Roku ends there, and the player opens the stream again from that point.
-- Then the error screen: Roku's error, "Your computer says: …" from `/v1/last-error` (only when under 3 minutes old), whether the title went to the helper from the start or after failing, what the helper was doing (`HelperPlanLine`: "Through the helper on your computer: picture converted to H.264, DTS sound converted."), the file, and the helper's address. The key is masked.
-- When the helper doesn't answer: "The helper on your computer didn't answer. Is the computer on, with the helper running?", its address, and the usual causes (asleep or off, window closed, address changed). A 401 says the key doesn't match (`HelperFailure`).
+- A helper stream that fails after it played starts again from where it got to (or the jump target), twice at most (a minute of playing resets the count). One that never played is asked for once more.
+- A "finished" more than 60 s before the helper's duration (`HelperEndedEarly`) isn't the end: the stream stopped short, and is started again from that point.
+- Then the error screen: Roku's error, "Your computer says: …" from `/v1/last-error`, whether the title went to the helper from the start or after failing, what the helper was doing (`HelperPlanLine`: "Through the helper on your computer: picture converted to H.264, DTS sound converted to AAC."), the file, and the helper's address. The key is masked.
+- When the helper doesn't answer: "The helper on your computer didn't answer. Is the computer on, with the helper running?", its address, and the usual causes (asleep or off, window closed, address changed). A 401 says the key doesn't match; a 404 that the helper may be older than the app (`HelperFailure`).
 - The identity checks of §7 (`startProbe`) are about the provider, so they're skipped for helper streams.
 
 ### 15.6 One connection, and leaving
-- The provider allows one connection, and the helper holds it while FFmpeg runs. So leaving a helper video sends `/v1/stop` (the scene does it from the `close` action's `helperStop`), and a direct stream after a helper one sends it too, then waits 1.2 s before asking the provider. Moving a playing direct stream to the helper stops it and waits 1.2 s too.
-- The helper stops FFmpeg itself when nothing has asked for a session for 2 minutes, and deletes sessions' files then (the newest after 30 minutes, so a paused video can pick up again), and all of them when it starts.
-- The Samsung TV and the Roku can't watch at once, with or without the helper: the newer request stops the older one.
+- The provider allows one connection, and the helper holds it while FFmpeg runs. So leaving a helper video sends `/v1/stop?session=<id>`, which stops that session only (the scene does it from the `close` action's `helperStop`), and a direct stream after a helper one sends it too, then waits 1.2 s before asking the provider. Moving a playing direct stream to the helper stops it and waits 1.2 s too.
+- The helper keeps the newest session for 3 hours of not being asked for (long pauses), older ones for 2 minutes, and deletes everything when it starts.
+- The Samsung TV, the iPhone and the Roku can't watch at once through the provider's one connection: the newer request stops the older one.
 
 ### 15.7 Subtitles
-- Built-in subtitle tracks don't come through the helper (`-sn`).
-- **The fingerprint:** for helper titles the subtitle search uses the helper's `hash` and reads nothing from the provider itself (`via: "helper"` in the `SubtitleTask` request): the helper holds the provider's one connection while it plays.
-- Online subtitles do. Roku times a side-loaded subtitle file against its own clock, which starts at 0 where the helper's stream starts, so for a stream starting partway the track's name is the helper's `/v1/subtitles.srt?key&start&src=<OpenSubtitles link>` (`HelperSubtitleUrl`), which fetches the file and moves every line `start` seconds earlier. The helper fetches only OpenSubtitles addresses. `onlineTrackName()` gives the name Roku knows the track by, wherever the player compares tracks.
+- Built-in subtitle tracks don't come through to the Roku. (The helper can write them out as WebVTT, `subs=1`, but those files grow as FFmpeg goes, and Roku reads a side-loaded file once, when the stream loads.)
+- **Online subtitles** do. A whole film's playlist runs on the film's clock, so OpenSubtitles' file plays as it is, from any point. A growing playlist that starts partway has its own clock, so it gets none (`onlineTrackName` is "").
+- **The fingerprint:** for helper titles the subtitle search uses the helper's (`/v1/hash`) and reads nothing from the provider itself (`via: "helper"` in the `SubtitleTask` request).
 
 ### 15.8 Code
-- `common/Helper.brs`: addresses, `HelperRoute`, the choices, `ParseHelperInfo`, `HelperFailure`, `HelperPlanLine`, the remembered titles (tested in `tests/utils_test.brs` and `tests/parse_test.brs`).
-- `tasks/HelperTask.*`: the requests (`info` 50 s, `lastError` 8 s, `stop` 4 s).
-- `screens/PlayerScreen.brs`: the route, `startHelper`, `openHelper`, `positionSecs`, `durationSecs`, `seekTo`, `helperFailed`, `helperDiagnosis`.
+- `common/Helper.brs`: addresses, `HelperRoute`, the choices, `HelperAudioOptions`, `ParseHelperInfo`, `ParseHelperStart`, `ParseHelperHash`, `HelperFailure`, `HelperPlanLine`, the remembered titles (tested in `tests/utils_test.brs` and `tests/parse_test.brs`).
+- `tasks/HelperTask.*`: the requests (`info` and `hash` 50 s, `start` 100 s, `lastError` 8 s, `stop` 4 s).
+- `screens/PlayerScreen.brs`: the route, `startHelper`, `helperGo`, `requestStart`, `openHelper`, `positionSecs`, `durationSecs`, `seekTo`, `chooseHelperTrack`, `helperFailed`, `helperDiagnosis`.
 - The helper itself: the Samsung repo's `helper/` and its README section.

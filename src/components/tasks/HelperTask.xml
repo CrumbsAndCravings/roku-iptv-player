@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   One request to the helper on a computer at home (common/Helper.brs), off the UI thread.
-  request { mode: "info" | "lastError" | "stop", url } ->
-  result { ok, info (info) | said (lastError) | error, request }
+  request { mode: "info" | "hash" | "start" | "lastError" | "stop", url } ->
+  result { ok, info | hash | started | said (lastError) | error, request }
 -->
 <component name="HelperTask" extends="Task">
   <interface>

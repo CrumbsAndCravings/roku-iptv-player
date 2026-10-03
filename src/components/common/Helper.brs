@@ -1,6 +1,10 @@
 ' The helper on a computer at home (the Samsung repo's helper/, started with
-' npm run helper): it fetches a file from the provider with FFmpeg and converts what
-' this Roku can't play into HLS while you watch. Settings come from account.json
+' npm run helper): it fetches a file from the provider and converts what this Roku
+' can't play into HLS with FFmpeg while you watch. For a film of known length it lists
+' the whole film in six-second pieces from the start (a VOD playlist) and makes each
+' piece when Roku asks for it, so the stream's clock is the film's and Roku jumps by
+' itself; otherwise it writes a playlist that grows from where it was started.
+' Settings come from account.json
 ' ("transcoder", TranscoderSettings in Utils.brs). These functions build its addresses
 ' and make the choices; tasks/HelperTask.brs makes the requests, and
 ' screens/PlayerScreen.brs plays the result. Tested in tests/utils_test.brs and
@@ -19,44 +23,45 @@ function helperBase(config as Object, path as String) as String
     return config.url + path + "?key=" + ToStr(config.key).EncodeUriComponent()
 end function
 
-' What the file holds, and what the helper would do with each track. `start` lets the
-' helper keep the connection that read the file's start for a stream from there; with
-' `wantHash` it also fingerprints the file for OpenSubtitles in the same reads.
-function HelperInfoUrl(config as Object, kind as String, id as String, ext as String, audio as String, start as Integer, wantHash as Boolean) as String
-    if start < 0 then start = 0
-    url = helperBase(config, "/v1/info") + "&" + HelperFileQuery(kind, id, ext) + "&start=" + start.ToStr()
-    if wantHash then url = url + "&hash=1"
-    if audio <> "" then url = url + "&audio=" + audio
-    return url
+' What the file holds, and what the helper would do with each track.
+function HelperInfoUrl(config as Object, kind as String, id as String, ext as String) as String
+    return helperBase(config, "/v1/info") + "&" + HelperFileQuery(kind, id, ext)
 end function
 
-' The converted video as HLS, from `start` seconds. choice is { video, height, audio,
-' track } (HelperVideo, HelperHeight, HelperAudio, HelperTrack).
-function HelperHlsUrl(config as Object, kind as String, id as String, ext as String, start as Integer, choice as Object) as String
+' The file's OpenSubtitles fingerprint, read by the helper, so the Roku makes no
+' requests to the provider of its own.
+function HelperHashUrl(config as Object, kind as String, id as String, ext as String) as String
+    return helperBase(config, "/v1/hash") + "&" + HelperFileQuery(kind, id, ext)
+end function
+
+' Starts the converted video, playing from `start` seconds; the helper answers once the
+' first piece is ready (ParseHelperStart). choice is { video, height, hevc, track }
+' (HelperVideo, HelperHeight, whether this Roku decodes HEVC, HelperTrack). The whole
+' film's playlist (vod=1) in MPEG-TS pieces; the picture and the one sound track
+' become H.264 and stereo AAC.
+function HelperStartUrl(config as Object, kind as String, id as String, ext as String, start as Integer, choice as Object) as String
     if start < 0 then start = 0
-    url = helperBase(config, "/v1/hls/index.m3u8") + "&" + HelperFileQuery(kind, id, ext) + "&start=" + start.ToStr() + "&video=" + FieldStr(choice, "video")
+    url = helperBase(config, "/v1/hls/start") + "&" + HelperFileQuery(kind, id, ext) + "&start=" + start.ToStr() + "&vod=1&format=ts"
+    video = FieldStr(choice, "video")
+    if video <> "" then url = url + "&video=" + video
     height = ToInt(Field(choice, "height"))
     if height > 0 then url = url + "&height=" + height.ToStr()
-    audio = FieldStr(choice, "audio")
-    if audio <> "" then url = url + "&audio=" + audio
+    if not helperFlag(choice, "hevc") then url = url + "&hevc=0"
     track = Field(choice, "track")
-    if track <> invalid and ToInt(track) >= 0 then url = url + "&track=" + ToInt(track).ToStr()
+    if track <> invalid and ToInt(track) >= 0 then url = url + "&a=" + ToInt(track).ToStr()
     return url
-end function
-
-' An online subtitle file (OpenSubtitles' link) with its times moved `start` seconds
-' earlier: Roku times subtitles from where the helper's stream starts.
-function HelperSubtitleUrl(config as Object, link as String, start as Integer) as String
-    return helperBase(config, "/v1/subtitles.srt") + "&start=" + start.ToStr() + "&src=" + link.EncodeUriComponent()
 end function
 
 function HelperErrorUrl(config as Object) as String
     return helperBase(config, "/v1/last-error")
 end function
 
-' Stops the helper's FFmpeg, so the provider's one connection is free again.
-function HelperStopUrl(config as Object) as String
-    return helperBase(config, "/v1/stop")
+' Stops the helper's FFmpeg for `session` (all of it when ""), so the provider's one
+' connection is free again.
+function HelperStopUrl(config as Object, session as String) as String
+    url = helperBase(config, "/v1/stop")
+    if session <> "" then url = url + "&session=" + session.EncodeUriComponent()
+    return url
 end function
 
 ' --- Choices -------------------------------------------------------------------------
@@ -98,15 +103,8 @@ function HelperHeight(screenLines as Integer) as Integer
     return screenLines
 end function
 
-' "aac" (every sound track as stereo AAC) unless this Roku decodes both AC-3 and E-AC-3,
-' which the helper otherwise keeps or makes.
-function HelperAudio(canAc3 as Boolean, canEac3 as Boolean) as String
-    if canAc3 and canEac3 then return ""
-    return "aac"
-end function
-
-' Which of the helper's sound tracks is in the viewer's language (prefs "audio"), so it
-' goes first; -1 for none.
+' Which of the helper's sound tracks is in the viewer's language (prefs "audio"): the
+' helper's stream carries one; -1 for none (the file's first).
 function HelperTrack(audio as Dynamic, language as String) as Integer
     if not IsArr(audio) or language = "" then return -1
     wanted = LanguageName(language)
@@ -117,9 +115,10 @@ function HelperTrack(audio as Dynamic, language as String) as Integer
     return -1
 end function
 
-' Whether a jump to `target` stays inside what the helper has converted so far: its
-' stream starts at `offset` and Roku has `available` seconds of it listed. A margin
-' of two segments keeps the jump off the part still being written.
+' For a growing playlist (a file of unknown length): whether a jump to `target` stays
+' inside what the helper has converted so far. Its stream starts at `offset` and Roku
+' has `available` seconds of it listed; a margin of two pieces keeps the jump off the
+' part still being written. A whole film's playlist jumps anywhere.
 function HelperSeekInside(target as Float, offset as Integer, available as Float) as Boolean
     if available <= 0 or target < offset then return false
     return target <= offset + available - 12
@@ -131,10 +130,25 @@ function HelperEndedEarly(position as Integer, duration as Integer) as Boolean
     return duration > 0 and position < duration - 60
 end function
 
+' The file's sound tracks for the Audio column, from the helper's description: its
+' stream carries one, so choosing another starts it again with that one. Each option is
+' { id: "helper:<n>", label, language, format }.
+function HelperAudioOptions(audio as Dynamic) as Object
+    options = []
+    if not IsArr(audio) then return options
+    for i = 0 to audio.Count() - 1
+        codec = LCase(FieldStr(audio[i], "codec"))
+        language = LCase(FieldStr(audio[i], "language"))
+        label = TrackLabel(language, FieldStr(audio[i], "title"), "Track " + (i + 1).ToStr())
+        if codec <> "" then label = label + " · " + CodecLabel(codec)
+        options.Push({ id: "helper:" + i.ToStr(), label: label, language: language, format: codec })
+    end for
+    return options
+end function
+
 ' --- What the helper says ------------------------------------------------------------
 
-' The helper's description of a file (/v1/info). `hash` is its OpenSubtitles
-' fingerprint, "" when it wasn't asked for or couldn't be read.
+' The helper's description of a file (/v1/info).
 function ParseHelperInfo(data as Dynamic) as Object
     video = Field(data, "video")
     plan = FieldStr(data, "videoPlan")
@@ -143,14 +157,11 @@ function ParseHelperInfo(data as Dynamic) as Object
     tracks = Field(data, "audio")
     if IsArr(tracks) then
         for each track in tracks
-            if IsAA(track) then audio.Push({ codec: FieldStr(track, "codec"), channels: ToInt(track.channels), language: FieldStr(track, "language"), plan: FieldStr(track, "plan") })
+            if IsAA(track) then audio.Push({ codec: FieldStr(track, "codec"), channels: ToInt(track.channels), language: FieldStr(track, "language"), title: FieldStr(track, "title"), plan: FieldStr(track, "plan") })
         end for
     end if
-    hash = LCase(FieldStr(data, "hash"))
-    if not CreateObject("roRegex", "^[0-9a-f]{16}$", "").IsMatch(hash) then hash = ""
     return {
         duration: ToInt(Field(data, "duration"))
-        hash: hash
         videoCodec: FieldStr(video, "codec")
         width: ToInt(Field(video, "width"))
         height: ToInt(Field(video, "height"))
@@ -159,10 +170,38 @@ function ParseHelperInfo(data as Dynamic) as Object
     }
 end function
 
+' A started stream (/v1/hls/start): `url` is the playlist's address on the helper,
+' `start` where the stream's clock starts in the film (0 for a whole film's playlist,
+' whose clock is the film's), `playFrom` where to start playing, and `vod` whether the
+' playlist lists the whole film.
+function ParseHelperStart(data as Dynamic) as Object
+    url = FieldStr(data, "url")
+    if Left(url, 1) <> "/" then url = ""
+    return {
+        session: FieldStr(data, "session")
+        url: url
+        vod: helperFlag(data, "vod")
+        start: ToInt(Field(data, "start"))
+        playFrom: ToInt(Field(data, "from"))
+        duration: ToInt(Field(data, "duration"))
+        video: FieldStr(data, "video")
+        audioTrack: ToInt(Field(data, "audioTrack"))
+        audioPlan: FieldStr(data, "audioPlan")
+    }
+end function
+
+' The OpenSubtitles fingerprint in the helper's answer (/v1/hash): 16 hex digits, or "".
+function ParseHelperHash(data as Dynamic) as String
+    hash = LCase(FieldStr(data, "hash"))
+    if CreateObject("roRegex", "^[0-9a-f]{16}$", "").IsMatch(hash) then return hash
+    return ""
+end function
+
 ' Why a request to the helper failed, in plain words. code 0 means no answer.
 function HelperFailure(code as Integer, body as String) as String
     if code <= 0 then return "The helper on your computer didn't answer. Is the computer on, with the helper running?"
     if code = 401 then return "The helper on your computer turned this app away: its key doesn't match. Copy " + Chr(34) + "transcoder" + Chr(34) + " from the helper's personal.json into account.json and build the app again."
+    if code = 404 then return "The helper on your computer doesn't know this request, so it may be older than this app. Update it (git pull in the Samsung repo) and start it again."
     said = ""
     trimmed = body.Trim()
     if Left(trimmed, 1) = "{" then said = FieldStr(ParseJson(trimmed), "error")
@@ -171,21 +210,25 @@ function HelperFailure(code as Integer, body as String) as String
 end function
 
 ' What the helper was doing, for the error screen: "Through the helper on your
-' computer: picture converted to H.264, DTS sound converted."
-function HelperPlanLine(info as Dynamic, video as String) as String
-    if not IsAA(info) then return "Through the helper on your computer, which didn't describe the file."
+' computer: picture converted to H.264, DTS sound converted to AAC." `info` is its
+' description of the file, `started` the stream it started (ParseHelperStart).
+function HelperPlanLine(info as Dynamic, started as Dynamic) as String
+    if not IsAA(info) or not IsAA(started) then return "Through the helper on your computer, which didn't describe the file."
     parts = []
-    if video = "convert" then
-        parts.Push("picture converted to H.264")
-    else
+    if FieldStr(started, "video") = "copy" then
         parts.Push("picture kept as it is")
+    else
+        parts.Push("picture converted to H.264")
     end if
     tracks = Field(info, "audio")
-    if IsArr(tracks) then
-        for each track in tracks
-            plan = FieldStr(track, "plan")
-            if plan <> "copy" and plan <> "" then parts.Push(CodecLabel(FieldStr(track, "codec")) + " sound converted")
-        end for
+    n = ToInt(Field(started, "audioTrack"))
+    if IsArr(tracks) and n >= 0 and n < tracks.Count() then
+        codec = LCase(FieldStr(tracks[n], "codec"))
+        if FieldStr(started, "audioPlan") = "aac" and codec <> "aac" then
+            parts.Push(CodecLabel(codec) + " sound converted to AAC")
+        else
+            parts.Push(CodecLabel(codec) + " sound kept")
+        end if
     end if
     return "Through the helper on your computer: " + parts.Join(", ") + "."
 end function

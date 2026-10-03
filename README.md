@@ -41,7 +41,7 @@ For other failures the player retries once without a format hint, then shows wha
 
 ## The helper on your computer
 
-The helper is a small program on a computer at home, switched on while you watch, that uses [FFmpeg](https://ffmpeg.org) to turn files the Roku can't play into a stream it can. It lives in the Samsung app's repo ([CrumbsAndCravings/Samsung-IPTV-Player](https://github.com/CrumbsAndCravings/Samsung-IPTV-Player), `helper/`), and the Samsung TV and the Roku share it.
+The helper is a small program on a computer at home, switched on while you watch, that uses [FFmpeg](https://ffmpeg.org) to turn files the Roku can't play into a stream it can. It lives in the Samsung app's repo ([CrumbsAndCravings/Samsung-IPTV-Player](https://github.com/CrumbsAndCravings/Samsung-IPTV-Player), `helper/`, on the `claude/eloquent-babbage-g1bhzg` branch: helper 1.2, which also serves the iPhone app), and the Samsung TV, the iPhone and the Roku share it.
 
 **What goes through it:**
 
@@ -50,17 +50,19 @@ The helper is a small program on a computer at home, switched on while you watch
 - **Files whose sound this Roku can't play** (DTS or TrueHD, with no other track): the player switches to the helper from where you are, and remembers the title so it starts there next time.
 - **Anything that fails on its own** after the usual retry, unless the provider refused it outright (it would refuse the helper too).
 
-**How it plays.** The helper fetches the file with your login (from its own settings file, so the login never travels from the TV) and writes HLS, the format Roku streams in: the picture is converted to H.264 at the Roku's screen height (720 lines on a 720p TV, which saves the computer most of the work on 1080p and 4K files), or kept as it is when this Roku decodes it; the sound becomes stereo AAC when this Roku can't decode Dolby, and the track in your language comes first. Online subtitles still work: when the helper's stream starts partway, they come through the helper with their times moved to match. Subtitle tracks built into the file don't come through.
+**How it plays.** The helper fetches the file with your login (from its own settings file, so the login never travels from the TV) and turns it into HLS, the format Roku streams in: a playlist for the whole film in six-second pieces, which the helper makes as the Roku asks for them. The picture becomes H.264 at the Roku's screen height (720 lines on a 720p TV, which saves the computer most of the work on 1080p and 4K files) and the sound stereo AAC, in your language when the file has it.
 
-- **The time bar** shows the whole film, from the length the helper read from the file.
-- **Jumping** within what is already converted is quick; a jump further on starts the helper again at the new time, which takes a few seconds. Resuming works the same way.
-- **When you leave a video,** the Roku tells the helper to stop, so the provider's one connection is free for whatever plays next. After a long pause the helper may have stopped; the Roku then opens the stream again from where you were.
-- **One at a time:** the provider allows one connection, so the Samsung TV and the Roku can't both watch at once, with or without the helper.
+- **The time bar** shows the whole film, and resuming starts right where you were.
+- **Jumping** is the Roku's own: a piece the helper has made plays at once, and one further away takes a few seconds while the helper starts converting from there.
+- **Another language:** the Audio column lists the file's sound tracks; picking one starts the stream again with it, from where you were.
+- **Online subtitles** work as they do for any other video. Subtitle tracks built into the file don't come through.
+- **When you leave a video,** the Roku tells the helper to stop, so the provider's one connection is free for whatever plays next.
+- **One at a time:** the provider allows one connection, so the Samsung TV, the iPhone and the Roku can't watch at once, with or without the helper.
 
 **Set it up on Windows (once):**
 
 1. Install FFmpeg: open PowerShell and run `winget install Gyan.FFmpeg`.
-2. Get the Samsung repo and follow its README's "The helper on your computer" section: put your provider's login in its `personal.json` and start the helper with `npm run helper` (or double-click `helper\start-helper.cmd`). The first time, it adds `"transcoder": { "url": ..., "key": ... }` (this computer's address and a random key) to that `personal.json`, and Windows asks whether Node.js may use the network: allow **private networks**.
+2. Get the Samsung repo, switch to its `claude/eloquent-babbage-g1bhzg` branch, and follow its README's "The helper on your computer" section: put your provider's login in its `personal.json` and start the helper with `npm run helper` (or double-click `helper\start-helper.cmd`). The first time, it adds `"transcoder": { "url": ..., "key": ... }` (this computer's address and a random key) to that `personal.json`, and Windows asks whether Node.js may use the network: allow **private networks**.
 3. Copy that `"transcoder"` part into this repo's `src/source/account.json`. `npm run helper-settings` does it for you when the Samsung repo sits next to this one (otherwise name it: `npm run helper-settings -- C:\path\to\Samsung-IPTV-Player`), keeping the rest of the file. By hand, it goes next to your login:
 
    ```json

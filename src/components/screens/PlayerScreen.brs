@@ -110,6 +110,8 @@ sub init()
     m.stopTask = invalid
     m.helperToken = 0
     m.helperUsed = false
+    ' The helper's latest session, kept across titles: stopping it frees the provider.
+    m.helperSession = ""
     resetHelper()
 
     m.row = "bar"
@@ -296,8 +298,8 @@ sub onPosition()
     if m.controls.visible then renderBar()
 end sub
 
-' Where the video is, in seconds from the file's start. Through the helper, its stream
-' starts at m.offset and Roku counts from there.
+' Where the video is, in seconds from the file's start. Through the helper, a growing
+' playlist starts at m.offset and Roku counts from there (a whole film's is at 0).
 function positionSecs() as Float
     return m.offset + m.video.position
 end function
@@ -306,6 +308,7 @@ end function
 ' since its stream only lists what is converted so far.
 function durationSecs() as Float
     if m.route <> "helper" then return m.video.duration
+    if m.helperStarted <> invalid and m.helperStarted.duration > 0 then return m.helperStarted.duration
     if m.helperInfo <> invalid and m.helperInfo.duration > 0 then return m.helperInfo.duration
     if m.video.duration > 0 then return m.offset + m.video.duration
     return 0
@@ -383,6 +386,7 @@ sub onState()
 
     if state = "playing" then
         m.started = true
+        if m.route = "helper" then m.helperPlayed = true
         onTracksChanged()
         if not m.audioChecked then
             m.audioChecked = true
@@ -616,16 +620,25 @@ end function
 ' --- The helper on a computer at home ------------------------------------------------
 '
 ' The helper (common/Helper.brs) fetches the file from the provider and converts it
-' into HLS while you watch. Its stream starts where asked (m.offset), so positions
-' are m.offset plus Roku's, and the file's length comes from the helper.
+' into HLS while you watch: first what the file holds, then (with online subtitles set
+' up) its fingerprint, then the stream from where it should play. For a film of known
+' length the playlist lists the whole film and the stream's clock is the film's, so Roku
+' jumps by itself; otherwise the playlist grows from where it started (m.offset), and
+' positions are m.offset plus Roku's.
 
 sub resetHelper()
     m.route = "direct"
     m.offset = 0
     m.helperInfo = invalid
+    m.helperHash = ""
+    m.helperHashAsked = false
+    m.helperStarted = invalid
+    m.helperVod = false
+    m.helperTrack = -1
     m.helperVideo = "convert"
     m.helperTried = false
     m.helperFromStart = false
+    m.helperPlayed = false
     m.helperProblem = ""
     m.helperSaid = ""
     m.helperReopens = 0
@@ -678,17 +691,20 @@ sub onPauseDone()
     end if
 end sub
 
-' First what the file holds (once per title), then the stream.
+' The next step: what the file holds (once per title), its fingerprint for online
+' subtitles (once, before the stream: asking during it would stop the helper's FFmpeg),
+' then the stream.
 sub helperGo()
     if m.closing then return
-    if m.helperInfo <> invalid then
-        openHelper(m.startAt)
-        return
-    end if
     item = currentItem()
-    ' With online subtitles set up, the helper fingerprints the file in its own reads.
-    url = HelperInfoUrl(TranscoderConfig(), streamKind(), item.id, item.ext, audioForHelper(), m.startAt, LoadOsAccount() <> invalid)
-    runHelper({ mode: "info", url: url }, "onHelperInfo")
+    config = TranscoderConfig()
+    if m.helperInfo = invalid then
+        runHelper({ mode: "info", url: HelperInfoUrl(config, streamKind(), item.id, item.ext) }, "onHelperInfo")
+    else if not m.helperHashAsked and LoadOsAccount() <> invalid then
+        runHelper({ mode: "hash", url: HelperHashUrl(config, streamKind(), item.id, item.ext) }, "onHelperHash")
+    else
+        requestStart(m.startAt)
+    end if
 end sub
 
 sub runHelper(request as Object, callback as String)
@@ -721,41 +737,80 @@ sub onHelperInfo(event as Object)
     canPicture = false
     if info.videoCodec <> "" then canPicture = canDecode("video", RokuVideoCodec(info.videoCodec), "")
     m.helperVideo = HelperVideo(info.videoPlan, canPicture)
-    openHelper(m.startAt)
+    helperGo()
 end sub
 
-' Plays the helper's stream from `startAt` seconds.
-sub openHelper(startAt as Integer)
+' Without a fingerprint the search goes on by title, so a failure here isn't one.
+sub onHelperHash(event as Object)
+    result = helperResultFor(event)
+    if result = invalid then return
+    m.helperHashAsked = true
+    if result.ok then m.helperHash = FieldStr(result, "hash")
+    helperGo()
+end sub
+
+' Asks the helper for the stream, playing from `startAt` seconds; it answers once the
+' first piece is ready.
+sub requestStart(startAt as Integer)
     if startAt < 0 then startAt = 0
+    m.startAt = startAt
+    m.started = false
+    m.helperPlayed = false
+    m.pendingSeek = -1
+    m.spinner.visible = true
+    m.spinner.control = "start"
     if m.helperInfo = invalid then
-        ' Still asking the helper about the file; the stream opens once it answers.
-        m.startAt = startAt
         helperGo()
         return
     end if
     item = currentItem()
-    showing = onlineSubtitleShowing()
-    m.offset = startAt
-    m.startAt = startAt
-    m.started = false
-    m.pendingSeek = -1
-    m.helperUsed = true
+    track = m.helperTrack
+    if track < 0 then track = HelperTrack(m.helperInfo.audio, FieldStr(LoadPrefs(), "audio"))
     choice = {
         video: m.helperVideo
         height: HelperHeight(screenHeight())
-        audio: audioForHelper()
-        track: HelperTrack(m.helperInfo.audio, FieldStr(LoadPrefs(), "audio"))
+        hevc: canDecode("video", "hevc", "")
+        track: track
     }
+    runHelper({ mode: "start", url: HelperStartUrl(TranscoderConfig(), streamKind(), item.id, item.ext, startAt, choice) }, "onHelperStart")
+end sub
+
+sub onHelperStart(event as Object)
+    result = helperResultFor(event)
+    if result = invalid then return
+    if not result.ok then
+        m.helperProblem = FieldStr(result, "error")
+        showPlaybackError()
+        return
+    end if
+    m.helperStarted = result.started
+    openHelper()
+end sub
+
+' Plays the stream the helper started (m.helperStarted).
+sub openHelper()
+    started = m.helperStarted
+    showing = onlineSubtitleShowing()
+    m.helperSession = started.session
+    m.helperVod = started.vod
+    m.helperUsed = true
+    ' A whole film's clock is the film's; a growing playlist's starts where it did.
+    m.offset = started.start
+    at = started.start
+    if started.vod then at = started.playFrom
     content = CreateObject("roSGNode", "ContentNode")
-    content.url = HelperHlsUrl(TranscoderConfig(), streamKind(), item.id, item.ext, startAt, choice)
+    content.url = TranscoderConfig().url + started.url
     content.title = m.titleLabel.text
     content.streamFormat = "hls"
+    if started.vod and at > 0 then content.playStart = at
     attachOnlineSubtitle(content, showing)
     ' The new stream numbers its tracks afresh.
     m.audioPrefDone = false
     m.subPrefDone = false
-    m.lastSaved = startAt
-    m.lastPos = startAt
+    m.startAt = at
+    m.lastSaved = at
+    m.lastPos = at
+    m.started = false
     m.video.visible = true
     m.video.content = content
     m.video.control = "play"
@@ -768,27 +823,21 @@ function screenHeight() as Integer
     return ToInt(Field(CreateObject("roDeviceInfo").GetDisplaySize(), "h"))
 end function
 
-function audioForHelper() as String
-    return HelperAudio(canDecode("audio", "ac3", ""), canDecode("audio", "eac3", ""))
-end function
-
 ' The helper's stream failed. One that had played opens again from where it got to
-' (a long pause can outlast the helper's files), twice at most. One that never played
-' is asked for once more: Roku may stop waiting before the helper is ready, and the
-' helper hands the same request its running stream. Otherwise ask the helper why, then
-' explain.
+' (the helper may have been restarted, or dropped the stream after a long pause),
+' twice at most. One that never played is asked for once more. Otherwise ask the
+' helper why, then explain.
 sub helperFailed()
     target = Int(positionSecs())
     if m.lastPos > target then target = m.lastPos
     if m.pendingSeek >= 0 then target = Int(m.pendingSeek)
-    played = m.started or target > m.offset
+    limit = 1
+    if m.helperPlayed then limit = 2
     m.started = false
     m.video.control = "stop"
-    limit = 1
-    if played then limit = 2
     if m.helperReopens < limit then
         m.helperReopens = m.helperReopens + 1
-        openHelper(target)
+        requestStart(target)
         return
     end if
     m.startAt = target
@@ -808,13 +857,26 @@ sub onHelperLastError(event as Object)
     showPlaybackError()
 end sub
 
+' The helper's stream carries one sound track: choosing another starts the stream again
+' with it, from here.
+sub chooseHelperTrack(n as Integer)
+    if m.helperStarted <> invalid and n = m.helperStarted.audioTrack then return
+    ' Where it is now, before stopping (a stopped video's position goes back to 0).
+    at = Int(positionSecs())
+    if not m.started or m.lastPos > at then at = m.lastPos
+    m.helperTrack = n
+    m.video.control = "stop"
+    closePanel(false)
+    requestStart(at)
+end sub
+
 ' Stops the helper's FFmpeg, so the provider's one connection is free for a stream
 ' straight from the provider.
 sub stopHelper()
     m.helperUsed = false
     if not HelperOn() then return
     m.stopTask = CreateObject("roSGNode", "HelperTask")
-    m.stopTask.request = { mode: "stop", url: HelperStopUrl(TranscoderConfig()) }
+    m.stopTask.request = { mode: "stop", url: HelperStopUrl(TranscoderConfig(), m.helperSession) }
     m.stopTask.control = "RUN"
 end sub
 
@@ -828,14 +890,13 @@ function helperDiagnosis(item as Object) as String
     else
         if m.errors.Count() > 0 then lines.Push("Roku says: " + m.errors.Peek())
         if m.helperSaid <> "" then lines.Push("Your computer says: " + m.helperSaid)
-        if not m.started and m.errors.Count() > 0 and HttpCodeIn(m.errors.Peek()) = 404 then lines.Push("If the helper is older than this app, it can't make the stream a Roku needs: update it and start it again.")
     end if
     if m.helperFromStart then
         lines.Push("This " + DeviceWord() + " can't play this file itself, so it went through the helper on your computer.")
     else
         lines.Push("It didn't play on its own, so it was tried through the helper on your computer.")
     end if
-    if m.helperInfo <> invalid then lines.Push(HelperPlanLine(m.helperInfo, m.helperVideo))
+    if m.helperInfo <> invalid and m.helperStarted <> invalid then lines.Push(HelperPlanLine(m.helperInfo, m.helperStarted))
     lines.Push(fileLine(item))
     if config <> invalid then
         lines.Push("Helper: " + config.url)
@@ -1080,21 +1141,22 @@ sub jumpBy(seconds as Integer)
     showControls("bar")
 end sub
 
-' Jumps to `target` seconds into the file. Through the helper, Roku jumps within what is
-' already converted; anything else opens the helper's stream again from there.
+' Jumps to `target` seconds into the file. Through the helper, Roku jumps anywhere in a
+' whole film's playlist (the helper makes the pieces it asks for) and within what a
+' growing one has converted; anything else starts the helper's stream again there.
 sub seekTo(target as Float)
     m.lastSaved = Int(target)
     if m.route <> "helper" then
         m.video.seek = target
         return
     end if
-    if HelperSeekInside(target, m.offset, m.video.duration) then
+    if m.helperVod or HelperSeekInside(target, m.offset, m.video.duration) then
         m.pendingSeek = target
         m.video.seek = target - m.offset
         return
     end if
     m.video.control = "stop"
-    openHelper(Int(target))
+    requestStart(Int(target))
 end sub
 
 ' --- Keys ----------------------------------------------------------------------
@@ -1257,7 +1319,7 @@ sub close()
     m.toastTimer.control = "stop"
     action = { name: "close" }
     ' The scene tells the helper to stop, so the provider's connection is free again.
-    if m.helperUsed and HelperOn() then action.helperStop = HelperStopUrl(TranscoderConfig())
+    if m.helperUsed and HelperOn() then action.helperStop = HelperStopUrl(TranscoderConfig(), m.helperSession)
     m.top.action = action
 end sub
 
@@ -1291,7 +1353,7 @@ sub runOsTask(request as Object, callback as String)
     ' the file already, so the search doesn't read the file itself.
     if m.route = "helper" then
         request.via = "helper"
-        if m.helperInfo <> invalid then request.hash = FieldStr(m.helperInfo, "hash")
+        request.hash = m.helperHash
     end if
     m.osTask = CreateObject("roSGNode", "SubtitleTask")
     m.osTask.request = request
@@ -1391,18 +1453,19 @@ sub onOnlineDownloaded(event as Object)
     if m.started then m.startAt = Int(positionSecs())
     m.video.control = "stop"
     if m.route = "helper" then
-        openHelper(m.startAt)
+        requestStart(m.startAt)
     else
         loadStream()
     end if
     refreshTracksPanel()
 end sub
 
-' The name Roku knows the online subtitles by: OpenSubtitles' file itself, or, for a
-' helper stream that starts partway, the helper's copy with the times moved to match.
+' The name Roku knows the online subtitles by: OpenSubtitles' file. A growing helper
+' playlist that starts partway has its own clock, which the file's times don't follow,
+' so it gets none ("").
 function onlineTrackName() as String
     if m.extraSubtitle = "" then return ""
-    if m.route = "helper" and m.offset > 0 then return HelperSubtitleUrl(TranscoderConfig(), m.extraSubtitle, m.offset)
+    if m.route = "helper" and m.offset > 0 then return ""
     return m.extraSubtitle
 end function
 
@@ -1414,8 +1477,8 @@ end function
 ' Online subtitles go with every stream load, since Roku reads them only then.
 ' `showing` turns them on again once the new stream plays.
 sub attachOnlineSubtitle(content as Object, showing as Boolean)
-    if m.extraSubtitle = "" then return
     name = onlineTrackName()
+    if name = "" then return
     content.subtitleTracks = [{ Language: "eng", TrackName: name, Description: "Online" }]
     if showing or m.pendingSubtitle <> "" then m.pendingSubtitle = name
 end sub
@@ -1583,7 +1646,12 @@ end sub
 
 sub openTracks()
     cancelSeek()
-    m.audioOptions = AudioOptions(m.video.availableAudioTracks)
+    ' Through the helper, the file's own tracks: its stream carries one of them.
+    if m.route = "helper" and m.helperInfo <> invalid and m.helperStarted <> invalid then
+        m.audioOptions = HelperAudioOptions(m.helperInfo.audio)
+    else
+        m.audioOptions = AudioOptions(m.video.availableAudioTracks)
+    end if
     buildSubtitleOptions()
     m.audioCursor = activeAudioIndex()
     if m.audioCursor < 0 then m.audioCursor = 0
@@ -1598,6 +1666,7 @@ sub openTracks()
 end sub
 
 function activeAudioIndex() as Integer
+    if m.route = "helper" and m.helperStarted <> invalid then return OptionIndex(m.audioOptions, "id", "helper:" + m.helperStarted.audioTrack.ToStr())
     return OptionIndex(m.audioOptions, "id", ToStr(m.video.audioTrack))
 end function
 
@@ -1617,8 +1686,12 @@ sub chooseTrack()
     if m.trackColumn = 0 then
         if m.audioOptions.Count() = 0 then return
         option = m.audioOptions[m.audioCursor]
-        m.video.audioTrack = option.id
         if option.language <> "" then SavePref("audio", option.language)
+        if Left(option.id, 7) = "helper:" then
+            chooseHelperTrack(Mid(option.id, 8).ToInt())
+            return
+        end if
+        m.video.audioTrack = option.id
     else
         option = m.subOptions[m.subCursor]
         if Left(option.id, 3) = "os:" then
