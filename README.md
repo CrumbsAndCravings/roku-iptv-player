@@ -35,9 +35,42 @@ With the controls showing, **Up** reaches Back (top left), **Down** reaches the 
 
 ## When a video won't play
 
-Some files can't play on a given Roku no matter which app you use: AVI (DivX/Xvid) files don't play on any Roku, and TVs without an HEVC decoder (like the TCL 32S357) can't play HEVC/H.265 video. ARAN+ asks the TV what it can decode and marks those titles before you press Play: posters are dimmed with "Won't play", episodes say "Won't play" instead of a runtime, and the details page explains why. Playing one anyway shows a plain explanation, with OK to try anyway.
+Some files can't play on a given Roku no matter which app you use: AVI (DivX/Xvid) files don't play on any Roku, and TVs without an HEVC decoder (like the TCL 32S357) can't play HEVC/H.265 video. ARAN+ asks the TV what it can decode and marks those titles before you press Play: posters are dimmed with "Won't play", episodes say "Won't play" instead of a runtime, and the details page explains why. Playing one anyway shows a plain explanation, with OK to try anyway. With [the helper on your computer](#the-helper-on-your-computer), those titles play too.
 
 For other failures the player retries once without a format hint, then shows what went wrong: Roku's own error, the file's container and codecs (as reported by your provider), whether this TV can decode them, and the stream address with the password hidden. A title only counts as watched once it has actually played.
+
+## The helper on your computer
+
+The helper is a small program on a computer at home, switched on while you watch, that uses [FFmpeg](https://ffmpeg.org) to turn files the Roku can't play into a stream it can. It lives in the Samsung app's repo ([CrumbsAndCravings/Samsung-IPTV-Player](https://github.com/CrumbsAndCravings/Samsung-IPTV-Player), `helper/`), and the Samsung TV and the Roku share it.
+
+**What goes through it:**
+
+- **AVI files** (DivX and Xvid): the picture is converted to H.264.
+- **HEVC files** when this Roku can't decode HEVC (most Roku TVs, the TCL 32S357 among them). These are most of the library, and the heaviest work for the computer.
+- **Files whose sound this Roku can't play** (DTS or TrueHD, with no other track): the player switches to the helper from where you are, and remembers the title so it starts there next time.
+- **Anything that fails on its own** after the usual retry, unless the provider refused it outright (it would refuse the helper too).
+
+**How it plays.** The helper fetches the file with your login (from its own settings file, so the login never travels from the TV) and writes HLS, the format Roku streams in: the picture is converted to H.264 at the Roku's screen height (720 lines on a 720p TV, which saves the computer most of the work on 1080p and 4K files), or kept as it is when this Roku decodes it; the sound becomes stereo AAC when this Roku can't decode Dolby, and the track in your language comes first. Online subtitles still work: when the helper's stream starts partway, they come through the helper with their times moved to match. Subtitle tracks built into the file don't come through.
+
+- **The time bar** shows the whole film, from the length the helper read from the file.
+- **Jumping** within what is already converted is quick; a jump further on starts the helper again at the new time, which takes a few seconds. Resuming works the same way.
+- **When you leave a video,** the Roku tells the helper to stop, so the provider's one connection is free for whatever plays next. After a long pause the helper may have stopped; the Roku then opens the stream again from where you were.
+- **One at a time:** the provider allows one connection, so the Samsung TV and the Roku can't both watch at once, with or without the helper.
+
+**Set it up on Windows (once):**
+
+1. Install FFmpeg: open PowerShell and run `winget install Gyan.FFmpeg`.
+2. Get the Samsung repo and follow its README's "The helper on your computer" section: put your provider's login in its `personal.json` and start the helper with `npm run helper` (or double-click `helper\start-helper.cmd`). The first time, it adds `"transcoder": { "url": ..., "key": ... }` (this computer's address and a random key) to that `personal.json`, and Windows asks whether Node.js may use the network: allow **private networks**.
+3. Copy that `"transcoder"` part into this repo's `src/source/account.json`, next to your login:
+
+   ```json
+   { "server": "...", "username": "...", "password": "...",
+     "transcoder": { "url": "http://192.168.1.20:8090", "key": "the key the helper wrote" } }
+   ```
+
+4. Build and install the app again (`npm run build`, then upload the zip, or `npm run deploy`).
+
+From then on, start the helper before you watch (or put a shortcut to `helper\start-helper.cmd` in the Startup folder: press Win+R, type `shell:startup`). Its window shows what it is converting and with what: the graphics card, Intel Quick Sync, or the processor. If the Roku says the helper didn't answer, check that the computer is on and the window is open. Give the computer a fixed address in your router, or the Roku may lose it. Without `transcoder` in `account.json`, ARAN+ plays exactly as it did before.
 
 ## Look and feel
 
@@ -74,7 +107,7 @@ ROKU_HOST=192.168.1.50 ROKU_PASSWORD=yourpass npm run deploy   # build and insta
 npm run images    # regenerate icons, splash and gradients (needs Pillow)
 ```
 
-For a personal build that signs in by itself, put your login in `src/source/account.json` as `{"server": "...", "username": "...", "password": "..."}` before `npm run build`. Git ignores that file, so it never reaches the repo or the CI builds. The login screen also opens filled in with it after a sign-out.
+For a personal build that signs in by itself, put your login in `src/source/account.json` as `{"server": "...", "username": "...", "password": "..."}` before `npm run build`. Git ignores that file, so it never reaches the repo or the CI builds. The login screen also opens filled in with it after a sign-out. The same file holds `languages`, `sync` (see [`sync/`](sync/README.md)) and `transcoder` (see [the helper](#the-helper-on-your-computer)).
 
 ### Layout
 
@@ -90,6 +123,7 @@ src/
     tasks/XtreamParse.brs     API response -> content nodes (tested)
     tasks/SearchTask.*        background library index; SearchIndex.brs does the matching (tested)
     tasks/SubtitleTask.*      OpenSubtitles sign-in, search and download; common/Subtitles.brs (tested)
+    tasks/HelperTask.*        requests to the helper on a computer at home; common/Helper.brs (tested)
     common/                   Utils, Registry, Progress (Continue Watching), Pills (buttons)
   fonts/                      Fredoka and Nunito (SIL Open Font License)
   images/                     generated by tools/make_images.py
