@@ -686,7 +686,9 @@ sub helperGo()
         return
     end if
     item = currentItem()
-    runHelper({ mode: "info", url: HelperInfoUrl(TranscoderConfig(), streamKind(), item.id, item.ext, audioForHelper()) }, "onHelperInfo")
+    ' With online subtitles set up, the helper fingerprints the file in its own reads.
+    url = HelperInfoUrl(TranscoderConfig(), streamKind(), item.id, item.ext, audioForHelper(), m.startAt, LoadOsAccount() <> invalid)
+    runHelper({ mode: "info", url: url }, "onHelperInfo")
 end sub
 
 sub runHelper(request as Object, callback as String)
@@ -1285,6 +1287,12 @@ sub runOsTask(request as Object, callback as String)
     if m.osTask <> invalid then m.osTask.UnobserveField("result")
     request.videoUrl = currentStreamUrl()
     request.userAgent = FieldStr(m.global.creds, "userAgent")
+    ' Through the helper, it holds the provider's one connection and has fingerprinted
+    ' the file already, so the search doesn't read the file itself.
+    if m.route = "helper" then
+        request.via = "helper"
+        if m.helperInfo <> invalid then request.hash = FieldStr(m.helperInfo, "hash")
+    end if
     m.osTask = CreateObject("roSGNode", "SubtitleTask")
     m.osTask.request = request
     m.osTask.ObserveField("result", callback)

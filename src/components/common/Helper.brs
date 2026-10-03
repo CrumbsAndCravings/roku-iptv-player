@@ -19,9 +19,13 @@ function helperBase(config as Object, path as String) as String
     return config.url + path + "?key=" + ToStr(config.key).EncodeUriComponent()
 end function
 
-' What the file holds, and what the helper would do with each track.
-function HelperInfoUrl(config as Object, kind as String, id as String, ext as String, audio as String) as String
-    url = helperBase(config, "/v1/info") + "&" + HelperFileQuery(kind, id, ext)
+' What the file holds, and what the helper would do with each track. `start` lets the
+' helper keep the connection that read the file's start for a stream from there; with
+' `wantHash` it also fingerprints the file for OpenSubtitles in the same reads.
+function HelperInfoUrl(config as Object, kind as String, id as String, ext as String, audio as String, start as Integer, wantHash as Boolean) as String
+    if start < 0 then start = 0
+    url = helperBase(config, "/v1/info") + "&" + HelperFileQuery(kind, id, ext) + "&start=" + start.ToStr()
+    if wantHash then url = url + "&hash=1"
     if audio <> "" then url = url + "&audio=" + audio
     return url
 end function
@@ -129,7 +133,8 @@ end function
 
 ' --- What the helper says ------------------------------------------------------------
 
-' The helper's description of a file (/v1/info).
+' The helper's description of a file (/v1/info). `hash` is its OpenSubtitles
+' fingerprint, "" when it wasn't asked for or couldn't be read.
 function ParseHelperInfo(data as Dynamic) as Object
     video = Field(data, "video")
     plan = FieldStr(data, "videoPlan")
@@ -141,8 +146,11 @@ function ParseHelperInfo(data as Dynamic) as Object
             if IsAA(track) then audio.Push({ codec: FieldStr(track, "codec"), channels: ToInt(track.channels), language: FieldStr(track, "language"), plan: FieldStr(track, "plan") })
         end for
     end if
+    hash = LCase(FieldStr(data, "hash"))
+    if not CreateObject("roRegex", "^[0-9a-f]{16}$", "").IsMatch(hash) then hash = ""
     return {
         duration: ToInt(Field(data, "duration"))
+        hash: hash
         videoCodec: FieldStr(video, "codec")
         width: ToInt(Field(video, "width"))
         height: ToInt(Field(video, "height"))

@@ -1,6 +1,6 @@
 # ARAN+ feature reference
 
-Every feature of ARAN+ for Roku as of **v0.5.0** (sync added after commit `8d861e1`; the helper on a computer at home, §15, in 0.5.0). Each feature lists what it does, the exact rules and numbers, why it works that way, and where the Roku code lives. Use it as the checklist and spec for bringing the Samsung app ([CrumbsAndCravings/Samsung-IPTV-Player](https://github.com/CrumbsAndCravings/Samsung-IPTV-Player)) up to the same level.
+Every feature of ARAN+ for Roku as of **v0.5.1** (sync added after commit `8d861e1`; the helper on a computer at home, §15, in 0.5.0, with its faster reading in 0.5.1). Each feature lists what it does, the exact rules and numbers, why it works that way, and where the Roku code lives. Use it as the checklist and spec for bringing the Samsung app ([CrumbsAndCravings/Samsung-IPTV-Player](https://github.com/CrumbsAndCravings/Samsung-IPTV-Player)) up to the same level.
 
 - **Build plan for Samsung:** [`samsung-plan.md`](samsung-plan.md). That plan covers parity with Roku v0.4.1; everything added since then is in this document, marked **New since 0.4.1**.
 - **User-facing summary:** [`../README.md`](../README.md).
@@ -507,7 +507,10 @@ New in 0.5.0. The helper is a small Node program in the Samsung repo (`helper/ar
 With a helper set up, "Won't play" is never shown: `containerProblem` (tasks) and `WontPlay(check)` (Compat.brs, for Home and Details) return nothing, `showUnplayable` isn't reached, and Details says "This TV can't play this file itself, so the helper on your computer converts it while you watch." ("Roku" on a stick, `DeviceWord`).
 
 ### 15.3 What the Roku asks for
-- First `GET /v1/info?key&kind&id&ext[&audio]`: `{ duration, video { codec, width, height }, audio [{ codec, channels, language, plan }], videoPlan }` (`ParseHelperInfo`). Asked once per title; the helper caches it for 6 hours.
+- First `GET /v1/info?key&kind&id&ext&start[&hash=1][&audio]`: `{ duration, video { codec, width, height }, audio [{ codec, channels, language, plan }], videoPlan, hash }` (`ParseHelperInfo`). Asked once per title; the helper caches it for 6 hours.
+  - `start` is where the stream will start: from the beginning, the helper keeps the connection that read the file's start open for 20 s, and the stream carries on with it.
+  - `hash=1` (with online subtitles set up) asks for the file's OpenSubtitles fingerprint, read in the same requests (§15.7).
+- **How the helper reads the provider** (helper 1.1 and later): FFmpeg never asks the provider itself, since opening an AVI costs it six requests and a provider takes a moment to start each one. The helper reads the file on one connection at a time and hands FFmpeg the bytes: from the beginning, the first 4 MB and then the rest of the same connection; from anywhere else, through a local address that answers from a memory cache of the file's start and index. Timed against a fake provider taking 2 s per request: from the beginning 1 request (2 with the fingerprint), a first resume 3, each later jump 1.
 - Then the content node: `url` from `HelperHlsUrl`, `streamFormat = "hls"`, no `playStart` and no `HttpHeaders` (the helper speaks to the provider, as a desktop browser by default).
   - `video`: `copy` only when the helper's plan is `copy` (H.264, HEVC, MPEG-2) and `CanDecodeVideo` says yes; otherwise `convert` (DivX and Xvid always).
   - `height`: the screen's height (`GetDisplaySize().h`), 720 if unknown, at most 1080 (`HelperHeight`). The helper scales converted pictures down to it, keeping the shape.
@@ -535,6 +538,7 @@ With a helper set up, "Won't play" is never shown: `containerProblem` (tasks) an
 
 ### 15.7 Subtitles
 - Built-in subtitle tracks don't come through the helper (`-sn`).
+- **The fingerprint:** for helper titles the subtitle search uses the helper's `hash` and reads nothing from the provider itself (`via: "helper"` in the `SubtitleTask` request): the helper holds the provider's one connection while it plays.
 - Online subtitles do. Roku times a side-loaded subtitle file against its own clock, which starts at 0 where the helper's stream starts, so for a stream starting partway the track's name is the helper's `/v1/subtitles.srt?key&start&src=<OpenSubtitles link>` (`HelperSubtitleUrl`), which fetches the file and moves every line `start` seconds earlier. The helper fetches only OpenSubtitles addresses. `onlineTrackName()` gives the name Roku knows the track by, wherever the player compares tracks.
 
 ### 15.8 Code
