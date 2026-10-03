@@ -491,7 +491,7 @@ New in 0.5.0. The helper is a small Node program in the Samsung repo (`helper/ar
 
 ### 15.1 Setup
 - The helper reads the provider login from its own `personal.json` and, on its first run, writes `"transcoder": { "url": "http://<this computer>:8090", "key": "<random>" }` there.
-- The user copies that `transcoder` into the Roku's git-ignored `src/source/account.json`. `TranscoderSettings(data)` (Utils.brs) reads it, without a trailing `/`; `TranscoderConfig()` and `HelperOn()` (Registry.brs) read the file once per component.
+- The user copies that `transcoder` into the Roku's git-ignored `src/source/account.json`, by hand or with `npm run helper-settings` (`tools/helper-settings.mjs`), which keeps the rest of the file. `TranscoderSettings(data)` (Utils.brs) reads it, without a trailing `/`; `TranscoderConfig()` and `HelperOn()` (Registry.brs) read the file once per component.
 - **Without `transcoder`, everything behaves as before.**
 
 ### 15.2 When a title goes through the helper

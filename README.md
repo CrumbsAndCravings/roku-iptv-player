@@ -61,7 +61,7 @@ The helper is a small program on a computer at home, switched on while you watch
 
 1. Install FFmpeg: open PowerShell and run `winget install Gyan.FFmpeg`.
 2. Get the Samsung repo and follow its README's "The helper on your computer" section: put your provider's login in its `personal.json` and start the helper with `npm run helper` (or double-click `helper\start-helper.cmd`). The first time, it adds `"transcoder": { "url": ..., "key": ... }` (this computer's address and a random key) to that `personal.json`, and Windows asks whether Node.js may use the network: allow **private networks**.
-3. Copy that `"transcoder"` part into this repo's `src/source/account.json`, next to your login:
+3. Copy that `"transcoder"` part into this repo's `src/source/account.json`. `npm run helper-settings` does it for you when the Samsung repo sits next to this one (otherwise name it: `npm run helper-settings -- C:\path\to\Samsung-IPTV-Player`), keeping the rest of the file. By hand, it goes next to your login:
 
    ```json
    { "server": "...", "username": "...", "password": "...",
