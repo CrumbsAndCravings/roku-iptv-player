@@ -7,6 +7,9 @@
 '                   Bottom: Audio & subtitles, Episodes, Next episode, Restart.
 ' Seeking previews a target on the bar and jumps once Left/Right has been released
 ' for a moment, since every jump makes an IPTV stream rebuffer.
+'
+' Files this Roku can't play go through the helper on a computer at home when there is
+' one (common/Helper.brs): it converts them into HLS while you watch.
 
 sub init()
     m.video = m.top.FindNode("video")
@@ -84,6 +87,9 @@ sub init()
     m.toastText.font = MakeFont("Nunito-SemiBold", 18)
     m.toastTimer = m.top.FindNode("toastTimer")
     m.toastTimer.ObserveField("fire", "hideToast")
+    m.pauseTimer = m.top.FindNode("pauseTimer")
+    m.pauseTimer.ObserveField("fire", "onPauseDone")
+    m.afterPause = ""
 
     m.playback = invalid
     m.kind = "movie"
@@ -100,6 +106,11 @@ sub init()
     m.tryAnyway = false
     m.probeTask = invalid
     resetProbe()
+    m.helperTask = invalid
+    m.stopTask = invalid
+    m.helperToken = 0
+    m.helperUsed = false
+    resetHelper()
 
     m.row = "bar"
     m.buttons = []
@@ -172,6 +183,7 @@ sub startItem(startAt as Integer)
     m.failed = false
     m.errors = []
     resetProbe()
+    resetHelper()
     m.introShown = false
     m.audioPrefDone = false
     m.audioChecked = false
@@ -191,14 +203,40 @@ sub startItem(startAt as Integer)
     end if
     buildButtons()
 
-    ' Files this TV can't decode would only fail after a wait, so explain up front.
+    ' Files this TV can't decode would only fail after a wait, so explain up front, or
+    ' play them through the helper on a computer at home, with the titles that played
+    ' badly on their own before (only DTS sound, say).
     m.check = PlaybackCheck(item.ext, FieldStr(item, "videoCodec"), FieldStr(item, "videoProfile"), FieldStr(item, "audioCodec"))
+    if HelperRoute(m.check, { listed: HelperListed(itemKey()) }, HelperOn(), false) then
+        m.helperFromStart = true
+        startHelper(resumePoint(startAt))
+        return
+    end if
     if m.check.blocked <> "" and not m.tryAnyway then
         showUnplayable()
         return
     end if
+    if m.helperUsed then
+        ' The helper may still hold the provider's one connection; free it first.
+        m.video.control = "stop"
+        stopHelper()
+        pauseThen("direct")
+        return
+    end if
     loadStream()
 end sub
+
+' Resuming backs up a few seconds, so the scene picks up where it left off.
+function resumePoint(startAt as Integer) as Integer
+    if startAt > 10 then return startAt - 5
+    return 0
+end function
+
+' "m:<id>" for a movie, "e:<id>" for an episode, as in helper/titles.
+function itemKey() as String
+    if m.kind = "movie" then return "m:" + currentItem().id
+    return "e:" + currentItem().id
+end function
 
 sub showUnplayable()
     item = currentItem()
@@ -234,7 +272,7 @@ sub loadStream()
     end if
     ' Back up a few seconds so the scene picks up where it left off.
     if m.startAt > 10 then content.playStart = m.startAt - 5
-    if m.extraSubtitle <> "" then content.subtitleTracks = [{ Language: "eng", TrackName: m.extraSubtitle, Description: "Online" }]
+    attachOnlineSubtitle(content, false)
 
     m.lastSaved = m.startAt
     m.video.visible = true
@@ -249,15 +287,34 @@ end sub
 
 sub onPosition()
     if m.closing or not m.started then return
-    position = Int(m.video.position)
+    position = Int(positionSecs())
+    m.lastPos = position
+    if m.pendingSeek >= 0 and Abs(position - m.pendingSeek) < 15 then m.pendingSeek = -1
+    ' A minute of playing since the helper's stream last opened again: it's fine.
+    if m.helperReopens > 0 and position - m.offset > 60 then m.helperReopens = 0
     if Abs(position - m.lastSaved) >= 15 then saveProgress()
     if m.controls.visible then renderBar()
 end sub
 
+' Where the video is, in seconds from the file's start. Through the helper, its stream
+' starts at m.offset and Roku counts from there.
+function positionSecs() as Float
+    return m.offset + m.video.position
+end function
+
+' The file's length. Through the helper, the length the helper read from the file,
+' since its stream only lists what is converted so far.
+function durationSecs() as Float
+    if m.route <> "helper" then return m.video.duration
+    if m.helperInfo <> invalid and m.helperInfo.duration > 0 then return m.helperInfo.duration
+    if m.video.duration > 0 then return m.offset + m.video.duration
+    return 0
+end function
+
 sub saveProgress()
     if m.playback = invalid or not m.started or m.failed then return
-    position = Int(m.video.position)
-    duration = Int(m.video.duration)
+    position = Int(positionSecs())
+    duration = Int(durationSecs())
     if position < 10 then return
     m.lastSaved = position
     if duration > 0 and position >= duration * 0.95 then
@@ -357,6 +414,13 @@ sub onState()
         ' Roku can report "finished" right after an error. Only a stream that actually
         ' played counts as watched.
         if m.failed or not m.started then return
+        ' The helper's stream ends early when its FFmpeg was stopped (a long pause,
+        ' another device) or the provider's connection dropped: not the end of the film.
+        if m.route = "helper" and HelperEndedEarly(m.lastPos, Int(durationSecs())) then
+            m.errors.Push("the stream from your computer ended at " + FormatClock(m.lastPos) + " of " + FormatClock(Int(durationSecs())))
+            helperFailed()
+            return
+        end if
         markFinished()
         if hasNextEpisode() then
             showUpNext()
@@ -368,7 +432,11 @@ end sub
 
 sub onPlaybackError()
     m.errors.Push(describeRokuError())
-    if m.started then m.startAt = Int(m.video.position)
+    if m.route = "helper" then
+        helperFailed()
+        return
+    end if
+    if m.started then m.startAt = Int(positionSecs())
     m.started = false
     ' A refused request won't change with a different format hint, so ask the server
     ' directly, as a Roku and as ARAN+, whether it would send this video.
@@ -379,6 +447,16 @@ sub onPlaybackError()
     end if
     if m.attempt = 0 and not m.probed then
         retryWithoutHint()
+        return
+    end if
+    directFailed()
+end sub
+
+' The stream didn't play on its own: try it through the helper on your computer, unless
+' the provider turned it down every way (it won't do better through the helper).
+sub directFailed()
+    if HelperRoute(m.check, { failed: true, refused: m.probeRefused }, HelperOn(), m.helperTried) then
+        startHelper(m.startAt)
         return
     end if
     showPlaybackError()
@@ -429,7 +507,7 @@ sub onProbeResult(event as Object)
     if m.closing then return
     results = result.results
     if not IsArr(results) or results.Count() < 2 then
-        showPlaybackError()
+        directFailed()
         return
     end if
     current = results[0]
@@ -456,7 +534,7 @@ sub onProbeResult(event as Object)
         retryWithoutHint()
         return
     end if
-    showPlaybackError()
+    directFailed()
 end sub
 
 function probeLine(res as Object) as String
@@ -498,6 +576,7 @@ end function
 ' What went wrong, what the file is, and whether this TV can decode it.
 function diagnosis() as String
     item = currentItem()
+    if m.route = "helper" then return helperDiagnosis(item)
     lines = []
     lines.Push("Roku says: " + m.errors.Peek())
     if m.formatRetried then lines.Push("Tried twice: with the format hint from the file name, then without it.")
@@ -532,6 +611,237 @@ end function
 function streamLine(item as Object) as String
     creds = m.global.creds
     return "Stream: " + creds.server + "/" + streamKind() + "/" + creds.username + "/••••/" + item.id + "." + item.ext
+end function
+
+' --- The helper on a computer at home ------------------------------------------------
+'
+' The helper (common/Helper.brs) fetches the file from the provider and converts it
+' into HLS while you watch. Its stream starts where asked (m.offset), so positions
+' are m.offset plus Roku's, and the file's length comes from the helper.
+
+sub resetHelper()
+    m.route = "direct"
+    m.offset = 0
+    m.helperInfo = invalid
+    m.helperVideo = "convert"
+    m.helperTried = false
+    m.helperFromStart = false
+    m.helperProblem = ""
+    m.helperSaid = ""
+    m.helperReopens = 0
+    m.pendingSeek = -1
+    m.lastPos = 0
+    ' Answers about the title before are dropped.
+    m.helperToken = m.helperToken + 1
+    if m.helperTask <> invalid then m.helperTask.UnobserveField("result")
+    m.helperTask = invalid
+    if m.pauseTimer <> invalid then m.pauseTimer.control = "stop"
+end sub
+
+' Moves this title to the helper, from `startAt` seconds.
+sub startHelper(startAt as Integer)
+    m.route = "helper"
+    m.helperTried = true
+    m.startAt = startAt
+    m.started = false
+    m.failed = false
+    m.errorBox.visible = false
+    ' The provider allows one connection, so let go of it before the helper asks.
+    state = m.video.state
+    wasStreaming = state = "playing" or state = "paused" or state = "buffering"
+    m.video.control = "stop"
+    m.spinner.visible = true
+    m.spinner.control = "start"
+    if wasStreaming then
+        pauseThen("helper")
+    else
+        helperGo()
+    end if
+end sub
+
+' Gives the provider a moment to notice a closed connection, then goes on.
+sub pauseThen(what as String)
+    m.afterPause = what
+    m.spinner.visible = true
+    m.spinner.control = "start"
+    m.pauseTimer.control = "stop"
+    m.pauseTimer.control = "start"
+end sub
+
+sub onPauseDone()
+    m.pauseTimer.control = "stop"
+    if m.closing then return
+    if m.afterPause = "direct" then
+        loadStream()
+    else
+        helperGo()
+    end if
+end sub
+
+' First what the file holds (once per title), then the stream.
+sub helperGo()
+    if m.closing then return
+    if m.helperInfo <> invalid then
+        openHelper(m.startAt)
+        return
+    end if
+    item = currentItem()
+    runHelper({ mode: "info", url: HelperInfoUrl(TranscoderConfig(), streamKind(), item.id, item.ext, audioForHelper()) }, "onHelperInfo")
+end sub
+
+sub runHelper(request as Object, callback as String)
+    if m.helperTask <> invalid then m.helperTask.UnobserveField("result")
+    request.token = m.helperToken
+    m.helperTask = CreateObject("roSGNode", "HelperTask")
+    m.helperTask.request = request
+    m.helperTask.ObserveField("result", callback)
+    m.helperTask.control = "RUN"
+end sub
+
+' Results for a title that's no longer playing are dropped.
+function helperResultFor(event as Object) as Dynamic
+    result = event.GetData()
+    m.helperTask = invalid
+    if m.closing or ToInt(Field(Field(result, "request"), "token")) <> m.helperToken then return invalid
+    return result
+end function
+
+sub onHelperInfo(event as Object)
+    result = helperResultFor(event)
+    if result = invalid then return
+    if not result.ok then
+        m.helperProblem = FieldStr(result, "error")
+        showPlaybackError()
+        return
+    end if
+    info = result.info
+    m.helperInfo = info
+    canPicture = false
+    if info.videoCodec <> "" then canPicture = canDecode("video", RokuVideoCodec(info.videoCodec), "")
+    m.helperVideo = HelperVideo(info.videoPlan, canPicture)
+    openHelper(m.startAt)
+end sub
+
+' Plays the helper's stream from `startAt` seconds.
+sub openHelper(startAt as Integer)
+    if startAt < 0 then startAt = 0
+    if m.helperInfo = invalid then
+        ' Still asking the helper about the file; the stream opens once it answers.
+        m.startAt = startAt
+        helperGo()
+        return
+    end if
+    item = currentItem()
+    showing = onlineSubtitleShowing()
+    m.offset = startAt
+    m.startAt = startAt
+    m.started = false
+    m.pendingSeek = -1
+    m.helperUsed = true
+    choice = {
+        video: m.helperVideo
+        height: HelperHeight(screenHeight())
+        audio: audioForHelper()
+        track: HelperTrack(m.helperInfo.audio, FieldStr(LoadPrefs(), "audio"))
+    }
+    content = CreateObject("roSGNode", "ContentNode")
+    content.url = HelperHlsUrl(TranscoderConfig(), streamKind(), item.id, item.ext, startAt, choice)
+    content.title = m.titleLabel.text
+    content.streamFormat = "hls"
+    attachOnlineSubtitle(content, showing)
+    ' The new stream numbers its tracks afresh.
+    m.audioPrefDone = false
+    m.subPrefDone = false
+    m.lastSaved = startAt
+    m.lastPos = startAt
+    m.video.visible = true
+    m.video.content = content
+    m.video.control = "play"
+    m.spinner.visible = true
+    m.spinner.control = "start"
+    m.keys.SetFocus(true)
+end sub
+
+function screenHeight() as Integer
+    return ToInt(Field(CreateObject("roDeviceInfo").GetDisplaySize(), "h"))
+end function
+
+function audioForHelper() as String
+    return HelperAudio(canDecode("audio", "ac3", ""), canDecode("audio", "eac3", ""))
+end function
+
+' The helper's stream failed. One that had played opens again from where it got to
+' (a long pause can outlast the helper's files), twice at most. One that never played
+' is asked for once more: Roku may stop waiting before the helper is ready, and the
+' helper hands the same request its running stream. Otherwise ask the helper why, then
+' explain.
+sub helperFailed()
+    target = Int(positionSecs())
+    if m.lastPos > target then target = m.lastPos
+    if m.pendingSeek >= 0 then target = Int(m.pendingSeek)
+    played = m.started or target > m.offset
+    m.started = false
+    m.video.control = "stop"
+    limit = 1
+    if played then limit = 2
+    if m.helperReopens < limit then
+        m.helperReopens = m.helperReopens + 1
+        openHelper(target)
+        return
+    end if
+    m.startAt = target
+    m.spinner.visible = true
+    m.spinner.control = "start"
+    runHelper({ mode: "lastError", url: HelperErrorUrl(TranscoderConfig()) }, "onHelperLastError")
+end sub
+
+sub onHelperLastError(event as Object)
+    result = helperResultFor(event)
+    if result = invalid then return
+    if result.ok then
+        m.helperSaid = FieldStr(result, "said")
+    else
+        m.helperProblem = FieldStr(result, "error")
+    end if
+    showPlaybackError()
+end sub
+
+' Stops the helper's FFmpeg, so the provider's one connection is free for a stream
+' straight from the provider.
+sub stopHelper()
+    m.helperUsed = false
+    if not HelperOn() then return
+    m.stopTask = CreateObject("roSGNode", "HelperTask")
+    m.stopTask.request = { mode: "stop", url: HelperStopUrl(TranscoderConfig()) }
+    m.stopTask.control = "RUN"
+end sub
+
+' What went wrong through the helper: who said what, what the helper was doing, the
+' file, and the helper's address (its key stays hidden).
+function helperDiagnosis(item as Object) as String
+    config = TranscoderConfig()
+    lines = []
+    if m.helperProblem <> "" then
+        lines.Push(m.helperProblem)
+    else
+        if m.errors.Count() > 0 then lines.Push("Roku says: " + m.errors.Peek())
+        if m.helperSaid <> "" then lines.Push("Your computer says: " + m.helperSaid)
+        if not m.started and m.errors.Count() > 0 and HttpCodeIn(m.errors.Peek()) = 404 then lines.Push("If the helper is older than this app, it can't make the stream a Roku needs: update it and start it again.")
+    end if
+    if m.helperFromStart then
+        lines.Push("This " + DeviceWord() + " can't play this file itself, so it went through the helper on your computer.")
+    else
+        lines.Push("It didn't play on its own, so it was tried through the helper on your computer.")
+    end if
+    if m.helperInfo <> invalid then lines.Push(HelperPlanLine(m.helperInfo, m.helperVideo))
+    lines.Push(fileLine(item))
+    if config <> invalid then
+        lines.Push("Helper: " + config.url)
+        if m.helperProblem = HelperFailure(0, "") then lines.Push("Often the computer is asleep or off, the helper's window was closed, or the computer's address has changed (a fixed address in the router keeps it).")
+    end if
+    text = lines.Join(Chr(10))
+    if config <> invalid and Len(config.key) >= 3 then text = text.Replace(config.key, "••••")
+    return text
 end function
 
 ' --- Controls ------------------------------------------------------------------
@@ -610,8 +920,8 @@ end sub
 sub renderBar()
     barX = 228
     barWidth = 896
-    duration = m.video.duration
-    position = m.video.position
+    duration = durationSecs()
+    position = positionSecs()
     shown = position
     if m.seeking then shown = m.seekTarget
 
@@ -681,8 +991,7 @@ sub runButton()
         goToEpisode(m.index + 1)
     else if action = "restart" then
         cancelSeek()
-        m.video.seek = 0
-        m.lastSaved = 0
+        seekTo(0)
         if m.video.state = "paused" then m.video.control = "resume"
         setRow("bar")
     end if
@@ -710,7 +1019,7 @@ sub beginHold(key as String, direction as Integer)
     m.commitTimer.control = "stop"
     if not m.seeking then
         m.seeking = true
-        m.seekTarget = m.video.position
+        m.seekTarget = positionSecs()
     end if
     m.holdKey = key
     m.holdDirection = direction
@@ -735,7 +1044,7 @@ sub onHoldTick()
 end sub
 
 sub stepSeek(seconds as Integer)
-    m.seekTarget = ClampSeek(m.seekTarget + seconds * m.holdDirection, m.video.duration)
+    m.seekTarget = ClampSeek(m.seekTarget + seconds * m.holdDirection, durationSecs())
     if not m.controls.visible then showControls("bar")
     renderBar()
     restartHideTimer()
@@ -751,8 +1060,7 @@ sub commitSeek()
     m.commitTimer.control = "stop"
     if not m.seeking then return
     m.seeking = false
-    m.video.seek = m.seekTarget
-    m.lastSaved = Int(m.seekTarget)
+    seekTo(m.seekTarget)
     renderBar()
     restartHideTimer()
 end sub
@@ -766,10 +1074,25 @@ end sub
 
 sub jumpBy(seconds as Integer)
     cancelSeek()
-    target = ClampSeek(m.video.position + seconds, m.video.duration)
-    m.video.seek = target
-    m.lastSaved = Int(target)
+    seekTo(ClampSeek(positionSecs() + seconds, durationSecs()))
     showControls("bar")
+end sub
+
+' Jumps to `target` seconds into the file. Through the helper, Roku jumps within what is
+' already converted; anything else opens the helper's stream again from there.
+sub seekTo(target as Float)
+    m.lastSaved = Int(target)
+    if m.route <> "helper" then
+        m.video.seek = target
+        return
+    end if
+    if HelperSeekInside(target, m.offset, m.video.duration) then
+        m.pendingSeek = target
+        m.video.seek = target - m.offset
+        return
+    end if
+    m.video.control = "stop"
+    openHelper(Int(target))
 end sub
 
 ' --- Keys ----------------------------------------------------------------------
@@ -923,12 +1246,17 @@ sub close()
     m.autoSubTimer.control = "stop"
     if m.osTask <> invalid then m.osTask.UnobserveField("result")
     if m.probeTask <> invalid then m.probeTask.UnobserveField("result")
+    if m.helperTask <> invalid then m.helperTask.UnobserveField("result")
+    m.pauseTimer.control = "stop"
     cancelSeek()
     m.countdown.control = "stop"
     m.hideTimer.control = "stop"
     m.video.control = "stop"
     m.toastTimer.control = "stop"
-    m.top.action = { name: "close" }
+    action = { name: "close" }
+    ' The scene tells the helper to stop, so the provider's connection is free again.
+    if m.helperUsed and HelperOn() then action.helperStop = HelperStopUrl(TranscoderConfig())
+    m.top.action = action
 end sub
 
 ' --- Online subtitles (OpenSubtitles) -------------------------------------------
@@ -1052,10 +1380,36 @@ sub onOnlineDownloaded(event as Object)
     ' Roku reads subtitle files when a stream loads, so reload at the same spot.
     m.extraSubtitle = result.link
     m.pendingSubtitle = result.link
-    if m.started then m.startAt = Int(m.video.position)
+    if m.started then m.startAt = Int(positionSecs())
     m.video.control = "stop"
-    loadStream()
+    if m.route = "helper" then
+        openHelper(m.startAt)
+    else
+        loadStream()
+    end if
     refreshTracksPanel()
+end sub
+
+' The name Roku knows the online subtitles by: OpenSubtitles' file itself, or, for a
+' helper stream that starts partway, the helper's copy with the times moved to match.
+function onlineTrackName() as String
+    if m.extraSubtitle = "" then return ""
+    if m.route = "helper" and m.offset > 0 then return HelperSubtitleUrl(TranscoderConfig(), m.extraSubtitle, m.offset)
+    return m.extraSubtitle
+end function
+
+function onlineSubtitleShowing() as Boolean
+    if m.extraSubtitle = "" or ToStr(m.video.globalCaptionMode) <> "On" then return false
+    return ToStr(m.video.subtitleTrack) = onlineTrackName()
+end function
+
+' Online subtitles go with every stream load, since Roku reads them only then.
+' `showing` turns them on again once the new stream plays.
+sub attachOnlineSubtitle(content as Object, showing as Boolean)
+    if m.extraSubtitle = "" then return
+    name = onlineTrackName()
+    content.subtitleTracks = [{ Language: "eng", TrackName: name, Description: "Online" }]
+    if showing or m.pendingSubtitle <> "" then m.pendingSubtitle = name
 end sub
 
 sub chooseOnline(id as String)
@@ -1068,7 +1422,7 @@ sub chooseOnline(id as String)
     else if Left(id, 8) = "os:file:" then
         fileId = Mid(id, 9)
         if fileId = m.online.fileId and m.online.link <> "" then
-            m.video.subtitleTrack = m.online.link
+            m.video.subtitleTrack = onlineTrackName()
             m.video.globalCaptionMode = "On"
             SavePref("subtitles", "online")
         else
@@ -1083,7 +1437,7 @@ end sub
 sub buildSubtitleOptions()
     options = []
     for each option in SubtitleOptions(m.video.availableSubtitleTracks)
-        if m.online.link = "" or option.id <> m.online.link then options.Push(option)
+        if m.online.link = "" or option.id <> onlineTrackName() then options.Push(option)
     end for
     if LoadOsAccount() = invalid then
         options.Push({ id: "os:setup", label: "Find English subtitles online", language: "" })
@@ -1198,6 +1552,13 @@ sub checkAudioPlayable()
             return
         end if
     end for
+    ' No sound this Roku can play: the helper converts it, now and next time.
+    if m.route = "direct" and HelperRoute(m.check, { silent: true }, HelperOn(), m.helperTried) then
+        RememberHelperTitle(itemKey())
+        showToast("This file's sound is " + CodecLabel(format) + ", which this " + DeviceWord() + " can't play, so the helper on your computer converts it.")
+        startHelper(Int(positionSecs()))
+        return
+    end if
     showToast("No sound? This file's audio is " + CodecLabel(format) + ", which this " + DeviceWord() + " can't play. Your provider may have another version of this title.")
 end sub
 
@@ -1235,7 +1596,7 @@ end function
 function activeSubtitleIndex() as Integer
     if ToStr(m.video.globalCaptionMode) <> "On" then return 0
     current = ToStr(m.video.subtitleTrack)
-    if m.online.link <> "" and current = m.online.link then return OptionIndex(m.subOptions, "id", "os:file:" + m.online.fileId)
+    if m.online.link <> "" and current = onlineTrackName() then return OptionIndex(m.subOptions, "id", "os:file:" + m.online.fileId)
     return OptionIndex(m.subOptions, "id", current)
 end function
 

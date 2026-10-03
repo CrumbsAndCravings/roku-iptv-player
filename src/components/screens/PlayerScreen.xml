@@ -2,7 +2,8 @@
 <!--
   Full-screen playback with our own controls (Roku's built-in UI is off).
   Rows: Back + title on top; play/pause and the scrollbar; a button row underneath.
-  Saves progress for Continue Watching and rolls into the next episode.
+  Saves progress for Continue Watching and rolls into the next episode. Files this Roku
+  can't play go through the helper on a computer at home when there is one.
 -->
 <component name="PlayerScreen" extends="Group">
   <interface>
@@ -89,6 +90,8 @@
     <Timer id="commitTimer" duration="0.8" repeat="false" />
     <Timer id="autoSubTimer" duration="2.5" repeat="false" />
     <Timer id="toastTimer" duration="9" repeat="false" />
+    <!-- Lets the provider notice a closed connection before the next one opens. -->
+    <Timer id="pauseTimer" duration="1.2" repeat="false" />
   </children>
   <script type="text/brightscript" uri="pkg:/components/common/Utils.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Registry.brs" />
@@ -98,5 +101,6 @@
   <script type="text/brightscript" uri="pkg:/components/common/Tracks.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Subtitles.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Playback.brs" />
+  <script type="text/brightscript" uri="pkg:/components/common/Helper.brs" />
   <script type="text/brightscript" uri="pkg:/components/screens/PlayerScreen.brs" />
 </component>

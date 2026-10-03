@@ -536,6 +536,20 @@ function SyncSpaceText(creds as Object) as String
     return server + Chr(10) + FieldStr(creds, "username")
 end function
 
+' Where the helper on a computer at home is (common/Helper.brs), from a personal
+' build's account.json: "transcoder": { url, key }, the values the helper wrote into
+' its own personal.json. { url, key } without a trailing "/", or invalid.
+function TranscoderSettings(data as Dynamic) as Dynamic
+    settings = Field(data, "transcoder")
+    url = FieldStr(settings, "url")
+    key = FieldStr(settings, "key")
+    if url = "" or key = "" then return invalid
+    while Right(url, 1) = "/"
+        url = Left(url, Len(url) - 1)
+    end while
+    return { url: url, key: key }
+end function
+
 ' 1234567 -> "1,234,567"
 function Commas(value as Integer) as String
     digits = Abs(value).ToStr()

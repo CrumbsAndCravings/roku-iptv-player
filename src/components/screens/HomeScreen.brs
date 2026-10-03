@@ -370,7 +370,7 @@ sub onHeroInfo(event as Object)
     if item = invalid or not result.ok then return
     ApplyInfo(item, result.info)
     check = PlaybackCheck(item.ext, item.videoCodec, item.videoProfile, item.audioCodec)
-    item.problem = check.blocked
+    item.problem = WontPlay(check)
     if m.focusedItem <> invalid and m.focusedItem.IsSameNode(item) then showHero(item)
 end sub
 

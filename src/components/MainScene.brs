@@ -158,7 +158,8 @@ sub onAction(event as Object)
         screen.playback = action.playback
         screen.takeFocus = true
     else if name = "close" then
-        ' Leaving a video: share where it stopped.
+        ' Leaving a video: share where it stopped, and free the helper's connection.
+        if FieldStr(action, "helperStop") <> "" then stopHelper(action.helperStop)
         popScreen()
         requestSync(true)
     else if name = "syncNow" then
@@ -207,6 +208,14 @@ sub onSynced(event as Object)
         m.syncAgain = false
         requestSync(true)
     end if
+end sub
+
+' After a video that went through the helper on a computer at home, the helper stops
+' converting, so the provider's one connection is free for whatever plays next.
+sub stopHelper(url as String)
+    m.helperStop = CreateObject("roSGNode", "HelperTask")
+    m.helperStop.request = { mode: "stop", url: url }
+    m.helperStop.control = "RUN"
 end sub
 
 ' The search worker holds an index of the signed-in library; drop it on sign-out.
