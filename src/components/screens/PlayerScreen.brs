@@ -191,6 +191,7 @@ sub startItem(startAt as Integer)
     m.audioChecked = false
     m.subPrefDone = false
     resetOnline()
+    lookUpSaved()
     cancelSeek()
     closePanel(false)
     hideControls()
@@ -1335,6 +1336,11 @@ sub resetOnline()
     m.extraSubtitle = ""
     m.pendingSubtitle = ""
     m.autoChecked = false
+    m.autoWaiting = false
+    m.saved = invalid
+    m.savedLooking = false
+    if m.savedTask <> invalid then m.savedTask.UnobserveField("result")
+    m.savedTask = invalid
     if m.autoSubTimer <> invalid then m.autoSubTimer.control = "stop"
     if m.osTask <> invalid then m.osTask.UnobserveField("result")
     m.osTask = invalid
@@ -1370,20 +1376,34 @@ function osResultFor(event as Object) as Dynamic
     return result
 end function
 
+' Where this device would show subtitles by itself ("online", or nothing chosen yet):
+' built-in English ones (for "online"), else the ones saved for this title on the sync
+' service, else (for "online") the best match from OpenSubtitles.
 sub autoSubtitles()
     if m.closing or m.failed or m.online.link <> "" then return
-    if FieldStr(LoadPrefs(), "subtitles") <> "online" then return
-    if LoadOsAccount() = invalid then return
-    ' Built-in English subtitles beat a download.
-    options = SubtitleOptions(m.video.availableSubtitleTracks)
-    index = OptionIndex(options, "language", "eng")
-    if index < 0 then index = OptionIndex(options, "language", "en")
-    if index > 0 then
-        m.video.subtitleTrack = options[index].id
-        m.video.globalCaptionMode = "On"
+    pref = FieldStr(LoadPrefs(), "subtitles")
+    if pref <> "online" and pref <> "" then return
+    if pref = "online" then
+        ' Built-in English subtitles beat a download.
+        options = SubtitleOptions(m.video.availableSubtitleTracks)
+        index = OptionIndex(options, "language", "eng")
+        if index < 0 then index = OptionIndex(options, "language", "en")
+        if index > 0 then
+            m.video.subtitleTrack = options[index].id
+            m.video.globalCaptionMode = "On"
+            return
+        end if
+    end if
+    if m.savedLooking then
+        ' Decided once the sync service answers.
+        m.autoWaiting = true
         return
     end if
-    startOnlineSearch(true)
+    if m.saved <> invalid then
+        showSaved(m.saved.delayMs)
+        return
+    end if
+    if pref = "online" and LoadOsAccount() <> invalid then startOnlineSearch(true)
 end sub
 
 sub startOnlineSearch(auto as Boolean)
@@ -1447,9 +1467,16 @@ sub onOnlineDownloaded(event as Object)
     m.online.shift = result.request.shift
     m.online.remaining = ToInt(result.remaining)
     SavePref("subtitles", "online")
-    ' Roku reads subtitle files when a stream loads, so reload at the same spot.
-    m.extraSubtitle = result.link
-    m.pendingSubtitle = result.link
+    reloadWithSubtitle(result.link)
+    ' A fresh download (not one moved by OpenSubtitles) is saved for every device.
+    if m.online.shift = 0 then shareSubtitle(m.online.fileId, result.link)
+    refreshTracksPanel()
+end sub
+
+' Roku reads subtitle files when a stream loads, so reload at the same spot.
+sub reloadWithSubtitle(link as String)
+    m.extraSubtitle = link
+    m.pendingSubtitle = link
     if m.started then m.startAt = Int(positionSecs())
     m.video.control = "stop"
     if m.route = "helper" then
@@ -1457,7 +1484,106 @@ sub onOnlineDownloaded(event as Object)
     else
         loadStream()
     end if
+end sub
+
+' --- Subtitles saved for every device (the sync service, sync/worker.js) -----------
+'
+' A download is saved there for this title, so the next device to play it shows it
+' without one. The Roku plays any device's saved subtitles from the service's address,
+' which also moves them for a nudge, so nudging them costs no download.
+
+function syncRequestFor(mode as String) as Dynamic
+    config = SyncConfig()
+    if config = invalid or FieldStr(m.global.creds, "server") = "" then return invalid
+    return { mode: mode, url: config.url, key: config.key, space: SyncSpace(m.global.creds), title: itemKey() }
+end function
+
+sub lookUpSaved()
+    request = syncRequestFor("subtitle-get")
+    if request = invalid then return
+    m.savedLooking = true
+    m.savedTask = CreateObject("roSGNode", "SyncTask")
+    m.savedTask.request = request
+    m.savedTask.ObserveField("result", "onSavedLooked")
+    m.savedTask.control = "RUN"
+end sub
+
+sub onSavedLooked(event as Object)
+    result = event.GetData()
+    m.savedTask = invalid
+    m.savedLooking = false
+    if IsAA(result) and FieldStr(result, "title") = itemKey() and ToStr(result.found) = "true" then
+        m.saved = { fileId: FieldStr(result, "fileId"), name: FieldStr(result, "name"), delayMs: ToInt(result.delayMs), file: FieldStr(result, "file") }
+        m.online.candidates.Unshift(SavedCandidate(m.saved))
+        refreshTracksPanel()
+    end if
+    ' No answer still lets the device search as before.
+    if m.autoWaiting then
+        m.autoWaiting = false
+        autoSubtitles()
+    end if
+end sub
+
+' The saved subtitles, moved `delayMs` by the service.
+sub showSaved(delayMs as Integer)
+    if m.saved = invalid then return
+    m.saved.delayMs = delayMs
+    ' A search or download still out is overtaken.
+    if m.osTask <> invalid then m.osTask.UnobserveField("result")
+    m.osTask = invalid
+    if m.online.state = "searching" or m.online.state = "downloading" then
+        m.online.state = "idle"
+        if SplitSavedCandidates(m.online.candidates).found.Count() > 0 then m.online.state = "results"
+    end if
+    link = SavedSubtitleUrl(m.saved.file, delayMs)
+    m.online.link = link
+    m.online.fileId = m.saved.fileId
+    m.online.shift = delayMs / 1000
+    reloadWithSubtitle(link)
     refreshTracksPanel()
+end sub
+
+function savedShowing() as Boolean
+    return m.saved <> invalid and m.online.link <> "" and m.online.fileId = m.saved.fileId
+end function
+
+sub shareSubtitle(fileId as String, link as String)
+    request = syncRequestFor("subtitle-save")
+    if request = invalid then return
+    request.fileId = fileId
+    request.link = link
+    request.name = ""
+    for each candidate in m.online.candidates
+        if candidate.fileId = fileId and ToStr(candidate.saved) <> "true" then request.name = candidate.release
+    end for
+    if m.shareTask <> invalid then m.shareTask.UnobserveField("result")
+    m.shareTask = CreateObject("roSGNode", "SyncTask")
+    m.shareTask.request = request
+    m.shareTask.ObserveField("result", "onSubtitleShared")
+    m.shareTask.control = "RUN"
+end sub
+
+sub onSubtitleShared(event as Object)
+    result = event.GetData()
+    m.shareTask = invalid
+    if not IsAA(result) or ToStr(result.ok) <> "true" or FieldStr(result, "title") <> itemKey() or FieldStr(result, "file") = "" then return
+    m.saved = { fileId: FieldStr(result, "fileId"), name: FieldStr(result, "name"), delayMs: 0, file: FieldStr(result, "file") }
+    ' What was saved before is replaced.
+    m.online.candidates = SplitSavedCandidates(m.online.candidates).found
+    refreshTracksPanel()
+end sub
+
+' A nudge of the saved subtitles: shown through the service, and saved for every device.
+sub nudgeSaved(moveMs as Integer)
+    showSaved(m.saved.delayMs + moveMs)
+    request = syncRequestFor("subtitle-delay")
+    if request = invalid then return
+    request.fileId = m.saved.fileId
+    request.delayMs = m.saved.delayMs
+    if m.delayTask <> invalid then m.delayTask.UnobserveField("result")
+    m.delayTask = CreateObject("roSGNode", "SyncTask")
+    m.delayTask.request = request
+    m.delayTask.control = "RUN"
 end sub
 
 ' The name Roku knows the online subtitles by: OpenSubtitles' file. A growing helper
@@ -1486,6 +1612,10 @@ end sub
 sub chooseOnline(id as String)
     if id = "os:search" then
         startOnlineSearch(false)
+    else if id = "os:earlier" and savedShowing() then
+        nudgeSaved(-1000)
+    else if id = "os:later" and savedShowing() then
+        nudgeSaved(1000)
     else if id = "os:earlier" then
         startOnlineDownload(m.online.fileId, m.online.shift - 1.0)
     else if id = "os:later" then
@@ -1496,6 +1626,9 @@ sub chooseOnline(id as String)
             m.video.subtitleTrack = onlineTrackName()
             m.video.globalCaptionMode = "On"
             SavePref("subtitles", "online")
+        else if m.saved <> invalid and fileId = m.saved.fileId then
+            showSaved(m.saved.delayMs)
+            SavePref("subtitles", "online")
         else
             startOnlineDownload(fileId, 0.0)
         end if
@@ -1504,30 +1637,34 @@ sub chooseOnline(id as String)
 end sub
 
 ' Built-in tracks (minus the loaded online one, which shows as its search result),
-' then the online choices for the current state.
+' then subtitles saved for this title on the sync service (no OpenSubtitles account
+' needed), then the online choices for the current state.
 sub buildSubtitleOptions()
     options = []
     for each option in SubtitleOptions(m.video.availableSubtitleTracks)
         if m.online.link = "" or option.id <> onlineTrackName() then options.Push(option)
     end for
+    split = SplitSavedCandidates(m.online.candidates)
+    for each candidate in split.saved
+        options.Push({ id: "os:file:" + candidate.fileId, label: SubtitleLabel(candidate), language: "eng" })
+    end for
+    state = m.online.state
     if LoadOsAccount() = invalid then
         options.Push({ id: "os:setup", label: "Find English subtitles online", language: "" })
-        m.subOptions = options
-        return
-    end if
-    state = m.online.state
-    if state = "searching" then
+    else if state = "searching" then
         options.Push({ id: "os:busy", label: "Searching online…", language: "" })
     else if state = "downloading" then
         options.Push({ id: "os:busy", label: "Downloading subtitles…", language: "" })
-    else if m.online.candidates.Count() = 0 then
+    else if split.found.Count() = 0 then
         label = "Find English subtitles online"
         if state = "none" or state = "error" then label = "Search online again"
         options.Push({ id: "os:search", label: label, language: "" })
     end if
-    for each candidate in m.online.candidates
-        options.Push({ id: "os:file:" + candidate.fileId, label: SubtitleLabel(candidate), language: "eng" })
-    end for
+    if LoadOsAccount() <> invalid then
+        for each candidate in split.found
+            options.Push({ id: "os:file:" + candidate.fileId, label: SubtitleLabel(candidate), language: "eng" })
+        end for
+    end if
     if m.online.link <> "" then
         options.Push({ id: "os:earlier", label: "Show subtitles 1s earlier", language: "" })
         options.Push({ id: "os:later", label: "Show subtitles 1s later", language: "" })
@@ -1540,7 +1677,7 @@ sub updateTracksNote()
     playing = LCase(ToStr(m.video.audioFormat))
     if playing <> "" then notes.Push("Audio now: " + CodecLabel(playing) + ".")
     state = m.online.state
-    if LoadOsAccount() = invalid then
+    if LoadOsAccount() = invalid and m.online.link = "" then
         notes.Push("To search online, connect OpenSubtitles: on the home screen press * and choose Online subtitles.")
     else if state = "searching" then
         notes.Push("Searching OpenSubtitles for English subtitles…")
@@ -1553,9 +1690,15 @@ sub updateTracksNote()
     else if m.online.link <> "" then
         shiftText = ""
         if m.online.shift <> 0 then shiftText = " Timing moved " + Str(m.online.shift).Trim() + "s."
-        notes.Push("Online subtitles on." + shiftText + " If they're out of sync, nudge them earlier or later (each nudge uses a download).")
-    else if m.online.candidates.Count() > 0 then
+        if savedShowing() then
+            notes.Push("Online subtitles on, saved for all your devices." + shiftText + " If they're out of sync, nudge them earlier or later.")
+        else
+            notes.Push("Online subtitles on." + shiftText + " If they're out of sync, nudge them earlier or later (each nudge uses a download).")
+        end if
+    else if SplitSavedCandidates(m.online.candidates).found.Count() > 0 then
         notes.Push("“Matches this file” means timed for your exact video.")
+    else if m.online.candidates.Count() > 0 then
+        notes.Push("“Saved for this title” came from an earlier download, on this or another device.")
     else if m.subOptions.Count() <= 2 then
         notes.Push("This file has no built-in subtitles.")
     end if

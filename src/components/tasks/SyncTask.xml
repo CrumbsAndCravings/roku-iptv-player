@@ -1,8 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  One round with the sync service (sync/worker.js): sends this Roku's Continue Watching
-  and removals, gets back the merged list from every device.
-  request { url, key, space, entries, removed } -> result { ok, state | error }
+  One request to the sync service (sync/worker.js). By request.mode:
+  - none: a Continue Watching round, sending this Roku's list and removals and getting
+    back the merged list from every device.
+    { url, key, space, entries, removed } -> { ok, state | error }
+  - "subtitle-get": the subtitles saved for a title ("m:<id>" or "e:<id>") by any device.
+    { url, key, space, title } -> { ok, title, found, fileId, name, delayMs, file }
+  - "subtitle-save": fetches a download from OpenSubtitles and saves it for the title.
+    { url, key, space, title, fileId, name, link } -> { ok, title, fileId, name, file }
+  - "subtitle-delay": saves a nudge of the title's saved subtitles.
+    { url, key, space, title, fileId, delayMs } -> { ok, title, file }
 -->
 <component name="SyncTask" extends="Task">
   <interface>
