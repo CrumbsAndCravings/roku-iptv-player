@@ -27,6 +27,13 @@ function PlaybackCheck(ext as String, videoCodec as String, videoProfile as Stri
     return result
 end function
 
+' What a poster or page marks as "won't play": nothing when the helper on a computer at
+' home converts what this Roku can't play.
+function WontPlay(check as Object) as String
+    if HelperOn() then return ""
+    return check.blocked
+end function
+
 function canDecode(kind as String, codec as String, profile as String) as Boolean
     if m.decodeCache = invalid then m.decodeCache = {}
     key = kind + "|" + codec + "|" + profile

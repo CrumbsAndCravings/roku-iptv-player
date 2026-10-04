@@ -102,15 +102,18 @@ end sub
 sub updateMovieCompat()
     item = m.item
     check = PlaybackCheck(item.ext, item.videoCodec, item.videoProfile, item.audioCodec)
-    item.problem = check.blocked
+    item.problem = WontPlay(check)
     m.compat.text = CompatLine(check, item.ext)
 end sub
 
 function CompatLine(check as Object, ext as String) as String
+    helper = HelperOn()
+    if check.blocked <> "" and helper then return "This " + DeviceWord() + " can't play this file itself, so the helper on your computer converts it while you watch."
     if check.blocked <> "" then
         if IsUnsupportedContainer(ext) then return "Won't play on this " + DeviceWord() + ": Roku devices can't play " + UCase(ext) + " files."
         return "Won't play on this " + DeviceWord() + ": it can't decode " + check.blocked + "."
     end if
+    if check.warning <> "" and helper then return "May not play fully on this " + DeviceWord() + ": it doesn't support " + check.warning + ". If it doesn't, the helper on your computer steps in."
     if check.warning <> "" then return "May not play fully on this " + DeviceWord() + ": it doesn't support " + check.warning + "."
     return ""
 end function
@@ -125,7 +128,7 @@ sub updateSeriesCompat()
         for e = 0 to season.GetChildCount() - 1
             ep = season.GetChild(e)
             check = PlaybackCheck(ep.ext, ep.videoCodec, ep.videoProfile, ep.audioCodec)
-            ep.problem = check.blocked
+            ep.problem = WontPlay(check)
             total = total + 1
             if check.blocked <> "" then
                 blockedCount = blockedCount + 1
@@ -137,6 +140,8 @@ sub updateSeriesCompat()
         m.compat.text = ""
     else if blockedCount = total then
         m.compat.text = reason
+    else if HelperOn() then
+        m.compat.text = blockedCount.ToStr() + " of " + total.ToStr() + " episodes can't play on this " + DeviceWord() + " itself, so the helper on your computer converts them while you watch."
     else
         m.compat.text = blockedCount.ToStr() + " of " + total.ToStr() + " episodes won't play on this " + DeviceWord() + ". They're marked in the list."
     end if

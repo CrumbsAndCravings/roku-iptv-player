@@ -37,6 +37,7 @@ sub ClearAccount()
     RegDelete("progress", "items")
     RegDelete("progress", "removed")
     RegDelete("opensubtitles", "account")
+    RegDelete("helper", "titles")
     DeleteFile(SearchCachePath())
 end sub
 
@@ -109,4 +110,17 @@ function SyncSpace(creds as Object) as String
     digest = CreateObject("roEVPDigest")
     digest.Setup("sha256")
     return LCase(Left(digest.Process(bytes), 16))
+end function
+
+' The helper on a computer at home that converts what this Roku can't play: { url, key }
+' from a personal build's account.json ("transcoder"), or invalid. Read once per
+' component.
+function TranscoderConfig() as Dynamic
+    if m.transcoderConfig = invalid then m.transcoderConfig = { value: TranscoderSettings(ParseJson(ReadAsciiFile("pkg:/source/account.json"))) }
+    return m.transcoderConfig.value
+end function
+
+' True when a helper is set up. Without one, everything plays as before.
+function HelperOn() as Boolean
+    return TranscoderConfig() <> invalid
 end function

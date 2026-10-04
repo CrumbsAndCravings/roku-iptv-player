@@ -17,3 +17,11 @@ end sub
 sub RegDelete(section as String, key as String)
     fakeRegistry().Delete(section + "/" + key)
 end sub
+
+' The helper (Registry.brs) is off unless a test switches it on with
+' GetGlobalAA().helperOn = true.
+function HelperOn() as Boolean
+    value = GetGlobalAA().helperOn
+    if type(value) = "Boolean" or type(value) = "roBoolean" then return value
+    return false
+end function

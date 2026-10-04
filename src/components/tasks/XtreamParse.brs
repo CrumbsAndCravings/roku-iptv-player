@@ -78,9 +78,10 @@ sub addMovieItem(row as Object, raw as Object)
     })
 end sub
 
-' Codec checks need the TV, so tasks only flag containers Roku never plays.
+' Codec checks need the TV, so tasks only flag containers Roku never plays, and none
+' at all when the helper on a computer at home converts them (HelperOn, Registry.brs).
 function containerProblem(ext as String) as String
-    if IsUnsupportedContainer(ext) then return UCase(ext) + " files"
+    if IsUnsupportedContainer(ext) and not HelperOn() then return UCase(ext) + " files"
     return ""
 end function
 

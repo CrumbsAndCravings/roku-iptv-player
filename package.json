@@ -7,7 +7,8 @@
     "build": "bsc",
     "deploy": "bsc --deploy --host $ROKU_HOST --password $ROKU_PASSWORD",
     "images": "python3 tools/make_images.py",
-    "test": "sh tools/test.sh"
+    "test": "sh tools/test.sh",
+    "helper-settings": "node tools/helper-settings.mjs"
   },
   "devDependencies": {
     "brighterscript": "^0.73.5",

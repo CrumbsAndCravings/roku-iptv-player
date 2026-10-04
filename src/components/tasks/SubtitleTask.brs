@@ -116,9 +116,11 @@ function osCheck() as Object
 end function
 
 function osFind(req as Object) as Object
-    hash = ""
+    ' The helper on a computer at home fingerprints the files it plays (req.hash); a
+    ' second connection to the provider during its playback would be one too many.
+    hash = FieldStr(req, "hash")
     videoUrl = FieldStr(req, "videoUrl")
-    if videoUrl <> "" then hash = fileHash(videoUrl)
+    if hash = "" and videoUrl <> "" and FieldStr(req, "via") <> "helper" then hash = fileHash(videoUrl)
 
     params = { languages: "en" }
     if hash <> "" then params.moviehash = hash

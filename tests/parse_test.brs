@@ -290,6 +290,22 @@ sub Main()
     RegDelete("progress", "items")
     check("cw empty", boolText(ContinueWatchingRow() = invalid), "true")
 
+    ' --- The helper: remembered titles and "won't play" marks
+    check("helper titles empty", FormatJson(HelperTitles()), "[]")
+    RememberHelperTitle("m:5")
+    RememberHelperTitle("e:9")
+    RememberHelperTitle("m:5")
+    check("helper titles saved", FormatJson(HelperTitles()), "[""m:5"",""e:9""]")
+    check("helper listed", boolText(HelperListed("e:9")), "true")
+    check("helper not listed", boolText(HelperListed("e:10")), "false")
+    RegWrite("helper", "titles", "{broken")
+    check("helper titles broken", FormatJson(HelperTitles()), "[]")
+    check("avi won't play", containerProblem("avi"), "AVI files")
+    GetGlobalAA().helperOn = true
+    check("avi through the helper", containerProblem("avi"), "")
+    GetGlobalAA().helperOn = false
+    check("mkv plays", containerProblem("mkv"), "")
+
     print ""
     if m.failures = 0 then
         print "ALL PASSED (" + m.count.ToStr() + " checks)"
