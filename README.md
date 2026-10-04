@@ -41,7 +41,7 @@ For other failures the player retries once without a format hint, then shows wha
 
 ## The helper on your computer
 
-The helper is a small program on a computer at home, switched on while you watch, that uses [FFmpeg](https://ffmpeg.org) to turn files the Roku can't play into a stream it can. It lives in the Samsung app's repo ([CrumbsAndCravings/Samsung-IPTV-Player](https://github.com/CrumbsAndCravings/Samsung-IPTV-Player), `helper/`, on the `claude/eloquent-babbage-g1bhzg` branch: helper 1.2, which also serves the iPhone app), and the Samsung TV, the iPhone and the Roku share it.
+The helper is a small program on a computer at home, switched on while you watch, that uses [FFmpeg](https://ffmpeg.org) to turn files the Roku can't play into a stream it can. It lives in the Samsung app's repo ([CrumbsAndCravings/Samsung-IPTV-Player](https://github.com/CrumbsAndCravings/Samsung-IPTV-Player), `helper/`, on its default branch: helper 1.2, which also serves the iPhone app), and the Samsung TV, the iPhone and the Roku share it.
 
 **What goes through it:**
 
@@ -62,7 +62,7 @@ The helper is a small program on a computer at home, switched on while you watch
 **Set it up on Windows (once):**
 
 1. Install FFmpeg: open PowerShell and run `winget install Gyan.FFmpeg`.
-2. Get the Samsung repo, switch to its `claude/eloquent-babbage-g1bhzg` branch, and follow its README's "The helper on your computer" section: put your provider's login in its `personal.json` and start the helper with `npm run helper` (or double-click `helper\start-helper.cmd`). The first time, it adds `"transcoder": { "url": ..., "key": ... }` (this computer's address and a random key) to that `personal.json`, and Windows asks whether Node.js may use the network: allow **private networks**.
+2. Get the Samsung repo (its default branch) and follow its README's "The helper on your computer" section: put your provider's login in its `personal.json` and start the helper with `npm run helper` (or double-click `helper\start-helper.cmd`). The first time, it adds `"transcoder": { "url": ..., "key": ... }` (this computer's address and a random key) to that `personal.json`, and Windows asks whether Node.js may use the network: allow **private networks**.
 3. Copy that `"transcoder"` part into this repo's `src/source/account.json`. `npm run helper-settings` does it for you when the Samsung repo sits next to this one (otherwise name it: `npm run helper-settings -- C:\path\to\Samsung-IPTV-Player`), keeping the rest of the file. By hand, it goes next to your login:
 
    ```json

@@ -487,7 +487,7 @@ Suggested order, most useful first:
 The helper on a computer at home (§15) needs no port: Samsung has it, and the Roku came second.
 
 ## 15. The helper on a computer at home
-New in 0.5.0; since 0.5.2 for the helper on the Samsung repo's `claude/eloquent-babbage-g1bhzg` branch (helper 1.2, which also serves the iPhone app). The helper is a small Node program in the Samsung repo (`helper/aranplus-helper.mjs`) that runs on a Windows computer at home and uses FFmpeg to convert what a TV can't play, while you watch. The Samsung TV takes it as one MPEG-TS stream (`/v1/stream`); Roku plays no endless MPEG-TS, so the Roku takes HLS (`/v1/hls/start`). The plan this followed is the Samsung repo's `docs/roku-helper-plan.md`.
+New in 0.5.0; since 0.5.2 for the helper on the Samsung repo's default branch (helper 1.2, which also serves the iPhone app). The helper is a small Node program in the Samsung repo (`helper/aranplus-helper.mjs`) that runs on a Windows computer at home and uses FFmpeg to convert what a TV can't play, while you watch. The Samsung TV takes it as one MPEG-TS stream (`/v1/stream`); Roku plays no endless MPEG-TS, so the Roku takes HLS (`/v1/hls/start`). The plan this followed is the Samsung repo's `docs/roku-helper-plan.md`.
 
 ### 15.1 Setup
 - The helper reads the provider login from its own `personal.json` and, on its first run, writes `"transcoder": { "url": "http://<this computer>:8090", "key": "<random>" }` there.
