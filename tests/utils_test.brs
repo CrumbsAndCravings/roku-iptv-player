@@ -331,6 +331,22 @@ sub Main()
     check("Episode prefix", prefix.Replace("Breaking Bad - S01E02 - Cat's in the Bag", ""), "Cat's in the Bag")
     check("Episode no prefix", prefix.Replace("Pilot", ""), "Pilot")
 
+    ' --- OpenSubtitles account: saved on this Roku, else the build's own
+    q = Chr(34)
+    built = OsAccountSettings({ opensubtitles: { apiKey: " k3y ", username: "jane", password: "pw" } })
+    check("os built-in key", built.apiKey, "k3y")
+    check("os built-in user", built.username, "jane")
+    check("os built-in none", ToStr(type(OsAccountSettings({ opensubtitles: { username: "jane" } }))), "Invalid")
+    check("os built-in missing", ToStr(type(OsAccountSettings(invalid))), "Invalid")
+    saved = "{" + q + "apiKey" + q + ":" + q + "tv" + q + "," + q + "username" + q + ":" + q + "sam" + q + "," + q + "token" + q + ":" + q + "t" + q + "}"
+    check("os saved wins", PickOsAccount(saved, built).apiKey, "tv")
+    check("os saved keeps token", PickOsAccount(saved, built).token, "t")
+    check("os nothing saved", PickOsAccount(invalid, built).apiKey, "k3y")
+    check("os broken saved", PickOsAccount("{broken", built).apiKey, "k3y")
+    check("os saved without key", PickOsAccount("{" + q + "username" + q + ":" + q + "sam" + q + "}", built).apiKey, "k3y")
+    check("os removed here", ToStr(type(PickOsAccount(FormatJson({ removed: true }), built))), "Invalid")
+    check("os none at all", ToStr(type(PickOsAccount(invalid, invalid))), "Invalid")
+
     ' --- The helper on a computer at home (Helper.brs)
     q = Chr(34)
     config = TranscoderSettings({ transcoder: { url: "http://192.168.1.20:8090//", key: "k/y&1 2" } })

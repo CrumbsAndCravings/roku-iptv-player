@@ -109,7 +109,7 @@ ROKU_HOST=192.168.1.50 ROKU_PASSWORD=yourpass npm run deploy   # build and insta
 npm run images    # regenerate icons, splash and gradients (needs Pillow)
 ```
 
-For a personal build that signs in by itself, put your login in `src/source/account.json` as `{"server": "...", "username": "...", "password": "..."}` before `npm run build`. Git ignores that file, so it never reaches the repo or the CI builds. The login screen also opens filled in with it after a sign-out. The same file holds `languages`, `sync` (see [`sync/`](sync/README.md)) and `transcoder` (see [the helper](#the-helper-on-your-computer)).
+For a personal build that signs in by itself, put your login in `src/source/account.json` as `{"server": "...", "username": "...", "password": "..."}` before `npm run build`. Git ignores that file, so it never reaches the repo or the CI builds. The login screen also opens filled in with it after a sign-out. The same file holds `languages`, `sync` (see [`sync/`](sync/README.md)), `transcoder` (see [the helper](#the-helper-on-your-computer)) and `opensubtitles` (`{"apiKey": "...", "username": "...", "password": "..."}`, used whenever the Roku has no OpenSubtitles account of its own, so it survives a reinstall or a sign-out).
 
 A 35 second vertical promo video, made from the app's own fonts, images and screens, is in [promo/](promo/README.md).
 

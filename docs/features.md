@@ -107,7 +107,7 @@ When the server answers anything other than 200, the error says who answered and
 
 ### 2.4 Account menu and sign-out
 - `*` on Home, everywhere except a Continue Watching poster (see 9.3), opens: **Keep watching**, **Online subtitles**, **Sign out**.
-- **Sign out** clears the login, Continue Watching, the OpenSubtitles account and the saved search library (`ClearAccount`), and stops the library worker.
+- **Sign out** clears the login, Continue Watching, the OpenSubtitles account and the saved search library (`ClearAccount`), and stops the library worker. A personal build's own OpenSubtitles account (§8) comes back by itself.
 
 ## 3. Being gentle with the provider
 New since 0.4.1. **Why:** one provider stopped answering for a while after about 100 requests in a minute; the Samsung app's M0 notes saw the same thing. During a block, sign-in and videos fail too, so every part of the app avoids bursts and stops asking once it is refused.
@@ -338,9 +338,14 @@ Additions since then:
 - Code: `screens/PlayerScreen.brs`, `common/Compat.brs`, `common/Tracks.brs`, `tasks/XtreamParse.brs` (`CodecFields`, `IsPictureCodec`).
 
 ## 8. Online subtitles
-Unchanged since 0.4.1; see `samsung-plan.md` §7.6. Samsung has it. Two points:
+Unchanged since 0.4.1 apart from where the account is kept; see `samsung-plan.md` §7.6. Samsung has it. Points:
 - **Save before checking.**
 - **Show OpenSubtitles' own words and HTTP code** in errors. Long errors replace the tips card, as on the login screen.
+- **Keeping the account** (new in 0.5.4). It's saved in the registry (`opensubtitles/account`), which a reinstall after deleting the channel, a cleared registry or a sign-out empties. So:
+  - A personal build can carry it in `account.json`: `"opensubtitles": { "apiKey", "username", "password" }` (`OsAccountSettings`). It's used whenever the registry has none (`PickOsAccount`), and a build with a different key or username replaces the saved one at launch (stamp in `opensubtitles/builtIn`, as for the built-in login).
+  - **Remove** saves `{ removed: true }`, so the build's own stays off too, until sign-out.
+  - Leaving the setup screen with Back keeps what was typed, unchecked (`keepTyped`).
+  - After saving, the screen reads the account back; if the Roku didn't keep it (an app's registry is about 16 KB), it says so instead of "Connected".
 
 ## 9. Continue Watching
 
@@ -438,7 +443,8 @@ Unchanged since 0.4.1; see `samsung-plan.md` §7.6. Samsung has it. Two points:
 | Built-in login stamp | registry `account/builtIn` = `"<server> <username>"` |
 | Player prefs (`prefs/player`) | `{ audio: lang, subtitles: lang \| "off" \| "online" }` |
 | Language prefs (`prefs/languages`) | `["en", "hi", "pa"]` |
-| OpenSubtitles (`opensubtitles/account`) | `{ apiKey, username, password, token, baseUrl }` |
+| OpenSubtitles (`opensubtitles/account`) | `{ apiKey, username, password, token, baseUrl }`, or `{ removed: true }` when turned off here |
+| Built-in OpenSubtitles (personal `account.json`) | `"opensubtitles": { "apiKey", "username", "password" }`; stamp `opensubtitles/builtIn` = `"<apiKey> <username>"` |
 | Removals (`progress/removed`) | `[{ k, at }]`, newest first, at most 100 |
 | Sync settings (personal `account.json`) | `"sync": { "url", "key" }` |
 | Helper settings (personal `account.json`) | `"transcoder": { "url", "key" }`, copied from the helper's own `personal.json` (§15) |

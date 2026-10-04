@@ -13,6 +13,17 @@ sub init()
     ' v0.1 kept Continue Watching here; its only entries came from a failed play.
     RegDelete("watch", "items")
 
+    ' A personal build with an OpenSubtitles account inside replaces the one saved here
+    ' when the build's own changes (a new key); otherwise the saved one stays.
+    os = BuiltInOsAccount()
+    if os <> invalid then
+        osStamp = os.apiKey + " " + os.username
+        if ToStr(RegRead("opensubtitles", "builtIn")) <> osStamp then
+            SaveOsAccount(os)
+            RegWrite("opensubtitles", "builtIn", osStamp)
+        end if
+    end if
+
     creds = LoadCreds()
     ' A personal build with a different login inside replaces the saved login (and its
     ' Continue Watching, which belongs to the old provider). Online subtitles stay.

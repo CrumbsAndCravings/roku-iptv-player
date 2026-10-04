@@ -21,6 +21,7 @@ sub init()
     end if
     m.index = 0
     m.busy = false
+    m.dirty = false
     m.task = invalid
 
     fields = m.top.FindNode("fields")
@@ -133,11 +134,20 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
             save()
         end if
     else if key = "back" then
+        keepTyped()
         return false
     end if
     render()
     return true
 end function
+
+' Leaving without "Save and check" keeps what was typed (checked the next time it's
+' used), so nothing has to be typed again.
+sub keepTyped()
+    if not m.dirty or m.values[0] = "" then return
+    SaveOsAccount({ apiKey: m.values[0], username: m.values[1], password: m.values[2] })
+    m.dirty = false
+end sub
 
 sub openKeyboard(index as Integer)
     dialog = CreateObject("roSGNode", "StandardKeyboardDialog")
@@ -157,7 +167,9 @@ sub onKeyboardButton()
     dialog = m.top.GetScene().dialog
     if dialog = invalid then return
     if dialog.buttonSelected = 0 then
-        m.values[m.editing] = dialog.text.Trim()
+        text = dialog.text.Trim()
+        if text <> m.values[m.editing] then m.dirty = true
+        m.values[m.editing] = text
         showStatus("", true)
         if m.editing < 2 then m.index = m.editing + 1
     end if
@@ -185,10 +197,15 @@ sub save()
     end if
     ' Keep what was typed even if the check fails, so nothing has to be retyped.
     SaveOsAccount({ apiKey: apiKey, username: username, password: password })
+    m.dirty = false
     m.hasAccount = true
     buildButtons()
+    if keptHere(apiKey, username) then
+        showStatus("Saved. Checking with OpenSubtitles…", true)
+    else
+        showStatus(notKeptText() + " They're being checked for now.", false)
+    end if
     m.busy = true
-    showStatus("Saved. Checking with OpenSubtitles…", true)
     m.task = CreateObject("roSGNode", "SubtitleTask")
     m.task.request = { mode: "login", account: { apiKey: apiKey, username: username, password: password } }
     m.task.ObserveField("result", "onChecked")
@@ -209,6 +226,11 @@ sub onChecked(event as Object)
     SaveOsAccount(account)
     m.hasAccount = true
     buildButtons()
+    if not keptHere(FieldStr(account, "apiKey"), FieldStr(account, "username")) then
+        showStatus("The details work, but " + LCase(Left(notKeptText(), 1)) + Mid(notKeptText(), 2), false)
+        render()
+        return
+    end if
     allowed = ToInt(result.allowed)
     if result.name <> "" then
         text = "Connected as " + result.name + "."
@@ -220,8 +242,18 @@ sub onChecked(event as Object)
     render()
 end sub
 
+' Reads the account back: a Roku can refuse to keep it (an app's storage is about 16 KB).
+function keptHere(apiKey as String, username as String) as Boolean
+    kept = LoadOsAccount()
+    return kept <> invalid and FieldStr(kept, "apiKey") = apiKey and FieldStr(kept, "username") = username
+end function
+
+function notKeptText() as String
+    return "This Roku didn't keep these details, so they'll be gone next time. Its storage for ARAN+ may be full: removing a few titles from Continue Watching makes room."
+end function
+
 sub remove()
-    RegDelete("opensubtitles", "account")
+    RemoveOsAccount()
     m.values = ["", "", ""]
     m.hasAccount = false
     m.index = 0
