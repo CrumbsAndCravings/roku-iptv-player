@@ -134,6 +134,7 @@ function ParseOsResults(data as Dynamic) as Object
 end function
 
 function SubtitleLabel(candidate as Object) as String
+    if ToStr(candidate.saved) = "true" then return "English · saved for this title"
     if candidate.hashMatch then
         label = "English · matches this file"
     else
@@ -145,4 +146,38 @@ function SubtitleLabel(candidate as Object) as String
     if candidate.sdh then label = label + " · SDH"
     if candidate.machine then label = label + " · auto-translated"
     return label
+end function
+
+' --- Subtitles saved for a title on the sync service (sync/worker.js) ----------------
+
+' What the sync service keeps for a title ({ fileId, name, delayMs, file }) as a choice in
+' the Subtitles column.
+function SavedCandidate(saved as Object) as Object
+    return { fileId: saved.fileId, release: saved.name, hashMatch: false, machine: false, sdh: false, downloads: 0, saved: true }
+end function
+
+' The column's online choices: the saved ones first, then search results that aren't
+' the same file. -> { saved, found }
+function SplitSavedCandidates(candidates as Object) as Object
+    saved = []
+    found = []
+    for each candidate in candidates
+        if ToStr(candidate.saved) = "true" then saved.Push(candidate)
+    end for
+    for each candidate in candidates
+        if ToStr(candidate.saved) <> "true" then
+            same = false
+            for each kept in saved
+                if kept.fileId = candidate.fileId then same = true
+            end for
+            if not same then found.Push(candidate)
+        end if
+    end for
+    return { saved: saved, found: found }
+end function
+
+' The saved file's address, moved `delayMs` later (earlier when negative) by the service.
+function SavedSubtitleUrl(file as String, delayMs as Integer) as String
+    if delayMs = 0 then return file
+    return file + "&delay=" + delayMs.ToStr()
 end function

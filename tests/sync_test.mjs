@@ -1,5 +1,5 @@
 // Off-device tests for the sync Worker (sync/worker.js), run with Node.
-import worker, { merge } from "../sync/worker.js";
+import worker, { merge, moveCues } from "../sync/worker.js";
 
 let failures = 0;
 let count = 0;
@@ -62,6 +62,54 @@ check("spaces kept apart", (await res2.json()).removed, []);
 check("cors preflight", res.headers.get("Access-Control-Allow-Origin"), "*");
 res = await worker.fetch(new Request("https://sync.example/v1/progress"), { ARANPLUS: env.ARANPLUS });
 check("missing secret explained", res.status, 500);
+
+// Saved subtitles
+const SPACE = "abc123def4567890";
+const subs = (method, query, body, key = "secret-key") =>
+  worker.fetch(new Request("https://sync.example/v1/subtitles?space=" + SPACE + query, { method, headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined }), env);
+const SRT = "1\n00:00:01,000 --> 00:00:02,500\nHello\n";
+res = await subs("GET", "&k=m:7", undefined, "wrong");
+check("subtitles need the key", res.status, 401);
+res = await subs("GET", "&k=m:7");
+check("none saved to start", await res.json(), { found: false });
+res = await subs("GET", "&k=x:7");
+check("odd title refused", res.status, 400);
+res = await subs("POST", "&k=e:42", { fileId: "9001", name: "Show.S01E02.WEB", delayMs: 0, text: SRT });
+const saved = await res.json();
+check("saved", [res.status, saved.fileId, saved.name, saved.delayMs, "text" in saved], [200, "9001", "Show.S01E02.WEB", 0, false]);
+res = await subs("GET", "&k=e:42");
+let got = await res.json();
+check("another device gets them", [got.found, got.fileId, got.text], [true, "9001", SRT]);
+check("with the file's address", got.file.startsWith("https://sync.example/v1/subtitles/file?space=" + SPACE + "&k=e%3A42&t="), true);
+res = await subs("GET", "&k=e:42&text=0");
+check("text left out when asked", "text" in (await res.json()), false);
+res = await worker.fetch(new Request(got.file), env);
+check("file without the key", [res.status, await res.text()], [200, SRT]);
+res = await worker.fetch(new Request(got.file + "&delay=1500"), env);
+check("file moved later", (await res.text()).split("\n")[1], "00:00:02,500 --> 00:00:04,000");
+res = await worker.fetch(new Request(got.file.replace(/t=[0-9a-f]+/, "t=" + "0".repeat(32))), env);
+check("wrong token refused", res.status, 404);
+res = await subs("POST", "&k=e:42", { fileId: "9001", delayMs: -1000 });
+check("nudge saved", (await res.json()).delayMs, -1000);
+res = await subs("GET", "&k=e:42");
+got = await res.json();
+check("nudge kept the file", [got.delayMs, got.text], [-1000, SRT]);
+res = await subs("POST", "&k=e:42", { fileId: "1234", delayMs: 500 });
+check("nudge for other subtitles refused", res.status, 404);
+res = await subs("POST", "&k=e:42", { fileId: "9002", name: "Other", delayMs: 0, text: "" });
+check("empty file refused", res.status, 400);
+res = await subs("POST", "&k=e:42", { fileId: "9002", name: "Other", text: "x".repeat(3 * 1024 * 1024 + 1) });
+check("huge file refused", res.status, 400);
+res = await subs("POST", "&k=e:42", { fileId: "9002", name: "Better.Match", text: SRT + "\n2\n00:00:03,000 --> 00:00:04,000\nAgain\n" });
+check("new choice replaces", (await res.json()).fileId, "9002");
+res = await worker.fetch(new Request(got.file), env);
+check("old address stops working", res.status, 404);
+res = await subs("GET", "&k=m:42");
+check("titles kept apart", (await res.json()).found, false);
+check("move cues earlier stops at 0", moveCues("00:00:01,000 --> 00:00:02,000", -1500), "00:00:00,000 --> 00:00:00,500");
+check("move cues past an hour", moveCues("00:59:59,500 --> 01:00:00,000", 1000), "01:00:00,500 --> 01:00:01,000");
+check("move webvtt cues", moveCues("WEBVTT\n\n00:01.000 --> 00:02.000", 250), "WEBVTT\n\n00:01.250 --> 00:02.250");
+check("text lines untouched", moveCues("Meet at 10:00:00,000 sharp", 1000), "Meet at 10:00:00,000 sharp");
 
 if (failures === 0) {
   console.log(`ALL PASSED (${count} checks)`);

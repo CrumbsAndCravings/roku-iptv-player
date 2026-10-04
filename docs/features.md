@@ -1,6 +1,6 @@
 # ARAN+ feature reference
 
-Every feature of ARAN+ for Roku as of **v0.5.2** (sync added after commit `8d861e1`; the helper on a computer at home, §15, in 0.5.0, and its whole-film playlists in 0.5.2). Each feature lists what it does, the exact rules and numbers, why it works that way, and where the Roku code lives. Use it as the checklist and spec for bringing the Samsung app ([CrumbsAndCravings/Samsung-IPTV-Player](https://github.com/CrumbsAndCravings/Samsung-IPTV-Player)) up to the same level.
+Every feature of ARAN+ for Roku as of **v0.5.3** (sync added after commit `8d861e1`; the helper on a computer at home, §15, in 0.5.0, and its whole-film playlists in 0.5.2; subtitles saved for every device, §9.5, in 0.5.3). Each feature lists what it does, the exact rules and numbers, why it works that way, and where the Roku code lives. Use it as the checklist and spec for bringing the Samsung app ([CrumbsAndCravings/Samsung-IPTV-Player](https://github.com/CrumbsAndCravings/Samsung-IPTV-Player)) up to the same level.
 
 - **Build plan for Samsung:** [`samsung-plan.md`](samsung-plan.md). That plan covers parity with Roku v0.4.1; everything added since then is in this document, marked **New since 0.4.1**.
 - **User-facing summary:** [`../README.md`](../README.md).
@@ -384,6 +384,15 @@ Unchanged since 0.4.1; see `samsung-plan.md` §7.6. Samsung has it. Two points:
 - **Setup on a device:** `"sync": { "url": "https://aranplus-sync.<sub>.workers.dev", "key": "…" }` in the git-ignored `account.json`. With no `sync`, nothing changes.
 - **Code:** `common/Progress.brs` (`ProgressRemovedList`, `MergeProgress`, `ProgressSave`), `common/Utils.brs` (`SyncSpaceText`), `common/Registry.brs` (`SyncConfig`, `SyncSpace`), `tasks/SyncTask.*`, `MainScene.brs` (`requestSync`, `onSynced`), `sync/worker.js`.
 - **Samsung/iPhone:** port `SyncSpaceText` and `MergeProgress` with their tests, compute SHA-256 with Web Crypto (`crypto.subtle.digest`), and sync at the same moments.
+
+### 9.5 Online subtitles saved for every device (new in 0.5.3)
+- **What:** a download from OpenSubtitles on any device (this Roku, the Samsung TV, the iPhone) is saved on the sync service for that movie or episode, nudges included, so every other device shows it without a download, and without an OpenSubtitles account.
+- **Storage:** one file per title (`m:<streamId>` or `e:<episodeId>`, as `itemKey()`), under `subs:<space>:<title>` in the Worker's KV, kept a year after it was last saved, up to 3 MB. Choosing other subtitles replaces it.
+- **API:** `GET /v1/subtitles?space&k` (`&text=0` leaves the file out), `POST` with `{ fileId, name, delayMs, text }` to save, or `{ fileId, delayMs }` for a nudge; `GET /v1/subtitles/file?space&k&t=<token>&delay=<ms>` serves the file, moved by `delay`, with its own token instead of the key, because Roku's player fetches subtitles by address and can't send headers.
+- **When the Roku shows them by itself:** where the subtitle preference is "online" (after built-in English ones) or not chosen yet (""); never over "off" or a built-in language. The column lists them first as "English · saved for this title", even without an OpenSubtitles account.
+- **The Roku's way:** `lookUpSaved()` asks the service as each video starts; `autoSubtitles()` waits for the answer if it's still out. Saved subtitles play from the service's address (`SavedSubtitleUrl`), and nudges change `delay` there, so on the Roku they no longer use a download either. A fresh download (not one moved by OpenSubtitles) is fetched once more by `SyncTask` and saved (`shareSubtitle`).
+- **Code:** `sync/worker.js` (`subtitles`, `subtitleFile`, `moveCues`), `tasks/SyncTask.*` (modes `subtitle-get`, `subtitle-save`, `subtitle-delay`), `common/Subtitles.brs` (`SavedCandidate`, `SplitSavedCandidates`, `SavedSubtitleUrl`, tested), `screens/PlayerScreen.brs` (`lookUpSaved`, `showSaved`, `shareSubtitle`, `nudgeSaved`).
+- **Setup:** the Worker needs updating once (`sync/README.md`, "Update it"); until then the service answers 404 to these requests and every device behaves as before.
 
 ## 10. Look and feel
 - **Palette:**
