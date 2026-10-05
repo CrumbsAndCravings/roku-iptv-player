@@ -80,14 +80,17 @@ end sub
 function onKeyEvent(key as String, press as Boolean) as Boolean
     if not press or m.busy then return true
     if key = "up" and m.index > 0 then
+        Sound("move")
         m.index = m.index - 1
         render()
         return true
     else if key = "down" and m.index < 3 then
+        Sound("move")
         m.index = m.index + 1
         render()
         return true
     else if key = "OK" then
+        Sound("select")
         if m.index < 3 then
             openKeyboard(m.index)
         else

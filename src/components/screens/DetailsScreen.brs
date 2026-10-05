@@ -19,6 +19,7 @@ sub init()
     m.backdropIn = m.top.FindNode("backdropIn")
     m.backdropFade = m.top.FindNode("backdropFade")
     m.backdropTarget = 1.0
+    m.settled = false
     m.backdrop.ObserveField("loadStatus", "onBackdropLoaded")
 
     m.title.font = MakeFont("Fredoka-SemiBold", 42)
@@ -41,6 +42,11 @@ sub init()
     m.task = invalid
 
     m.episodes.ObserveField("itemSelected", "onEpisodeSelected")
+    m.episodes.ObserveField("itemFocused", "onEpisodeFocused")
+end sub
+
+sub onEpisodeFocused()
+    MovedSound(m.episodes, m.episodes.itemFocused)
 end sub
 
 sub onItem()
@@ -49,6 +55,13 @@ sub onItem()
     m.item = item
     m.kind = item.kind
     showInfo()
+    ' The words come up one line after another as the page rises.
+    delay = 0.08
+    for each part in [m.title, m.meta, m.plot, m.credits, m.buttonsGroup]
+        part.opacity = 0.0
+        Tween(part, "opacity", [0.0, 1.0], 0.45, "outQuad", delay)
+        delay = delay + 0.04
+    end for
     if m.kind = "movie" then
         buildMovieButtons()
         updateMovieCompat()
@@ -83,6 +96,11 @@ sub onBackdropLoaded()
     if m.backdrop.loadStatus <> "ready" then return
     m.backdropFade.keyValue = [0.0, m.backdropTarget]
     m.backdropIn.control = "start"
+    ' The first picture settles from a little bigger as it fades in.
+    if not m.settled then
+        m.settled = true
+        Tween(m.backdrop, "scale", [[1.06, 1.06], [1.0, 1.0]], 1.6, "outCubic", 0)
+    end if
 end sub
 
 ' --- Movies ------------------------------------------------------------------
@@ -304,6 +322,7 @@ sub onEpisodeSelected()
     if ep = invalid then return
     index = queueIndexOf(ep.itemId)
     if index < 0 then return
+    Sound("select")
     startAt = 0
     if m.entry <> invalid and FieldStr(m.entry, "id") = ep.itemId then startAt = ToInt(m.entry.pos)
     playEpisode(index, startAt)
@@ -443,14 +462,17 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
             if key = "left" then delta = -1
             target = m.seasonIndex + delta
             if target >= 0 and target < m.seasonPills.Count() then
+                Sound("move")
                 showSeason(target)
                 m.episodes.jumpToItem = 0
             end if
             return true
         else if key = "up" then
+            Sound("move")
             enterZone("seasons")
             return true
         else if key = "back" then
+            Sound("back")
             enterZone("buttons")
             return true
         end if
@@ -459,12 +481,22 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
 
     if m.zone = "seasons" then
         if key = "left" and m.seasonIndex > 0 then
+            Sound("move")
             showSeason(m.seasonIndex - 1)
         else if key = "right" and m.seasonIndex < m.seasonPills.Count() - 1 then
+            Sound("move")
             showSeason(m.seasonIndex + 1)
         else if key = "down" or key = "OK" then
-            if m.episodes.content <> invalid and m.episodes.content.GetChildCount() > 0 then enterZone("episodes")
+            if m.episodes.content <> invalid and m.episodes.content.GetChildCount() > 0 then
+                Sound("move")
+                enterZone("episodes")
+            end if
         else if key = "up" or key = "back" then
+            if key = "back" then
+                Sound("back")
+            else
+                Sound("move")
+            end if
             enterZone("buttons")
         end if
         return true
@@ -472,18 +504,23 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
 
     ' Buttons
     if key = "left" and m.buttonIndex > 0 then
+        Sound("move")
         m.buttonIndex = m.buttonIndex - 1
         styleButtons()
     else if key = "right" and m.buttonIndex < m.pills.Count() - 1 then
+        Sound("move")
         m.buttonIndex = m.buttonIndex + 1
         styleButtons()
     else if key = "OK" then
+        Sound("select")
         activateButton()
     else if key = "play" then
+        Sound("select")
         m.buttonIndex = 0
         styleButtons()
         activateButton()
     else if key = "down" and hasEpisodes() then
+        Sound("move")
         enterZone("seasons")
     else if key = "back" then
         return false

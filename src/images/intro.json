@@ -1,0 +1,43 @@
+{
+ "letters": [
+  {
+   "uri": "pkg:/images/intro_a.png",
+   "x": -32,
+   "y": -32,
+   "w": 151,
+   "h": 215
+  },
+  {
+   "uri": "pkg:/images/intro_r.png",
+   "x": 57,
+   "y": -32,
+   "w": 139,
+   "h": 215
+  },
+  {
+   "uri": "pkg:/images/intro_a.png",
+   "x": 134,
+   "y": -32,
+   "w": 151,
+   "h": 215
+  },
+  {
+   "uri": "pkg:/images/intro_n.png",
+   "x": 223,
+   "y": -32,
+   "w": 148,
+   "h": 215
+  }
+ ],
+ "fontSize": 124,
+ "plus": {
+  "x": 319,
+  "y": 9,
+  "w": 138,
+  "h": 138,
+  "size": 74,
+  "flashPad": 4
+ },
+ "width": 425,
+ "height": 121
+}

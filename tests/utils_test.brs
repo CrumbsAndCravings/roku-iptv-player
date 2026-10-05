@@ -331,6 +331,22 @@ sub Main()
     check("Episode prefix", prefix.Replace("Breaking Bad - S01E02 - Cat's in the Bag", ""), "Cat's in the Bag")
     check("Episode no prefix", prefix.Replace("Pilot", ""), "Pilot")
 
+    ' --- OpenSubtitles account: saved on this Roku, else the build's own
+    q = Chr(34)
+    built = OsAccountSettings({ opensubtitles: { apiKey: " k3y ", username: "jane", password: "pw" } })
+    check("os built-in key", built.apiKey, "k3y")
+    check("os built-in user", built.username, "jane")
+    check("os built-in none", ToStr(type(OsAccountSettings({ opensubtitles: { username: "jane" } }))), "Invalid")
+    check("os built-in missing", ToStr(type(OsAccountSettings(invalid))), "Invalid")
+    saved = "{" + q + "apiKey" + q + ":" + q + "tv" + q + "," + q + "username" + q + ":" + q + "sam" + q + "," + q + "token" + q + ":" + q + "t" + q + "}"
+    check("os saved wins", PickOsAccount(saved, built).apiKey, "tv")
+    check("os saved keeps token", PickOsAccount(saved, built).token, "t")
+    check("os nothing saved", PickOsAccount(invalid, built).apiKey, "k3y")
+    check("os broken saved", PickOsAccount("{broken", built).apiKey, "k3y")
+    check("os saved without key", PickOsAccount("{" + q + "username" + q + ":" + q + "sam" + q + "}", built).apiKey, "k3y")
+    check("os removed here", ToStr(type(PickOsAccount(FormatJson({ removed: true }), built))), "Invalid")
+    check("os none at all", ToStr(type(PickOsAccount(invalid, invalid))), "Invalid")
+
     ' --- The helper on a computer at home (Helper.brs)
     q = Chr(34)
     config = TranscoderSettings({ transcoder: { url: "http://192.168.1.20:8090//", key: "k/y&1 2" } })
@@ -440,6 +456,26 @@ sub Main()
     end for
     checkInt("titles capped", AddHelperTitle(many, "e:9").Count(), 200)
     checkInt("titles from nothing", AddHelperTitle(invalid, "m:7").Count(), 1)
+
+    ' Motion: the web app's spring and jelly curves, and values along them
+    spring = SpringCurve()
+    jelly = JellyCurve()
+    checkInt("SpringCurve keys", spring.Count(), 49)
+    checkInt("JellyCurve keys", jelly.Count(), 49)
+    check("SpringCurve ends", boolText(spring[0] = 0 and spring[48] = 1), "true")
+    check("JellyCurve ends", boolText(jelly[0] = 0 and jelly[48] = 1), "true")
+    peak = 0
+    for each t in spring
+        if t > peak then peak = t
+    end for
+    check("SpringCurve overshoots a touch", boolText(peak > 1.05 and peak < 1.1), "true")
+    numbers = CurveValues(10, 30, [0, 0.5, 1])
+    checkInt("CurveValues numbers", ToInt(numbers[0]) * 10000 + ToInt(numbers[1]) * 100 + ToInt(numbers[2]), 102030)
+    pairs = CurveValues([0, 4], [10, 8], [0, 0.5, 1])
+    checkInt("CurveValues pairs", pairs.Count(), 3)
+    checkInt("CurveValues pair middle", ToInt(pairs[1][0]) * 10 + ToInt(pairs[1][1]), 56)
+    sizes = ScaleValues(PopCurve())
+    check("ScaleValues even", boolText(sizes[2][0] = sizes[2][1] and sizes[2][0] > 1), "true")
 
     print ""
     if m.failures = 0 then

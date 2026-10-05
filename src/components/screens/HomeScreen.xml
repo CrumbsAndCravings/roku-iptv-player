@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Hero banner for the focused title, a tab bar (Home / Movies / Series) and rows of posters.
-  Layout is for a 1280x720 UI.
+  Hero banner for the focused title, a glass tab bar (Home / Movies / Series / Categories /
+  Search) and rows of posters. Layout is for a 1280x720 UI.
 -->
 <component name="HomeScreen" extends="Group">
   <interface>
@@ -10,7 +10,8 @@
   </interface>
   <children>
     <Rectangle width="1280" height="720" color="0x151028FF" />
-    <Poster id="backdrop" translation="[340, 0]" width="940" height="529" loadWidth="940" loadHeight="529" loadDisplayMode="scaleToZoom" />
+    <!-- Settles from a little bigger as it fades in; grows from its left edge, which the fade covers. -->
+    <Poster id="backdrop" translation="[340, 0]" width="940" height="529" loadWidth="940" loadHeight="529" loadDisplayMode="scaleToZoom" scaleRotateCenter="[0, 264]" />
     <Poster translation="[340, 0]" width="440" height="540" uri="pkg:/images/fade_left.png" />
     <Poster translation="[320, 280]" width="960" height="260" uri="pkg:/images/fade_bottom.png" />
     <Rectangle translation="[0, 528]" width="1280" height="192" color="0x151028FF" />
@@ -22,8 +23,35 @@
 
     <Poster translation="[48, 27]" uri="pkg:/images/logo.png" width="110" height="40" />
     <Poster translation="[164, 22]" uri="pkg:/images/sparkle.png" width="14" height="14" blendColor="0xFFD98AFF" />
-    <Poster id="tabHighlight" translation="[232, 26]" uri="pkg:/images/pill.9.png" width="0" height="38" blendColor="0x30275AFF" />
-    <Group id="tabs" translation="[232, 26]" />
+
+    <!--
+      The tab bar: floating glass, as in the web app (tools/make_images.py draws it). A
+      glass lens rests on the current tab; with the bar focused it's lit lavender and
+      springs from tab to tab, stretching as it goes. The tab names inside the lens are a
+      second, dark copy (lensView), clipped to the lens, so the lens shows them dark
+      wherever it is. OK swells the bar and lifts the lens (HomeScreen.brs, styleTabs).
+      Slots are 112 wide, 4 in from the bar's ends.
+    -->
+    <Group id="tabBar" translation="[204, 23]" scaleRotateCenter="[284, 24]">
+      <Poster translation="[-40, -40]" width="648" height="128" uri="pkg:/images/glass_shadow.png" />
+      <Poster width="568" height="48" uri="pkg:/images/glass_bar.png" />
+      <Group id="lens" translation="[4, 4]">
+        <Group id="lensShape" scaleRotateCenter="[56, 20]">
+          <Poster id="lensClear" width="112" height="40" uri="pkg:/images/lens_fill.png" opacity="0.1" />
+          <Poster id="lensLit" width="112" height="40" uri="pkg:/images/lens_fill.png" blendColor="0xC9B8FFFF" opacity="0" />
+        </Group>
+      </Group>
+      <Group id="tabLabels" />
+      <Group id="lensTop" translation="[4, 4]">
+        <Group clippingRect="[0, 0, 112, 40]">
+          <Group id="lensView" translation="[-4, -4]" opacity="0" />
+        </Group>
+        <Group id="lensShine" scaleRotateCenter="[56, 20]">
+          <Poster id="lensGlass" width="112" height="40" uri="pkg:/images/lens_glass.png" opacity="0.6" />
+          <Poster id="lensRim" width="112" height="40" uri="pkg:/images/lens_rim.png" opacity="0.3" />
+        </Group>
+      </Group>
+    </Group>
     <!-- Takes focus while the tab bar is active; its keys bubble up to this screen. -->
     <Group id="navKeys" />
 
@@ -53,25 +81,15 @@
 
     <Timer id="heroTimer" duration="0.6" repeat="false" />
 
-    <!-- The banner floats up and fades in for each new title. -->
-    <Animation id="heroIn" duration="0.35" easeFunction="outCubic">
-      <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[0.0, 1.0]" fieldToInterp="hero.opacity" />
-      <Vector2DFieldInterpolator key="[0.0, 1.0]" keyValue="[[48, 126], [48, 112]]" fieldToInterp="hero.translation" />
-    </Animation>
     <Animation id="backdropIn" duration="0.5" easeFunction="outQuad">
       <FloatFieldInterpolator id="backdropFade" key="[0.0, 1.0]" keyValue="[0.0, 1.0]" fieldToInterp="backdrop.opacity" />
-    </Animation>
-    <!-- The tab highlight glides to the chosen tab. -->
-    <Animation id="tabSlide" duration="0.22" easeFunction="outCubic">
-      <Vector2DFieldInterpolator id="tabSlidePos" key="[0.0, 1.0]" fieldToInterp="tabHighlight.translation" />
-      <FloatFieldInterpolator id="tabSlideWidth" key="[0.0, 1.0]" fieldToInterp="tabHighlight.width" />
     </Animation>
   </children>
   <script type="text/brightscript" uri="pkg:/components/common/Utils.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Registry.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Compat.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Progress.brs" />
-  <script type="text/brightscript" uri="pkg:/components/common/Pills.brs" />
+  <script type="text/brightscript" uri="pkg:/components/common/Motion.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Categories.brs" />
   <script type="text/brightscript" uri="pkg:/components/screens/HomeScreen.brs" />
 </component>

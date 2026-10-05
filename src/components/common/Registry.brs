@@ -57,17 +57,27 @@ sub SavePref(key as String, value as String)
 end sub
 
 ' OpenSubtitles account: { apiKey, username, password, token, baseUrl }. Stays on the TV.
+' When this Roku has none (a new install, a cleared registry, after signing out), a
+' personal build's own account.json "opensubtitles" is used (PickOsAccount).
 function LoadOsAccount() as Dynamic
-    raw = RegRead("opensubtitles", "account")
-    if raw = invalid then return invalid
-    account = ParseJson(raw)
-    if not IsAA(account) or FieldStr(account, "apiKey") = "" then return invalid
-    return account
+    return PickOsAccount(RegRead("opensubtitles", "account"), BuiltInOsAccount())
 end function
 
 sub SaveOsAccount(account as Object)
     RegWrite("opensubtitles", "account", FormatJson(account))
 end sub
+
+' Turns online subtitles off on this Roku, the build's own account too, until sign-out.
+sub RemoveOsAccount()
+    RegWrite("opensubtitles", "account", FormatJson({ removed: true }))
+end sub
+
+' The OpenSubtitles account built into this package, or invalid. Read once per
+' component.
+function BuiltInOsAccount() as Dynamic
+    if m.builtInOs = invalid then m.builtInOs = { value: OsAccountSettings(ParseJson(ReadAsciiFile("pkg:/source/account.json"))) }
+    return m.builtInOs.value
+end function
 
 ' A login built into this package (src/source/account.json, which git ignores), so a
 ' personal build can sign in by itself. invalid when there isn't one.

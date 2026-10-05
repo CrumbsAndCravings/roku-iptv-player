@@ -44,5 +44,6 @@
     <Timer id="debounce" duration="0.35" repeat="false" />
   </children>
   <script type="text/brightscript" uri="pkg:/components/common/Utils.brs" />
+  <script type="text/brightscript" uri="pkg:/components/common/Motion.brs" />
   <script type="text/brightscript" uri="pkg:/components/screens/SearchScreen.brs" />
 </component>

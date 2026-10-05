@@ -35,5 +35,6 @@
   <script type="text/brightscript" uri="pkg:/components/common/Utils.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Registry.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Pills.brs" />
+  <script type="text/brightscript" uri="pkg:/components/common/Motion.brs" />
   <script type="text/brightscript" uri="pkg:/components/screens/SubtitleSetupScreen.brs" />
 </component>

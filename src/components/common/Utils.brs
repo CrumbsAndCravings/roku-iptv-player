@@ -246,7 +246,7 @@ end function
 
 ' How ARAN+ introduces itself when a provider turns away requests that say "Roku".
 function AppUserAgent() as String
-    return "ARANplus/0.5.2"
+    return "ARANplus/0.5.6"
 end function
 
 ' A plain desktop web browser, for providers whose servers only answer browsers (a
@@ -548,6 +548,30 @@ function TranscoderSettings(data as Dynamic) as Dynamic
         url = Left(url, Len(url) - 1)
     end while
     return { url: url, key: key }
+end function
+
+' The OpenSubtitles account a personal build carries (account.json "opensubtitles":
+' { apiKey, username, password }), or invalid.
+function OsAccountSettings(data as Dynamic) as Dynamic
+    settings = Field(data, "opensubtitles")
+    apiKey = FieldStr(settings, "apiKey")
+    if apiKey = "" then return invalid
+    return { apiKey: apiKey, username: FieldStr(settings, "username"), password: FieldStr(settings, "password") }
+end function
+
+' Which OpenSubtitles account to use: the one saved on this Roku (`saved`, the
+' registry's text), else the build's own (`builtIn`), unless it was removed here on
+' purpose ({ removed: true } saved). invalid for none.
+function PickOsAccount(saved as Dynamic, builtIn as Dynamic) as Dynamic
+    if saved <> invalid then
+        account = ParseJson(ToStr(saved))
+        if IsAA(account) then
+            if FieldStr(account, "apiKey") <> "" then return account
+            if FieldStr(account, "removed") = "true" then return invalid
+        end if
+    end if
+    if IsAA(builtIn) and FieldStr(builtIn, "apiKey") <> "" then return builtIn
+    return invalid
 end function
 
 ' 1234567 -> "1,234,567"

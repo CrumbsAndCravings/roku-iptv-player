@@ -6,6 +6,7 @@ sub init()
     m.rows.rowLabelFont = MakeFont("Fredoka-Medium", 21)
     m.counts = {}
     m.rows.ObserveField("rowItemSelected", "onSelected")
+    m.rows.ObserveField("rowItemFocused", "onMoved")
     ' Title counts come from the library stored on the Roku.
     m.task = LibraryTask()
     m.task.ObserveFieldScoped("counts", "onCounts")
@@ -119,6 +120,10 @@ function inList(list as Object, value as String) as Boolean
     return false
 end function
 
+sub onMoved()
+    MovedSound(m.rows, m.rows.rowItemFocused)
+end sub
+
 sub onSelected()
     root = m.rows.content
     selected = m.rows.rowItemSelected
@@ -129,6 +134,7 @@ sub onSelected()
     if item = invalid then return
     kindName = "Movies"
     if item.listKind = "series" then kindName = "Series"
+    Sound("select")
     m.top.action = { name: "openCategory", category: { kind: item.listKind, categoryId: item.categoryId, title: item.title + "  ·  " + kindName } }
 end sub
 

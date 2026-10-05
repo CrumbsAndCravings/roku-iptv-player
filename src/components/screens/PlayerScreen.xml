@@ -28,7 +28,7 @@
 
       <Group id="playButton" translation="[48, 558]">
         <Poster id="playBg" width="56" height="56" uri="pkg:/images/circle.png" />
-        <Poster id="playIcon" translation="[16, 16]" width="24" height="24" uri="pkg:/images/icon_pause.png" />
+        <Poster id="playIcon" translation="[16, 16]" width="24" height="24" uri="pkg:/images/icon_pause.png" scaleRotateCenter="[12, 12]" />
       </Group>
       <Label id="elapsed" translation="[120, 574]" width="96" horizAlign="right" color="0xF7F3FFFF" />
       <Rectangle id="barTrack" translation="[228, 584]" width="896" height="5" color="0xC9B8FF40" />
@@ -97,6 +97,14 @@
     <Timer id="commitTimer" duration="0.8" repeat="false" />
     <Timer id="autoSubTimer" duration="2.5" repeat="false" />
     <Timer id="toastTimer" duration="9" repeat="false" />
+    <!-- The controls fade in rising a little, and fade away (showControls, hideControls). -->
+    <Animation id="controlsIn" duration="0.28" easeFunction="outExpo">
+      <FloatFieldInterpolator id="controlsInFade" key="[0.0, 1.0]" keyValue="[0.0, 1.0]" fieldToInterp="controls.opacity" />
+      <Vector2DFieldInterpolator key="[0.0, 1.0]" keyValue="[[0, 10], [0, 0]]" fieldToInterp="controls.translation" />
+    </Animation>
+    <Animation id="controlsOut" duration="0.3" easeFunction="outQuad">
+      <FloatFieldInterpolator id="controlsOutFade" key="[0.0, 1.0]" keyValue="[1.0, 0.0]" fieldToInterp="controls.opacity" />
+    </Animation>
     <!-- Lets the provider notice a closed connection before the next one opens. -->
     <Timer id="pauseTimer" duration="1.2" repeat="false" />
   </children>
@@ -105,6 +113,7 @@
   <script type="text/brightscript" uri="pkg:/components/common/Compat.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Progress.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Pills.brs" />
+  <script type="text/brightscript" uri="pkg:/components/common/Motion.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Tracks.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Subtitles.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Playback.brs" />

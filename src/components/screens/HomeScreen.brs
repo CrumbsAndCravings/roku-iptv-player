@@ -8,15 +8,21 @@ sub init()
     m.navKeys = m.top.FindNode("navKeys")
     m.heroTimer = m.top.FindNode("heroTimer")
     m.hero = m.top.FindNode("hero")
-    m.heroIn = m.top.FindNode("heroIn")
     m.backdropIn = m.top.FindNode("backdropIn")
     m.backdropFade = m.top.FindNode("backdropFade")
-    m.tabHighlight = m.top.FindNode("tabHighlight")
-    m.tabSlide = m.top.FindNode("tabSlide")
-    m.tabSlidePos = m.top.FindNode("tabSlidePos")
-    m.tabSlideWidth = m.top.FindNode("tabSlideWidth")
+    m.tabBar = m.top.FindNode("tabBar")
+    m.lens = m.top.FindNode("lens")
+    m.lensShape = m.top.FindNode("lensShape")
+    m.lensClear = m.top.FindNode("lensClear")
+    m.lensLit = m.top.FindNode("lensLit")
+    m.lensTop = m.top.FindNode("lensTop")
+    m.lensView = m.top.FindNode("lensView")
+    m.lensShine = m.top.FindNode("lensShine")
+    m.lensGlass = m.top.FindNode("lensGlass")
+    m.lensRim = m.top.FindNode("lensRim")
     m.heroItem = invalid
     m.backdropTarget = 1.0
+    m.settleBackdrop = false
     m.backdrop.ObserveField("loadStatus", "onBackdropLoaded")
 
     m.heroTitle.font = MakeFont("Fredoka-SemiBold", 40)
@@ -31,7 +37,10 @@ sub init()
     m.tabCursor = 0
     m.navFocused = true
     m.firstLoad = true
-    m.tabPills = BuildPills(m.top.FindNode("tabs"), m.tabNames, 18)
+    m.lensAt = -1
+    m.lensState = ""
+    m.okDown = false
+    buildTabs()
     styleTabs()
 
     m.generation = 0
@@ -293,6 +302,7 @@ function focusedItem() as Dynamic
 end function
 
 sub onRowItemFocused()
+    MovedSound(m.rows, m.rows.rowItemFocused)
     refreshHero()
     root = m.rows.content
     focus = m.rows.rowItemFocused
@@ -330,10 +340,16 @@ sub showHero(item as Object)
     isNew = true
     if m.heroItem <> invalid then isNew = not m.heroItem.IsSameNode(item)
     m.heroItem = item
+    ' Its lines come up one after another, and its picture settles as it fades in.
     if isNew then
-        m.heroIn.control = "stop"
-        m.hero.opacity = 0.0
-        m.heroIn.control = "start"
+        Tween(m.hero, "translation", [[48, 126], [48, 112]], 0.45, "outExpo", 0)
+        delay = 0.0
+        for each part in [m.heroTitle, m.heroMeta, m.heroPlot]
+            part.opacity = 0.0
+            Tween(part, "opacity", [0.0, 1.0], 0.4, "outQuad", delay)
+            delay = delay + 0.07
+        end for
+        m.settleBackdrop = true
     end if
     m.backdropIn.control = "stop"
     m.backdropTarget = ShowBackdrop(m.backdrop, item.backdrop, item.HDPosterUrl)
@@ -343,6 +359,10 @@ sub onBackdropLoaded()
     if m.backdrop.loadStatus <> "ready" then return
     m.backdropFade.keyValue = [0.0, m.backdropTarget]
     m.backdropIn.control = "start"
+    if m.settleBackdrop then
+        m.settleBackdrop = false
+        Tween(m.backdrop, "scale", [[1.06, 1.06], [1.0, 1.0]], 1.6, "outCubic", 0)
+    end if
 end sub
 
 sub clearHero()
@@ -386,6 +406,7 @@ sub onRowItemSelected()
     if item = invalid then return
     if item.placeholder then return
     if m.navFocused then return
+    Sound("select")
     if item.kind = "seeAll" then
         title = row.title
         if m.tab = 1 then title = title + "  ·  Movies"
@@ -435,7 +456,8 @@ sub focusRows()
         return
     end if
     m.navFocused = false
-    m.rows.SetFocus(true)
+    ' The intro has the keys until it's over (MainScene then gives them back).
+    if m.global.introPlaying <> true then m.rows.SetFocus(true)
     styleTabs()
 end sub
 
@@ -445,7 +467,7 @@ end sub
 sub focusNav()
     m.navFocused = true
     m.tabCursor = m.tab
-    m.navKeys.SetFocus(true)
+    if m.global.introPlaying <> true then m.navKeys.SetFocus(true)
     styleTabs()
 end sub
 
@@ -481,44 +503,144 @@ sub activateTab()
     focusRows()
 end sub
 
-' Tab labels sit on one shared highlight that glides between them: lavender while the
-' tab bar has focus, a quiet plum on the current tab otherwise.
+' --- The tab bar ---------------------------------------------------------------
+'
+' Glass, as in the web app (HomeScreen.xml): the tab names, and a glass lens that rests
+' on the current tab. With the bar focused it's lit lavender and follows the cursor,
+' springing from tab to tab and stretching as it goes, the faster the more; OK swells
+' the bar and lifts the lens, which wobbles back as the tab opens. Each tab has a 112
+' wide slot, 4 in from the bar's ends.
+
+sub buildTabs()
+    m.tabLabels = []
+    m.tabCopies = []
+    labels = m.top.FindNode("tabLabels")
+    copies = m.top.FindNode("lensView")
+    for i = 0 to m.tabNames.Count() - 1
+        m.tabLabels.Push(tabLabel(labels, i, "0xE4DEF2FF"))
+        ' Inside the lens, dark on its lavender.
+        m.tabCopies.Push(tabLabel(copies, i, "0x151028FF"))
+    end for
+end sub
+
+function tabLabel(parent as Object, index as Integer, color as String) as Object
+    label = parent.CreateChild("Label")
+    label.font = MakeFont("Fredoka-Medium", 18)
+    label.text = m.tabNames[index]
+    label.color = color
+    label.width = 112
+    label.height = 40
+    label.horizAlign = "center"
+    label.vertAlign = "center"
+    label.translation = [tabX(index), 4]
+    label.scaleRotateCenter = [56, 20]
+    return label
+end function
+
+function tabX(index as Integer) as Integer
+    return 4 + index * 112
+end function
+
 sub styleTabs()
-    target = m.tab
-    if m.navFocused then target = m.tabCursor
-    for i = 0 to m.tabPills.Count() - 1
-        pill = m.tabPills[i]
-        pillBg = pill.GetChild(0)
-        pillBg.opacity = 0.0
-        label = pill.GetChild(1)
-        if m.navFocused and i = m.tabCursor then
-            label.color = "0x151028FF"
-        else if i = m.tab then
-            label.color = "0xF7F3FFFF"
+    for i = 0 to m.tabLabels.Count() - 1
+        if i = m.tab then
+            m.tabLabels[i].color = "0xC9B8FFFF"
         else
-            label.color = "0xA195CCFF"
+            m.tabLabels[i].color = "0xE4DEF2FF"
         end if
     end for
-
-    pill = m.tabPills[target]
-    bg = pill.GetChild(0)
-    position = pill.translation
-    toPosition = [232 + position[0], 26]
     if m.navFocused then
-        m.tabHighlight.blendColor = "0xC9B8FFFF"
+        moveLens(m.tabCursor)
     else
-        m.tabHighlight.blendColor = "0x30275AFF"
+        moveLens(m.tab)
     end if
-    m.tabHighlight.height = bg.height
-    if m.tabHighlight.width = 0 then
-        m.tabHighlight.translation = toPosition
-        m.tabHighlight.width = bg.width
+    lightLens(m.navFocused)
+end sub
+
+' Springs the lens to a tab (the web app's spring, 620 ms), stretched along the way by
+' its speed: longer one way and thinner the other, as a moving drop is.
+sub moveLens(index as Integer)
+    if index = m.lensAt then return
+    toX = tabX(index)
+    if m.lensAt < 0 then
+        m.lensAt = index
+        m.lens.translation = [toX, 4]
+        m.lensTop.translation = [toX, 4]
+        m.lensView.translation = [-toX, -4]
         return
     end if
-    m.tabSlide.control = "stop"
-    m.tabSlidePos.keyValue = [m.tabHighlight.translation, toPosition]
-    m.tabSlideWidth.keyValue = [m.tabHighlight.width, bg.width]
-    m.tabSlide.control = "start"
+    m.lensAt = index
+    fromX = m.lens.translation[0]
+    curve = SpringCurve()
+    last = curve.Count() - 1
+    stepMs = 620 / last
+    ' How much of the stretch is left after each step (it comes and goes over ~70 ms).
+    keep = Exp(-stepMs / 70)
+    stretch = m.lensShape.scale[0]
+    places = []
+    views = []
+    shapes = []
+    x = fromX
+    for i = 0 to last
+        previous = x
+        x = fromX + (toX - fromX) * curve[i]
+        places.Push([x, 4])
+        views.Push([-x, -4])
+        want = 1 + Abs(x - previous) / stepMs * 0.22
+        if want > 1.3 then want = 1.3
+        stretch = want + (stretch - want) * keep
+        if i = last then stretch = 1.0
+        shapes.Push([stretch, 1 / Sqr(stretch)])
+    end for
+    Tween(m.lens, "translation", places, 0.62, "linear", 0)
+    Tween(m.lensTop, "translation", places, 0.62, "linear", 0)
+    Tween(m.lensView, "translation", views, 0.62, "linear", 0)
+    Tween(m.lensShape, "scale", shapes, 0.62, "linear", 0)
+    Tween(m.lensShine, "scale", shapes, 0.62, "linear", 0)
+end sub
+
+' Lit lavender (the bar has focus, the dark names show inside it) or clear glass.
+sub lightLens(lit as Boolean)
+    state = "clear"
+    if lit then state = "lit"
+    if state = m.lensState then return
+    m.lensState = state
+    if lit then
+        FadeTo(m.lensLit, 0.95, 0.2)
+        FadeTo(m.lensClear, 0.0, 0.2)
+        FadeTo(m.lensView, 1.0, 0.2)
+        FadeTo(m.lensGlass, 1.0, 0.2)
+    else
+        FadeTo(m.lensLit, 0.0, 0.2)
+        FadeTo(m.lensClear, 0.1, 0.2)
+        FadeTo(m.lensView, 0.0, 0.2)
+        FadeTo(m.lensGlass, 0.6, 0.2)
+    end if
+    FadeTo(m.lensRim, rimOpacity(), 0.2)
+end sub
+
+function rimOpacity() as Float
+    if m.lensState = "lit" then return 0.55
+    return 0.3
+end function
+
+' OK held on the bar: it swells and the lens lifts, its rim catching more colour. Let go,
+' and both spring back, the lens wobbling like jelly.
+sub pressBar(down as Boolean)
+    if down then
+        SpringScale(m.tabBar, 1.04)
+        lifted = [1.1, 1.22]
+        Tween(m.lensShape, "scale", CurveValues(m.lensShape.scale, lifted, SpringCurve()), 0.42, "linear", 0)
+        Tween(m.lensShine, "scale", CurveValues(m.lensShine.scale, lifted, SpringCurve()), 0.42, "linear", 0)
+        FadeTo(m.lensRim, 0.9, 0.15)
+    else
+        SpringScale(m.tabBar, 1.0)
+        Tween(m.lensShape, "scale", CurveValues(m.lensShape.scale, [1.0, 1.0], JellyCurve()), 0.76, "linear", 0)
+        Tween(m.lensShine, "scale", CurveValues(m.lensShine.scale, [1.0, 1.0], JellyCurve()), 0.76, "linear", 0)
+        FadeTo(m.lensRim, rimOpacity(), 0.3)
+        PopNode(m.tabLabels[m.tabCursor])
+        PopNode(m.tabCopies[m.tabCursor])
+    end if
 end sub
 
 function onKeyEvent(key as String, press as Boolean) as Boolean
@@ -537,9 +659,11 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
 
     ' The rows didn't use this key: Up on the first row, or Left on a row's first poster.
     if key = "up" or key = "left" then
+        Sound("move")
         focusNav()
         return true
     else if key = "back" then
+        Sound("back")
         focus = m.rows.rowItemFocused
         if focus <> invalid and focus.Count() > 0 and focus[0] > 0 then
             m.rows.jumpToRowItem = [0, 0]
@@ -552,19 +676,40 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
 end function
 
 function onNavKey(key as String, press as Boolean) as Boolean
-    ' OK acts on release, so the release can't land on the rows once they have focus.
+    ' OK acts on release, so the release can't land on the rows once they have focus,
+    ' and only after a press here (not one that closed a dialog). Held, the bar swells.
     if key = "OK" then
-        if not press then activateTab()
+        if press then
+            m.okDown = true
+            pressBar(true)
+        else if m.okDown = true then
+            m.okDown = false
+            pressBar(false)
+            Sound("select")
+            activateTab()
+        end if
         return true
     end if
     if not press then return key <> "back"
     if key = "left" then
-        if m.tabCursor > 0 then m.tabCursor = m.tabCursor - 1
+        if m.tabCursor > 0 then
+            m.tabCursor = m.tabCursor - 1
+            Sound("move")
+        end if
         styleTabs()
     else if key = "right" then
-        if m.tabCursor < m.tabNames.Count() - 1 then m.tabCursor = m.tabCursor + 1
+        if m.tabCursor < m.tabNames.Count() - 1 then
+            m.tabCursor = m.tabCursor + 1
+            Sound("move")
+        end if
         styleTabs()
     else if key = "down" then
+        ' Down into the tab's own rows is a move; onto another tab or screen, a choice.
+        if m.tabCursor = m.tab and not m.failed then
+            Sound("move")
+        else
+            Sound("select")
+        end if
         activateTab()
     else if key = "options" then
         showAccountMenu()
@@ -621,7 +766,11 @@ sub showAccountMenu()
     dialog = CreateObject("roSGNode", "StandardMessageDialog")
     dialog.title = "Account"
     dialog.message = ["Signed in as " + FieldStr(creds, "username") + " on " + FieldStr(creds, "server") + "."]
-    dialog.buttons = ["Keep watching", "Online subtitles", "Sign out"]
+    sounds = "Turn click sounds off"
+    if not m.global.soundsOn then sounds = "Turn click sounds on"
+    intro = "Turn the intro off"
+    if FieldStr(LoadPrefs(), "intro") = "off" then intro = "Turn the intro on"
+    dialog.buttons = ["Keep watching", "Online subtitles", sounds, intro, "Sign out"]
     dialog.ObserveField("buttonSelected", "onAccountButton")
     dialog.ObserveField("wasClosed", "onDialogClosed")
     m.top.GetScene().dialog = dialog
@@ -633,7 +782,25 @@ sub onAccountButton()
     choice = dialog.buttonSelected
     dialog.close = true
     if choice = 1 then m.top.action = { name: "openSubtitleSetup" }
-    if choice = 2 then m.top.action = { name: "signOut" }
+    if choice = 2 then
+        ' Saved on this Roku; MainScene plays them only while they're on.
+        turnOn = not m.global.soundsOn
+        m.global.soundsOn = turnOn
+        if turnOn then
+            SavePref("sounds", "on")
+            Sound("select")
+        else
+            SavePref("sounds", "off")
+        end if
+    end if
+    if choice = 3 then
+        if FieldStr(LoadPrefs(), "intro") = "off" then
+            SavePref("intro", "on")
+        else
+            SavePref("intro", "off")
+        end if
+    end if
+    if choice = 4 then m.top.action = { name: "signOut" }
 end sub
 
 sub onDialogClosed()

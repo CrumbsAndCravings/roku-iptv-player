@@ -1,11 +1,11 @@
 title=ARAN+
 major_version=0
 minor_version=5
-build_version=4
+build_version=6
 mm_icon_focus_hd=pkg:/images/icon_hd.png
 mm_icon_focus_fhd=pkg:/images/icon_fhd.png
 splash_screen_hd=pkg:/images/splash_hd.png
 splash_screen_fhd=pkg:/images/splash_fhd.png
-splash_color=#0B0B0F
+splash_color=#0D0A1A
 splash_min_time=800
 ui_resolutions=hd
