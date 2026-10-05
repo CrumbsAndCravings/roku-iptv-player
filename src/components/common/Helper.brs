@@ -172,8 +172,8 @@ end function
 
 ' A started stream (/v1/hls/start): `url` is the playlist's address on the helper,
 ' `start` where the stream's clock starts in the film (0 for a whole film's playlist,
-' whose clock is the film's), `playFrom` where to start playing, and `vod` whether the
-' playlist lists the whole film.
+' whose clock is the film's), `playFrom` where to start playing, `vod` whether the
+' playlist lists the whole film, and `previews` its pictures (HelperPreviewUrl).
 function ParseHelperStart(data as Dynamic) as Object
     url = FieldStr(data, "url")
     if Left(url, 1) <> "/" then url = ""
@@ -187,7 +187,33 @@ function ParseHelperStart(data as Dynamic) as Object
         video: FieldStr(data, "video")
         audioTrack: ToInt(Field(data, "audioTrack"))
         audioPlan: FieldStr(data, "audioPlan")
+        previews: parseHelperPreviews(Field(data, "previews"))
     }
+end function
+
+' The pictures of a whole film's playlist: { every, prefix }, one for each `every`
+' seconds, which the helper writes as it converts the pieces. invalid without them (an
+' older helper).
+function parseHelperPreviews(data as Dynamic) as Dynamic
+    every = ToInt(Field(data, "every"))
+    prefix = FieldStr(data, "prefix")
+    if every <= 0 or Left(prefix, 1) <> "/" then return invalid
+    return { every: every, prefix: prefix }
+end function
+
+' The address on the helper of the picture for `seconds` into the film: the prefix,
+' the piece's number in 5 digits (more past 166 hours, as FFmpeg writes them), ".jpg".
+' "" without pictures. A picture the helper hasn't made yet answers 404 at once; it
+' never makes the helper ask the provider for more.
+function HelperPreviewUrl(previews as Dynamic, seconds as Float) as String
+    if not IsAA(previews) or seconds < 0 then return ""
+    every = ToInt(Field(previews, "every"))
+    if every <= 0 then return ""
+    n = Int(seconds / every).ToStr()
+    while Len(n) < 5
+        n = "0" + n
+    end while
+    return FieldStr(previews, "prefix") + n + ".jpg"
 end function
 
 ' The OpenSubtitles fingerprint in the helper's answer (/v1/hash): 16 hex digits, or "".

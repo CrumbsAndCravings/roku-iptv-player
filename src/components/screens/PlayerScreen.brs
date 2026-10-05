@@ -29,6 +29,14 @@ sub init()
     m.knob = m.top.FindNode("knob")
     m.bubble = m.top.FindNode("bubble")
     m.bubbleLabel = m.top.FindNode("bubbleLabel")
+    m.thumb = m.top.FindNode("thumb")
+    m.thumbPics = m.top.FindNode("thumbPics")
+    m.thumbFront = invalid
+    m.thumbLoader = invalid
+    m.thumbShown = ""
+    m.thumbLoading = ""
+    m.thumbLoadAt = 0.0
+    m.thumbMissing = {}
     m.buttonRow = m.top.FindNode("buttonRow")
 
     m.upNext = m.top.FindNode("upNext")
@@ -643,6 +651,8 @@ sub resetHelper()
     m.helperProblem = ""
     m.helperSaid = ""
     m.helperReopens = 0
+    m.helperPreviews = invalid
+    forgetThumbs()
     m.pendingSeek = -1
     m.lastPos = 0
     ' Answers about the title before are dropped.
@@ -795,6 +805,10 @@ sub openHelper()
     m.helperSession = started.session
     m.helperVod = started.vod
     m.helperUsed = true
+    ' Another session's pictures are another film's, or another sound track's.
+    m.helperPreviews = invalid
+    if started.vod then m.helperPreviews = started.previews
+    forgetThumbs()
     ' A whole film's clock is the film's; a growing playlist's starts where it did.
     m.offset = started.start
     at = started.start
@@ -1027,6 +1041,7 @@ sub renderBar()
         if bubbleX > 1232 - 104 then bubbleX = 1232 - 104
         m.bubble.translation = [bubbleX, 530]
     end if
+    renderThumb(shown, knobX)
 end sub
 
 sub setRow(row as String)
@@ -1134,6 +1149,7 @@ sub cancelSeek()
     m.holdTimer.control = "stop"
     m.commitTimer.control = "stop"
     m.seeking = false
+    clearThumb()
 end sub
 
 sub jumpBy(seconds as Integer)
@@ -1158,6 +1174,117 @@ sub seekTo(target as Float)
     end if
     m.video.control = "stop"
     requestStart(Int(target))
+end sub
+
+' --- Preview pictures ----------------------------------------------------------------
+'
+' While choosing where to jump in a whole film from the helper, a picture of that moment
+' sits above the time. The helper writes one for each six-second piece it converts
+' (HelperPreviewUrl); where it hasn't converted yet there's none, just the time, and
+' nothing more is asked of the provider. One picture loads at a time, into a Poster of
+' its own (a fresh Poster's loadStatus can only be about its own picture), and the last
+' one stays up until the next is ready. A missing one is asked for again after 10 s.
+
+sub renderThumb(seconds as Float, knobX as Float)
+    path = ""
+    if m.seeking and m.helperVod then path = HelperPreviewUrl(m.helperPreviews, seconds)
+    if path = "" then
+        if m.thumb.visible then clearThumb()
+        return
+    end if
+    url = TranscoderConfig().url + path
+    x = knobX - 132
+    if x < 48 then x = 48
+    if x > 1232 - 264 then x = 1232 - 264
+    m.thumb.translation = [x, 368]
+    ' Kept visible (if see-through) while the first picture loads.
+    m.thumb.visible = true
+    if m.thumbLoader <> invalid and UpTime(0) - m.thumbLoadAt > 4 then dropThumbLoad()
+    if url <> m.thumbShown and m.thumbLoader = invalid and not isThumbMissing(url) then loadThumb(url)
+    if m.thumbShown <> "" and not isThumbMissing(url) then
+        m.thumb.opacity = 1
+    else
+        m.thumb.opacity = 0
+    end if
+end sub
+
+sub loadThumb(url as String)
+    pic = m.thumbPics.CreateChild("Poster")
+    pic.width = 256
+    pic.height = 144
+    pic.loadWidth = 256
+    pic.loadHeight = 144
+    pic.loadDisplayMode = "scaleToFit"
+    pic.opacity = 0
+    m.thumbLoader = pic
+    m.thumbLoading = url
+    m.thumbLoadAt = UpTime(0)
+    pic.ObserveField("loadStatus", "onThumbStatus")
+    pic.uri = url
+    ' A picture Roku still holds may be ready already.
+    thumbStatus()
+end sub
+
+sub onThumbStatus()
+    thumbStatus()
+end sub
+
+' The loading picture is ready (it replaces the one showing) or isn't there (not made
+' yet), then on to wherever the target is now.
+sub thumbStatus()
+    pic = m.thumbLoader
+    if pic = invalid then return
+    status = pic.loadStatus
+    if status <> "ready" and status <> "failed" then return
+    pic.UnobserveField("loadStatus")
+    m.thumbLoader = invalid
+    url = m.thumbLoading
+    m.thumbLoading = ""
+    if status = "ready" then
+        if m.thumbFront <> invalid then m.thumbPics.RemoveChild(m.thumbFront)
+        pic.opacity = 1
+        m.thumbFront = pic
+        m.thumbShown = url
+        m.thumbMissing.Delete(url)
+    else
+        m.thumbPics.RemoveChild(pic)
+        m.thumbMissing[url] = UpTime(0)
+    end if
+    if m.seeking then renderBar()
+end sub
+
+' A picture that took too long counts as missing for now.
+sub dropThumbLoad()
+    pic = m.thumbLoader
+    if pic = invalid then return
+    pic.UnobserveField("loadStatus")
+    m.thumbPics.RemoveChild(pic)
+    m.thumbMissing[m.thumbLoading] = UpTime(0)
+    m.thumbLoader = invalid
+    m.thumbLoading = ""
+end sub
+
+function isThumbMissing(url as String) as Boolean
+    if not m.thumbMissing.DoesExist(url) then return false
+    return UpTime(0) - m.thumbMissing[url] < 10
+end function
+
+' Hides the picture and lets go of it, and of one on its way.
+sub clearThumb()
+    if m.thumbLoader <> invalid then m.thumbLoader.UnobserveField("loadStatus")
+    m.thumbLoader = invalid
+    m.thumbLoading = ""
+    m.thumbFront = invalid
+    m.thumbShown = ""
+    m.thumbPics.RemoveChildrenIndex(m.thumbPics.GetChildCount(), 0)
+    m.thumb.visible = false
+    m.thumb.opacity = 0
+end sub
+
+' A new stream: what was missing from the last one says nothing about this one.
+sub forgetThumbs()
+    clearThumb()
+    m.thumbMissing = {}
 end sub
 
 ' --- Keys ----------------------------------------------------------------------

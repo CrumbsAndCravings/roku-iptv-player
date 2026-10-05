@@ -1,6 +1,6 @@
 # ARAN+ feature reference
 
-Every feature of ARAN+ for Roku as of **v0.5.3** (sync added after commit `8d861e1`; the helper on a computer at home, §15, in 0.5.0, and its whole-film playlists in 0.5.2; subtitles saved for every device, §9.5, in 0.5.3). Each feature lists what it does, the exact rules and numbers, why it works that way, and where the Roku code lives. Use it as the checklist and spec for bringing the Samsung app ([CrumbsAndCravings/Samsung-IPTV-Player](https://github.com/CrumbsAndCravings/Samsung-IPTV-Player)) up to the same level.
+Every feature of ARAN+ for Roku as of **v0.5.4** (sync added after commit `8d861e1`; the helper on a computer at home, §15, in 0.5.0, and its whole-film playlists in 0.5.2; subtitles saved for every device, §9.5, in 0.5.3; pictures above the bar while choosing a jump through the helper, §15.4, in 0.5.4). Each feature lists what it does, the exact rules and numbers, why it works that way, and where the Roku code lives. Use it as the checklist and spec for bringing the Samsung app ([CrumbsAndCravings/Samsung-IPTV-Player](https://github.com/CrumbsAndCravings/Samsung-IPTV-Player)) up to the same level.
 
 - **Build plan for Samsung:** [`samsung-plan.md`](samsung-plan.md). That plan covers parity with Roku v0.4.1; everything added since then is in this document, marked **New since 0.4.1**.
 - **User-facing summary:** [`../README.md`](../README.md).
@@ -57,6 +57,7 @@ Every feature of ARAN+ for Roku as of **v0.5.3** (sync added after commit `8d861
 | Player | Poster-image codecs (MJPEG, PNG) ignored as "video" | Missing |
 | Player | Audio formats shown; unplayable audio track swapped automatically | Missing |
 | Player | **The helper on a computer at home** converts AVI, HEVC (where this Roku can't decode it), unplayable sound, and titles that fail on their own (§15) | Has (it started there; the Roku uses its HLS output) |
+| Player | Pictures above the bar while choosing a jump through the helper (§15.4) | Missing (its one MPEG-TS stream from the helper has no pictures; the web app has them) |
 | Subtitles | OpenSubtitles search, download, auto mode, timing nudges | Has |
 | Continue Watching | Row, progress, resume, next episode | Has |
 | Continue Watching | Remove a title (Home poster menu, details button) | Missing |
@@ -520,7 +521,7 @@ Three requests, in order, through `HelperTask` (each answer is dropped if the ti
 
 1. `GET /v1/info?key&kind&id&ext`: `{ duration, video { codec, width, height }, audio [{ codec, channels, language, title, plan }], videoPlan }` (`ParseHelperInfo`). Once per title; the helper keeps it for 6 hours.
 2. With online subtitles set up, `GET /v1/hash?key&kind&id&ext`: `{ hash, size }`, the file's OpenSubtitles fingerprint (`ParseHelperHash`). Once per title, and before the stream, since the helper stops its FFmpeg to read it. Without it the search goes on by title.
-3. `GET /v1/hls/start?key&kind&id&ext&start&vod=1&format=ts&video&height[&hevc=0][&a=<n>]` (`HelperStartUrl`), answered once the first piece is ready (up to a minute; the task waits 100 s): `{ session, url, vod, start, from, duration, video, audioTrack, audioPlan, ... }` (`ParseHelperStart`).
+3. `GET /v1/hls/start?key&kind&id&ext&start&vod=1&format=ts&video&height[&hevc=0][&a=<n>]` (`HelperStartUrl`), answered once the first piece is ready (up to a minute; the task waits 100 s): `{ session, url, vod, start, from, duration, video, audioTrack, audioPlan, previews, ... }` (`ParseHelperStart`).
    - `start`: the resume point (5 s early, as for direct play), the jump target, or where the stream got to.
    - `video`: `copy` only when the helper's plan is `copy` (H.264, HEVC, MPEG-2) and `CanDecodeVideo` says yes; otherwise `convert`. `hevc=0` when this Roku can't decode HEVC.
    - `height`: the screen's height (`GetDisplaySize().h`), 720 if unknown, at most 1080 (`HelperHeight`).
@@ -535,8 +536,15 @@ Three requests, in order, through `HelperTask` (each answer is dropped if the ti
 ### 15.4 Position, length and jumps
 - `positionSecs()` is `m.offset` plus `m.video.position`: 0 plus Roku's for a whole film's playlist, the stream's start plus Roku's for a growing one. `durationSecs()` is the helper's `duration`. `onPosition`, `saveProgress`, `markFinished`, `renderBar`, the jump preview and `jumpBy` all use them.
 - **Jumps** (`seekTo`): in a whole film's playlist, a plain `m.video.seek`; the helper makes the piece asked for (FFmpeg starts again there when it's far from where it was, a few seconds). In a growing one, a target inside what Roku has listed, with two pieces' margin (`HelperSeekInside`), is a plain seek; anything else starts the helper's stream again there.
+- **Pictures while choosing a jump** (new in 0.5.4): in a whole film's playlist, the jump preview shows a picture of the target above the time bubble.
+  - Where they come from: every FFmpeg run that makes pieces also writes a 180-line JPEG for each piece, from inside it. `/v1/hls/start` says where: `previews: { every: 6, prefix: "/v1/hls/s/<session>/p" }` (`parseHelperPreviews`; invalid from an older helper, or a prefix that isn't a path on the helper). The picture for `t` seconds is `prefix` + `floor(t / every)` in 5 digits + `.jpg` (`HelperPreviewUrl`), on the helper's address.
+  - What exists: everything the helper has converted in this session, behind you and ahead as far as FFmpeg has got (it isn't held back, so it runs to the end at whatever pace the provider and the computer allow). A picture not made yet is a quick 404: the helper never asks the provider for one, since the provider's one connection is playing the film.
+  - On screen: a 256x144 picture in a dark card with the lavender ring, over the knob, kept between x 48 and 1232, its bottom 10 px above the bubble. Wider films are letterboxed in it (`scaleToFit`, decoded at 256x144 to keep textures small).
+  - Loading: one picture at a time, each into a fresh `Poster` (so its `loadStatus` can only be about that picture), observed and also checked at once in case Roku still holds it. When it's ready it replaces the one showing; until then the last picture stays up. A 404 (`failed`) or a load over 4 s hides the picture for that piece and isn't asked for again for 10 s. Holding Left/Right steps every 250 ms, which paces the requests; the picture for the final target loads during the 0.8 s before the jump.
+  - Gone when the preview ends (jump, Back, a panel), and forgotten with each new stream (another session's pictures are another film's or another sound track's). Direct streams and growing playlists have none: just the time, as before.
+  - Code: `renderThumb`, `loadThumb`, `thumbStatus`, `clearThumb` in `screens/PlayerScreen.brs`; `thumb` in `PlayerScreen.xml`. The web app (web-iptv-player, `renderPreview`) works the same way.
 - **Sound tracks:** the Audio column lists the file's tracks from `/v1/info` (`HelperAudioOptions`); choosing another starts the stream again with it, from where you were, and saves the language (`chooseHelperTrack`).
-- **To check on the device:** that Roku starts a whole film's playlist at `playStart`, and that its `position` there is the film's time (the pieces' timestamps are).
+- **To check on the device:** that Roku starts a whole film's playlist at `playStart`, and that its `position` there is the film's time (the pieces' timestamps are). For the pictures: that a `Poster` loads them from the helper's plain `http://` address, and that `loadStatus` reaches `ready` (or `failed` on a 404) for each fresh `Poster`, including one whose picture Roku already holds. If one never reports, the 4 s limit moves on.
 
 ### 15.5 Errors and the end
 - A helper stream that fails after it played starts again from where it got to (or the jump target), twice at most (a minute of playing resets the count). One that never played is asked for once more.
@@ -556,7 +564,7 @@ Three requests, in order, through `HelperTask` (each answer is dropped if the ti
 - **The fingerprint:** for helper titles the subtitle search uses the helper's (`/v1/hash`) and reads nothing from the provider itself (`via: "helper"` in the `SubtitleTask` request).
 
 ### 15.8 Code
-- `common/Helper.brs`: addresses, `HelperRoute`, the choices, `HelperAudioOptions`, `ParseHelperInfo`, `ParseHelperStart`, `ParseHelperHash`, `HelperFailure`, `HelperPlanLine`, the remembered titles (tested in `tests/utils_test.brs` and `tests/parse_test.brs`).
+- `common/Helper.brs`: addresses, `HelperRoute`, the choices, `HelperAudioOptions`, `ParseHelperInfo`, `ParseHelperStart`, `HelperPreviewUrl`, `ParseHelperHash`, `HelperFailure`, `HelperPlanLine`, the remembered titles (tested in `tests/utils_test.brs` and `tests/parse_test.brs`).
 - `tasks/HelperTask.*`: the requests (`info` and `hash` 50 s, `start` 100 s, `lastError` 8 s, `stop` 4 s).
-- `screens/PlayerScreen.brs`: the route, `startHelper`, `helperGo`, `requestStart`, `openHelper`, `positionSecs`, `durationSecs`, `seekTo`, `chooseHelperTrack`, `helperFailed`, `helperDiagnosis`.
+- `screens/PlayerScreen.brs`: the route, `startHelper`, `helperGo`, `requestStart`, `openHelper`, `positionSecs`, `durationSecs`, `seekTo`, `renderThumb` and the rest of the preview pictures, `chooseHelperTrack`, `helperFailed`, `helperDiagnosis`.
 - The helper itself: the Samsung repo's `helper/` and its README section.

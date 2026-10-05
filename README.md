@@ -25,7 +25,7 @@ Remote shortcuts: **Left** from a row's first poster (or **Up** from the first r
 |---|---|
 | OK | Pause and show the controls |
 | Up / Down | Show the controls |
-| Left / Right (or ⏪ ⏩) | Preview a jump of 10 seconds; hold to go faster (30 s steps after 1.5 s, then doubling every 1.5 s, up to 10 min per step). The video jumps shortly after you let go. |
+| Left / Right (or ⏪ ⏩) | Preview a jump of 10 seconds; hold to go faster (30 s steps after 1.5 s, then doubling every 1.5 s, up to 10 min per step). The video jumps shortly after you let go. Through [the helper](#the-helper-on-your-computer), a picture of that moment shows above the bar. |
 | Play/Pause | Pause or resume |
 | Instant replay | Back 10 seconds |
 | \* | Audio & subtitles |
@@ -54,6 +54,7 @@ The helper is a small program on a computer at home, switched on while you watch
 
 - **The time bar** shows the whole film, and resuming starts right where you were.
 - **Jumping** is the Roku's own: a piece the helper has made plays at once, and one further away takes a few seconds while the helper starts converting from there.
+- **Pictures while you choose a jump:** holding Left/Right shows a picture of where you'd land, for every part the helper has converted: behind you, and ahead as far as it has got. Further on there's just the time, since asking the provider for pictures would stop the film (it allows one connection).
 - **Another language:** the Audio column lists the file's sound tracks; picking one starts the stream again with it, from where you were.
 - **Online subtitles** work as they do for any other video. Subtitle tracks built into the file don't come through.
 - **When you leave a video,** the Roku tells the helper to stop, so the provider's one connection is free for whatever plays next.
