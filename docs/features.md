@@ -84,7 +84,8 @@ Every feature of ARAN+ for Roku as of **v0.5.6** (sync added after commit `8d861
 - **No saved login:** the login screen fills in from the file and signs in by itself at launch (`autoSignIn`).
 - **After a sign-out:** the form is prefilled but not submitted.
 - **Switching providers:** the app stores a stamp (`server + " " + username`) under registry `account/builtIn`. When a newer build carries a different login, the app replaces the saved login and clears Continue Watching, whose IDs belong to the old provider. Online subtitles are kept.
-- Code: `common/Registry.brs` (`BuiltInCreds`, `LanguagePrefs`), `MainScene.brs` (init), `screens/LoginScreen.brs`.
+- **The same account** (fixed in 0.5.6): when the stamp is new but the saved login is the build's own account (`SameLogin`: the same server as `NormalizeServer` writes it, ignoring case, and the same username), nothing is cleared: the saved login takes the build's password and the stamp is written. Before, the first build carrying a login cleared Continue Watching even for the account already signed in by hand.
+- Code: `common/Registry.brs` (`BuiltInCreds`, `LanguagePrefs`), `common/Utils.brs` (`SameLogin`, tested), `MainScene.brs` (init), `screens/LoginScreen.brs`.
 - **Samsung:** the equivalent is a git-ignored `personal.json` bundled into the `.wgt`. The same "switch when the stamp changes" rule applies.
 
 ### 2.3 Refused sign-ins, explained (new since 0.4.1)

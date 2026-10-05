@@ -34,16 +34,23 @@ sub init()
 
     creds = LoadCreds()
     ' A personal build with a different login inside replaces the saved login (and its
-    ' Continue Watching, which belongs to the old provider). Online subtitles stay.
+    ' Continue Watching, which belongs to the old provider). Online subtitles stay. The
+    ' same account, signed in by hand or by an earlier build, keeps everything; only its
+    ' password follows the build.
     builtIn = BuiltInCreds()
     if builtIn <> invalid then
         stamp = builtIn.server + " " + builtIn.username
         if ToStr(RegRead("account", "builtIn")) <> stamp then
-            RegDelete("account", "creds")
-            RegDelete("progress", "items")
-            RegDelete("progress", "removed")
+            if SameLogin(creds, builtIn) then
+                creds.password = builtIn.password
+                SaveCreds(creds)
+            else
+                RegDelete("account", "creds")
+                RegDelete("progress", "items")
+                RegDelete("progress", "removed")
+                creds = invalid
+            end if
             RegWrite("account", "builtIn", stamp)
-            creds = invalid
         end if
     end if
     if creds = invalid then

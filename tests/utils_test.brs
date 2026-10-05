@@ -43,6 +43,13 @@ sub Main()
     check("Normalize trailing slash", NormalizeServer(" http://line.example.com:8080/ "), "http://line.example.com:8080")
     check("Normalize https", NormalizeServer("https://tv.example.org"), "https://tv.example.org")
     check("Normalize m3u link", NormalizeServer("http://a.b:80/get.php?username=u&password=p&type=m3u_plus"), "http://a.b:80")
+    login = { server: "http://line.example.com:8080", username: "AB12", password: "old" }
+    check("SameLogin same", boolText(SameLogin(login, { server: "line.example.com:8080/", username: "AB12", password: "new" })), "true")
+    check("SameLogin host case", boolText(SameLogin(login, { server: "HTTP://Line.Example.com:8080", username: "AB12" })), "true")
+    check("SameLogin other user", boolText(SameLogin(login, { server: "http://line.example.com:8080", username: "ab12" })), "false")
+    check("SameLogin other port", boolText(SameLogin(login, { server: "http://line.example.com:80", username: "AB12" })), "false")
+    check("SameLogin signed out", boolText(SameLogin(invalid, login)), "false")
+    check("SameLogin blank", boolText(SameLogin({ server: "", username: "" }, { server: "", username: "" })), "false")
 
     ' Refused requests
     q = Chr(34)

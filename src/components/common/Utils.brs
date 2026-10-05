@@ -182,6 +182,15 @@ function NormalizeServer(raw as String) as String
     return server
 end function
 
+' Whether two logins ({ server, username }) are the same account: the same server (as
+' NormalizeServer writes it, ignoring case) and the same username.
+function SameLogin(a as Dynamic, b as Dynamic) as Boolean
+    server = LCase(NormalizeServer(FieldStr(a, "server")))
+    if server = "" or FieldStr(a, "username") = "" then return false
+    if server <> LCase(NormalizeServer(FieldStr(b, "server"))) then return false
+    return FieldStr(a, "username") = FieldStr(b, "username")
+end function
+
 ' Pulls server, username and password out of a pasted link: get.php or player_api.php
 ' with ?username=&password=, or a path like /playlist/<user>/<pass>/m3u_plus (also
 ' /live/, /movie/ and /series/ stream links).
