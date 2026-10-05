@@ -1,6 +1,6 @@
 {
   "rootDir": "src",
-  "files": ["manifest", "source/**/*", "components/**/*", "images/**/*", "fonts/**/*"],
+  "files": ["manifest", "source/**/*", "components/**/*", "images/**/*", "fonts/**/*", "sounds/**/*"],
   "stagingDir": "build/staging",
   "outFile": "build/aranplus.zip",
   "createPackage": true,

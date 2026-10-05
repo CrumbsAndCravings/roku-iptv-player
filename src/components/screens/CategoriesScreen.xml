@@ -36,6 +36,7 @@
       drawFocusFeedback="false" />
   </children>
   <script type="text/brightscript" uri="pkg:/components/common/Utils.brs" />
+  <script type="text/brightscript" uri="pkg:/components/common/Motion.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Categories.brs" />
   <script type="text/brightscript" uri="pkg:/components/screens/CategoriesScreen.brs" />
 </component>

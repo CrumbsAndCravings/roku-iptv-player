@@ -113,6 +113,7 @@ end sub
 function onKeyEvent(key as String, press as Boolean) as Boolean
     if not press or m.busy then return key <> "back"
     last = 2 + m.buttons.Count()
+    before = m.index
     if key = "up" and m.index > 0 then
         if m.index > 3 then
             m.index = 2
@@ -126,6 +127,7 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
     else if key = "left" and m.index > 3 then
         m.index = m.index - 1
     else if key = "OK" then
+        Sound("select")
         if m.index < 3 then
             openKeyboard(m.index)
         else if m.buttonLabels[m.index - 3] = "Remove" then
@@ -137,6 +139,7 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
         keepTyped()
         return false
     end if
+    if m.index <> before then Sound("move")
     render()
     return true
 end function

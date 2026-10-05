@@ -106,7 +106,7 @@ When the server answers anything other than 200, the error says who answered and
 - Code: `common/Utils.brs` (`HttpDetail`, `BriefText`, `IsCloudflare`, `IsCloudflareBlock`, `CloudflareKind`, `IsRefusalCode`, `UserAgentsToTry`, `UserAgentName`, `BrowserUserAgent`, `AppUserAgent`), `tasks/Http.brs`, `tasks/XtreamTask.brs` (`runAuth`), `screens/LoginScreen.*`.
 
 ### 2.4 Account menu and sign-out
-- `*` on Home, everywhere except a Continue Watching poster (see 9.3), opens: **Keep watching**, **Online subtitles**, **Sign out**.
+- `*` on Home, everywhere except a Continue Watching poster (see 9.3), opens: **Keep watching**, **Online subtitles**, **Turn click sounds off** (or on), **Turn the intro off** (or on), **Sign out** (new in 0.5.5: the two switches, §10).
 - **Sign out** clears the login, Continue Watching, the OpenSubtitles account and the saved search library (`ClearAccount`), and stops the library worker. A personal build's own OpenSubtitles account (§8) comes back by itself.
 
 ## 3. Being gentle with the provider
@@ -219,7 +219,7 @@ Categories whose names hold `xxx`, `adult`, `18+` or `porn`, and titles with `is
 ## 5. Browsing
 
 ### 5.1 Home
-- **Tabs:** Home, Movies, Series, **Categories** (new), Search. A lavender highlight glides between them (220 ms).
+- **Tabs:** Home, Movies, Series, **Categories** (new), Search, on a floating glass bar with a glass lens on the current tab (new in 0.5.5, §10).
 - **Hero:** backdrop, title, meta (year · runtime · genre · ★ rating), plot. Resting 0.6 s on a movie fetches `get_vod_info` for runtime, backdrop and codecs.
 - **Keys:**
   - Left from a row's first poster, or Up from the first row, reaches the tabs.
@@ -423,7 +423,16 @@ Unchanged since 0.4.1 apart from where the account is kept; see `samsung-plan.md
   - Focus lifts the poster 6% (it was 10%) and shows the ring.
   - Home rows are 218 px tall; search rows 232 px.
 - **Category and See-all cards:** the name on a tinted card. Category cards in the Categories tab have a pink left accent.
-- **Motion:** screens fade and float in (300 ms); the hero floats up (350 ms); backdrops fade in once loaded (500 ms); tabs glide (220 ms); placeholders pulse (1.4 s).
+- **Motion** (new in 0.5.5, after the web app's `src/styles/motion.css` and `shell.css`; `common/Motion.brs` has its springs and `Tween`):
+  - **Screens:** a page slides in from the right (28 px, 300 ms) and leaves the same way (240 ms); Details rises 40 px like a card (380 ms) and drops away; the player, Home and Login fade. The page underneath sinks back (to 97 %, faded out) and comes up again when you return (`MainScene.brs`, `moveScreen`).
+  - **Home's banner:** it rises 14 px as its title, meta and plot fade in 70 ms apart; its backdrop fades in (500 ms) while settling from 106 % (1.6 s). Details does the same with its lines 40 ms apart.
+  - **Posters:** a row's posters build in from the right, 45 ms apart (480 ms), when the row arrives; each picture fades in once loaded (320 ms); progress bars fill in after them (800 ms). Placeholders pulse (1.4 s).
+  - **Buttons** (`Pills.brs`): the focused one springs to 106 % (the web app's spring, 420 ms).
+  - **Player:** the controls fade in rising 10 px (280 ms) and fade away (300 ms); play turning into pause pops from 60 %.
+- **Glass tab bar** (new in 0.5.5, after the web app's iOS 26 tab bar): a translucent plum pill with light along its top, a rim and a soft shadow (drawn: a Roku can't blur what's behind). A glass lens rests on the current tab, clear with the tab name lavender; with the bar focused it's lit lavender and follows the cursor, the names inside it dark (a second copy of the names, clipped to the lens). It springs from tab to tab (620 ms, overshooting a touch), stretching by its speed, longer one way and thinner the other. OK swells the bar to 104 % and lifts the lens (110 % by 122 %, its rainbow rim brighter); letting go, both spring back, the lens wobbling like jelly (760 ms), and the tab name pops. Tabs have equal 112 px slots. Code: `screens/HomeScreen.*` (`styleTabs`, `moveLens`, `pressBar`).
+- **Glass buttons:** every pill has a sheen and rim over its tint (`glass_pill.9.png`), and unfocused ones are a little see-through.
+- **Click sounds** (new in 0.5.5): a soft glassy tick for moving (focus moving in any list or row of buttons), a little rising pop with a ping for choosing, the pop falling for going back. Screens call `Sound("move" | "select" | "back")` (`common/Motion.brs`); MainScene holds the three `SoundEffect` nodes and plays them, leaving them out when they're off, while a video plays and during the intro. Moves closer than 60 ms apart (a key held down) tick once. Made by `tools/make_sounds.py`, quiet by design (peaks at −20, −14 and −16 dBFS).
+- **Intro** (new in 0.5.5, after the web app's `src/ui/intro.ts`, `intro.css` and `sting.ts`): about 2.5 s over the first screen, which loads underneath. The splash screen is its first frame (the plus alone). The plus knocks (0.1 s); a boom (0.5 s) and ARAN punches in letter by letter out of a lavender and pink glow with 16 light rays bursting behind; the plus spins half a turn with two pings (0.68 and 0.82 s) and six sparks; at 1.55 s it flies through the plus (scaling 70 times around its middle) into the app, with a whoosh. The sting (`sounds/intro.wav`) is the web app's sting rendered to a file. Any key skips it; the Account menu turns it off. While it plays it keeps the keys (Home leaves the focus alone, `introPlaying`). Code: `components/Intro.*`; pieces and their places from `tools/make_images.py` (`images/intro.json`).
 - **Safe area:** keep important text above y 648 at 720p. TVs crop the edges, which is why long errors moved into side cards.
 
 ## 11. Messages and diagnostics
@@ -441,7 +450,8 @@ Unchanged since 0.4.1 apart from where the account is kept; see `samsung-plan.md
 |---|---|
 | Login (registry `account/creds`) | `{ server, username, password, userAgent }`; `userAgent` "" means the device's own |
 | Built-in login stamp | registry `account/builtIn` = `"<server> <username>"` |
-| Player prefs (`prefs/player`) | `{ audio: lang, subtitles: lang \| "off" \| "online" }` |
+| Player prefs (`prefs/player`) | `{ audio: lang, subtitles: lang \| "off" \| "online", sounds: "on" \| "off", intro: "on" \| "off" }` (sounds and intro on unless "off") |
+| Global fields (`m.global`) | `creds`, `playing`, `syncedAt`, `search`, `soundsOn`, `introPlaying`, and `sound` (alwaysNotify: the click sound a screen asks for) |
 | Language prefs (`prefs/languages`) | `["en", "hi", "pa"]` |
 | OpenSubtitles (`opensubtitles/account`) | `{ apiKey, username, password, token, baseUrl }`, or `{ removed: true }` when turned off here |
 | Built-in OpenSubtitles (personal `account.json`) | `"opensubtitles": { "apiKey", "username", "password" }`; stamp `opensubtitles/builtIn` = `"<apiKey> <username>"` |
@@ -482,6 +492,9 @@ Unchanged since 0.4.1 apart from where the account is kept; see `samsung-plan.md
   - Focusing an ancestor of a RowList leaves the RowList taking keys; use an empty sibling Group as the focus holder.
   - Never take focus from an open keyboard dialog.
 - The `brs` test interpreter has `tmp:` but not `cachefs:`, and throws on reading a missing `tmp:` file.
+- **Animations find their nodes by id** (`fieldToInterp` "id.field"), searched within the component, so ids must be unique there. `Tween` names nodes without one; MainScene never reuses a screen id, so a late animation can't land on a new screen.
+- **No `Min` or `Max`** in BrightScript; `Abs`, `Sqr` and `Exp` exist.
+- **Springs:** `easeFunction` has no overshoot, so springs are many keys (the web app's `linear()` lists, `SpringCurve` and `JellyCurve`) with `easeFunction="linear"`.
 
 ## 14. Samsung port checklist
 Suggested order, most useful first:
@@ -498,6 +511,7 @@ Suggested order, most useful first:
 10. **Built-in personal login** with the switch-on-change stamp.
 11. **Picture codecs ignored; audio format labels and unplayable-track swap.**
 12. **Sharp look:** 3 to 5 px corners, posters 10 px apart, badges on the poster, 6% focus lift. At 1080p, multiply Roku sizes by 1.5.
+13. **Motion, glass, sounds and intro** (§10): the web app already has the glass, motion and intro (CSS and Web Audio) to port from; add the click sounds and the Account menu switches too.
 
 The helper on a computer at home (§15) needs no port: Samsung has it, and the Roku came second.
 

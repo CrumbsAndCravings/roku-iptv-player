@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The intro when ARAN+ opens, after the web app's (its src/ui/intro.ts and intro.css),
+  in time with its sting (src/sounds/intro.wav, from tools/make_sounds.py). It starts as
+  the splash screen ends, from the same picture: the plus alone. A soft knock and the plus
+  pulses; a boom and ARAN punches in out of a glow, light rays bursting out behind it; the
+  plus spins and sparks with two pings; then it flies through the plus into the app,
+  which has been loading underneath. Any key skips it; the Account menu turns it off.
+  The pieces and where they sit come from tools/make_images.py (images/intro.json).
+-->
+<component name="Intro" extends="Group">
+  <interface>
+    <!-- Set when it's over; MainScene removes it. -->
+    <field id="done" type="boolean" alwaysNotify="true" />
+  </interface>
+  <children>
+    <Group id="stage">
+      <Poster width="1280" height="720" uri="pkg:/images/intro_bg.png" />
+      <Poster id="glow" translation="[0, -280]" width="1280" height="1280" uri="pkg:/images/intro_glow.png" scaleRotateCenter="[640, 640]" opacity="0" />
+      <Group id="rays" translation="[640, 360]" />
+      <Group id="logo">
+        <Group id="letters" />
+        <Group id="plusMark">
+          <Poster id="plusGlow" uri="pkg:/images/intro_plus.png" />
+          <Poster id="plusCore" uri="pkg:/images/intro_plus_core.png" opacity="0" />
+          <Poster id="plusFlash" uri="pkg:/images/intro_plus_flash.png" opacity="0" />
+        </Group>
+        <Group id="sparks" />
+      </Group>
+    </Group>
+    <SoundEffect id="sting" volume="80" />
+    <!-- Waits this long at most for the sting to load, then plays without it. -->
+    <Timer id="waitTimer" duration="0.8" repeat="false" />
+    <Timer id="leaveTimer" duration="1.55" repeat="false" />
+    <Timer id="doneTimer" duration="0.9" repeat="false" />
+  </children>
+  <script type="text/brightscript" uri="pkg:/components/common/Utils.brs" />
+  <script type="text/brightscript" uri="pkg:/components/Intro.brs" />
+</component>

@@ -5,7 +5,15 @@ sub init()
     m.stack = m.top.FindNode("stack")
     m.screens = []
     m.screenCount = 0
-    m.global.AddFields({ creds: {}, playing: false, syncedAt: 0 })
+    m.moving = {}
+    prefs = LoadPrefs()
+    m.global.AddFields({ creds: {}, playing: false, syncedAt: 0, soundsOn: FieldStr(prefs, "sounds") <> "off", introPlaying: false })
+    ' alwaysNotify, so the same sound twice plays twice.
+    m.global.AddField("sound", "string", true)
+    m.global.ObserveField("sound", "onSound")
+    m.sounds = { move: m.top.FindNode("moveSound"), select: m.top.FindNode("selectSound"), back: m.top.FindNode("backSound") }
+    m.moveClock = CreateObject("roTimespan")
+    m.intro = invalid
     m.syncTask = invalid
     m.syncAgain = false
     m.syncClock = invalid
@@ -47,6 +55,51 @@ sub init()
         resetTo("HomeScreen")
         requestSync(true)
     end if
+    if FieldStr(prefs, "intro") <> "off" then showIntro()
+end sub
+
+' --- Intro and sounds ------------------------------------------------------------------
+
+' The intro (Intro.xml) plays over the first screen, which loads underneath meanwhile.
+' It takes the keys, so any key skips it.
+sub showIntro()
+    m.intro = m.top.CreateChild("Intro")
+    if m.intro.done then
+        onIntroDone()
+        return
+    end if
+    ' Screens leave the focus alone meanwhile (HomeScreen's focusRows).
+    m.global.introPlaying = true
+    m.intro.ObserveField("done", "onIntroDone")
+    m.intro.SetFocus(true)
+end sub
+
+sub onIntroDone()
+    if m.intro = invalid then return
+    m.intro.UnobserveField("done")
+    m.top.RemoveChild(m.intro)
+    m.intro = invalid
+    m.global.introPlaying = false
+    if m.screens.Count() > 0 then m.screens.Peek().takeFocus = true
+end sub
+
+' A click sound a screen asked for (Sound() in common/Motion.brs).
+sub onSound()
+    playSound(m.global.sound)
+end sub
+
+' Plays "move", "select" or "back", unless they're turned off (Account menu), a video
+' is playing or the intro is. Moves closer together than 60 ms (a key held down) tick once.
+sub playSound(name as String)
+    if not m.global.soundsOn or m.global.playing = true or m.intro <> invalid then return
+    node = m.sounds[name]
+    if node = invalid then return
+    if name = "move" then
+        if m.moveClock.TotalMilliseconds() < 60 then return
+        m.moveClock.Mark()
+    end if
+    node.control = "stop"
+    node.control = "play"
 end sub
 
 ' Roku's own dialogs and keyboards (sign-in fields, account menu) in the ARAN+ colours.
@@ -69,57 +122,28 @@ sub applyDialogPalette()
 end sub
 
 function pushScreen(name as String) as Object
-    if m.screens.Count() > 0 then
-        current = m.screens.Peek()
-        current.visible = false
-    end if
+    previous = invalid
+    if m.screens.Count() > 0 then previous = m.screens.Peek()
     screen = m.stack.CreateChild(name)
-    screen.ObserveField("action", "onAction")
-    m.screens.Push(screen)
-    animateIn(screen)
-    return screen
-end function
-
-' New screens fade in while floating up a little.
-sub animateIn(screen as Object)
+    ' Ids are never reused, so an animation can't land on the wrong screen.
     m.screenCount = m.screenCount + 1
     screen.id = "screen" + m.screenCount.ToStr()
-    screen.opacity = 0.0
-    screen.translation = [0, 18]
-    anim = m.top.CreateChild("Animation")
-    anim.duration = 0.3
-    anim.easeFunction = "outCubic"
-    fade = anim.CreateChild("FloatFieldInterpolator")
-    fade.key = [0.0, 1.0]
-    fade.keyValue = [0.0, 1.0]
-    fade.fieldToInterp = screen.id + ".opacity"
-    slide = anim.CreateChild("Vector2DFieldInterpolator")
-    slide.key = [0.0, 1.0]
-    slide.keyValue = [[0, 18], [0, 0]]
-    slide.fieldToInterp = screen.id + ".translation"
-    anim.ObserveField("state", "onScreenAnimation")
-    anim.control = "start"
-end sub
-
-' Drops finished transitions and makes sure the screen ends fully shown.
-sub onScreenAnimation(event as Object)
-    anim = event.GetRoSGNode()
-    if anim.state <> "stopped" then return
-    for each screen in m.screens
-        screen.opacity = 1.0
-        screen.translation = [0, 0]
-    end for
-    anim.UnobserveField("state")
-    m.top.RemoveChild(anim)
-end sub
+    screen.scaleRotateCenter = [640, 360]
+    screen.ObserveField("action", "onAction")
+    m.screens.Push(screen)
+    moveScreen(screen, entrance(name))
+    if previous <> invalid then moveScreen(previous, "sink")
+    return screen
+end function
 
 sub popScreen()
     if m.screens.Count() <= 1 then return
     top = m.screens.Pop()
     top.UnobserveField("action")
-    m.stack.RemoveChild(top)
+    moveScreen(top, exitFor(top.Subtype()))
     previous = m.screens.Peek()
     previous.visible = true
+    moveScreen(previous, "back")
     previous.takeFocus = true
 end sub
 
@@ -127,11 +151,132 @@ sub resetTo(name as String)
     for each screen in m.screens
         screen.UnobserveField("action")
     end for
+    for each key in m.moving.Keys()
+        stopMoving(m.moving[key].screen)
+    end for
+    m.moving = {}
     m.screens = []
-    m.screenCount = 0
     m.stack.RemoveChildrenIndex(m.stack.GetChildCount(), 0)
     screen = pushScreen(name)
     screen.takeFocus = true
+    ' Signing in by itself during the intro: the intro keeps the keys.
+    if m.intro <> invalid then m.intro.SetFocus(true)
+end sub
+
+' --- Screens coming and going ------------------------------------------------------------
+'
+' As in the web app (its motion.css): a page slides in from the right and leaves the same
+' way, Details rises like a card and drops away, the player and Home fade; the page
+' underneath sinks back a little and comes up again when you return. Only opacity,
+' position and scale move.
+
+function entrance(name as String) as String
+    if name = "DetailsScreen" then return "rise"
+    if name = "PlayerScreen" or name = "HomeScreen" or name = "LoginScreen" then return "fade"
+    return "in"
+end function
+
+function exitFor(name as String) as String
+    if name = "DetailsScreen" then return "drop"
+    if name = "PlayerScreen" then return "fadeOut"
+    return "out"
+end function
+
+' motion: "in", "rise", "fade" and "back" bring a screen in; "sink" takes it under the
+' next one (then hides it); "out", "drop" and "fadeOut" take it away (then remove it).
+' A screen's new motion takes over from one still running.
+sub moveScreen(screen as Object, motion as String)
+    stopMoving(screen)
+    seconds = 0.3
+    ease = "outExpo"
+    after = "show"
+    opacity = [0.0, 1.0]
+    position = invalid
+    size = invalid
+    if motion = "in" then
+        position = [[28, 0], [0, 0]]
+    else if motion = "rise" then
+        seconds = 0.38
+        position = [[0, 40], [0, 0]]
+    else if motion = "fade" then
+        ease = "outQuad"
+    else if motion = "back" then
+        opacity = [screen.opacity, 1.0]
+        size = [screen.scale, [1.0, 1.0]]
+    else if motion = "sink" then
+        seconds = 0.26
+        ease = "inCubic"
+        opacity = [screen.opacity, 0.0]
+        size = [screen.scale, [0.97, 0.97]]
+        after = "hide"
+    else
+        seconds = 0.24
+        ease = "inCubic"
+        opacity = [screen.opacity, 0.0]
+        if motion = "out" then position = [screen.translation, [28, 0]]
+        if motion = "drop" then position = [screen.translation, [0, 40]]
+        after = "remove"
+    end if
+
+    anim = m.top.CreateChild("Animation")
+    anim.duration = seconds
+    anim.easeFunction = ease
+    anim.AddFields({ screenId: screen.id })
+    screen.opacity = opacity[0]
+    addLerp(anim, "FloatFieldInterpolator", screen.id + ".opacity", opacity)
+    if position <> invalid then
+        screen.translation = position[0]
+        addLerp(anim, "Vector2DFieldInterpolator", screen.id + ".translation", position)
+    end if
+    if size <> invalid then
+        screen.scale = size[0]
+        addLerp(anim, "Vector2DFieldInterpolator", screen.id + ".scale", size)
+    end if
+    m.moving[screen.id] = { anim: anim, screen: screen, after: after }
+    anim.ObserveField("state", "onScreenMoved")
+    anim.control = "start"
+end sub
+
+sub addLerp(anim as Object, kind as String, target as String, values as Object)
+    lerp = anim.CreateChild(kind)
+    lerp.key = [0.0, 1.0]
+    lerp.keyValue = values
+    lerp.fieldToInterp = target
+end sub
+
+sub onScreenMoved(event as Object)
+    anim = event.GetRoSGNode()
+    if anim.state <> "stopped" then return
+    job = m.moving[anim.screenId]
+    if job = invalid or not job.anim.IsSameNode(anim) then
+        anim.UnobserveField("state")
+        m.top.RemoveChild(anim)
+        return
+    end if
+    m.moving.Delete(anim.screenId)
+    anim.UnobserveField("state")
+    m.top.RemoveChild(anim)
+    screen = job.screen
+    if job.after = "remove" then
+        m.stack.RemoveChild(screen)
+    else if job.after = "hide" then
+        ' Left sunk back, so "back" brings it up from there.
+        screen.visible = false
+    else
+        screen.opacity = 1.0
+        screen.translation = [0, 0]
+        screen.scale = [1.0, 1.0]
+    end if
+end sub
+
+' Stops a screen's motion where it is, without what was to follow it.
+sub stopMoving(screen as Object)
+    job = m.moving[screen.id]
+    if job = invalid then return
+    m.moving.Delete(screen.id)
+    job.anim.UnobserveField("state")
+    job.anim.control = "stop"
+    m.top.RemoveChild(job.anim)
 end sub
 
 sub onAction(event as Object)
@@ -242,6 +387,7 @@ end sub
 function onKeyEvent(key as String, press as Boolean) as Boolean
     if not press then return false
     if key = "back" and m.screens.Count() > 1 then
+        playSound("back")
         popScreen()
         return true
     end if

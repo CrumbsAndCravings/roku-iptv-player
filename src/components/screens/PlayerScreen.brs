@@ -17,6 +17,13 @@ sub init()
     m.keys = m.top.FindNode("keys")
 
     m.controls = m.top.FindNode("controls")
+    ' Whether the controls are up (they may still be fading away when not).
+    m.controlsOn = false
+    m.controlsIn = m.top.FindNode("controlsIn")
+    m.controlsInFade = m.top.FindNode("controlsInFade")
+    m.controlsOut = m.top.FindNode("controlsOut")
+    m.controlsOutFade = m.top.FindNode("controlsOutFade")
+    m.controlsOut.ObserveField("state", "onControlsGone")
     m.backBg = m.top.FindNode("backBg")
     m.backLabel = m.top.FindNode("backLabel")
     m.titleLabel = m.top.FindNode("titleLabel")
@@ -296,7 +303,7 @@ sub onPosition()
     ' A minute of playing since the helper's stream last opened again: it's fine.
     if m.helperReopens > 0 and position - m.offset > 60 then m.helperReopens = 0
     if Abs(position - m.lastSaved) >= 15 then saveProgress()
-    if m.controls.visible then renderBar()
+    if m.controlsOn then renderBar()
 end sub
 
 ' Where the video is, in seconds from the file's start. Through the helper, a growing
@@ -406,12 +413,12 @@ sub onState()
         if not m.introShown then
             m.introShown = true
             showControls("bar")
-        else if m.controls.visible then
+        else if m.controlsOn then
             restartHideTimer()
         end if
     else if state = "paused" then
         saveProgress()
-        if not m.controls.visible then showControls("bar")
+        if not m.controlsOn then showControls("bar")
         m.hideTimer.control = "stop"
     else if state = "error" then
         onPlaybackError()
@@ -926,15 +933,31 @@ sub buildButtons()
 end sub
 
 sub showControls(row as String)
-    m.controls.visible = true
+    if not m.controlsOn then
+        m.controlsOn = true
+        m.controlsOut.control = "stop"
+        fadeFrom = 0.0
+        if m.controls.visible then fadeFrom = m.controls.opacity
+        m.controls.visible = true
+        m.controlsInFade.keyValue = [fadeFrom, 1.0]
+        m.controlsIn.control = "start"
+    end if
     m.row = row
     renderControls()
     restartHideTimer()
 end sub
 
 sub hideControls()
-    m.controls.visible = false
     m.hideTimer.control = "stop"
+    if not m.controlsOn then return
+    m.controlsOn = false
+    m.controlsIn.control = "stop"
+    m.controlsOutFade.keyValue = [m.controls.opacity, 0.0]
+    m.controlsOut.control = "start"
+end sub
+
+sub onControlsGone()
+    if m.controlsOut.state = "stopped" and not m.controlsOn then m.controls.visible = false
 end sub
 
 sub restartHideTimer()
@@ -965,10 +988,12 @@ sub renderControls()
 end sub
 
 sub renderPlayButton()
-    if m.video.state = "paused" then
-        m.playIcon.uri = "pkg:/images/icon_play.png"
-    else
-        m.playIcon.uri = "pkg:/images/icon_pause.png"
+    icon = "pkg:/images/icon_pause.png"
+    if m.video.state = "paused" then icon = "pkg:/images/icon_play.png"
+    ' Play turning into pause (and back) pops.
+    if m.playIcon.uri <> icon then
+        m.playIcon.uri = icon
+        Tween(m.playIcon, "scale", [[0.6, 0.6], [1.0, 1.0]], 0.32, "outExpo", 0)
     end if
     if m.row = "bar" then
         m.playBg.blendColor = "0xC9B8FFFF"
@@ -1109,7 +1134,7 @@ end sub
 
 sub stepSeek(seconds as Integer)
     m.seekTarget = ClampSeek(m.seekTarget + seconds * m.holdDirection, durationSecs())
-    if not m.controls.visible then showControls("bar")
+    if not m.controlsOn then showControls("bar")
     renderBar()
     restartHideTimer()
 end sub
@@ -1205,7 +1230,7 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
         if m.seeking then
             cancelSeek()
             renderBar()
-        else if m.controls.visible then
+        else if m.controlsOn then
             hideControls()
         else
             leave()
@@ -1222,7 +1247,7 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
         return true
     end if
 
-    if not m.controls.visible then
+    if not m.controlsOn then
         if key = "OK" then
             if m.video.state <> "paused" then m.video.control = "pause"
             showControls("bar")

@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   A 120x180 poster tile for RowList and MarkupGrid: sharp corners, grows a little with a
-  lavender ring when focused, and pulses softly while its row is still loading. Badges
+  lavender ring when focused, and pulses softly while its row is still loading. A row's
+  posters build in one after another when it arrives, each picture fading in as it loads. Badges
   ("Won't play", "S1:E4") and the progress bar sit on the poster, so rows can sit
   close together. Category and "See all" items show their name on a tinted card.
 -->
@@ -31,6 +32,19 @@
 
     <Animation id="pulse" duration="1.4" repeat="true" easeFunction="inOutQuad">
       <FloatFieldInterpolator key="[0.0, 0.5, 1.0]" keyValue="[0.45, 1.0, 0.45]" fieldToInterp="base.opacity" />
+    </Animation>
+    <!-- Pictures fade in once they're here. -->
+    <Animation id="imageIn" duration="0.32" easeFunction="outQuad">
+      <FloatFieldInterpolator id="imageFade" key="[0.0, 1.0]" keyValue="[0.0, 1.0]" fieldToInterp="poster.opacity" />
+    </Animation>
+    <!-- A row's posters build in from the right, one after another (delay set by place). -->
+    <Animation id="buildIn" duration="0.48" easeFunction="outExpo">
+      <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[0.0, 1.0]" fieldToInterp="card.opacity" />
+      <Vector2DFieldInterpolator key="[0.0, 1.0]" keyValue="[[18, 0], [0, 0]]" fieldToInterp="card.translation" />
+    </Animation>
+    <!-- Then how far you got fills in. -->
+    <Animation id="fillIn" duration="0.8" easeFunction="outExpo">
+      <FloatFieldInterpolator id="fillGrow" key="[0.0, 1.0]" keyValue="[0.0, 120.0]" fieldToInterp="fill.width" />
     </Animation>
   </children>
   <script type="text/brightscript" uri="pkg:/components/common/Utils.brs" />
