@@ -82,8 +82,6 @@
     <Timer id="heroTimer" duration="0.6" repeat="false" />
     <!-- Starts the library worker for the rows picked for you, once Home and its own rows are up. -->
     <Timer id="picksTimer" duration="6" repeat="false" />
-    <!-- Clears the guard if the picks take long (HomeScreen.brs, picksAllowed). -->
-    <Timer id="guardTimer" duration="30" repeat="false" />
 
     <Animation id="backdropIn" duration="0.5" easeFunction="outQuad">
       <FloatFieldInterpolator id="backdropFade" key="[0.0, 1.0]" keyValue="[0.0, 1.0]" fieldToInterp="backdrop.opacity" />

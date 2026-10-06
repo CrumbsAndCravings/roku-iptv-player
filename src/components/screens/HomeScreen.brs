@@ -70,10 +70,10 @@ sub init()
     m.nextDialog = ""
     m.picksTimer = m.top.FindNode("picksTimer")
     m.picksTimer.ObserveField("fire", "askPicks")
-    m.guardTimer = m.top.FindNode("guardTimer")
-    m.guardTimer.ObserveField("fire", "picksDone")
-    m.picksOn = picksAllowed()
-    m.guardDone = false
+    ' 0.5.9 and 0.5.10 had a guard that switched these rows off after a launch that
+    ' stopped part way (it hid My List after 0.5.9's crash); its marks go.
+    RegDelete("taste", "guard")
+    RegDelete("taste", "off")
 
     m.rows.ObserveField("rowItemFocused", "onRowItemFocused")
     m.rows.ObserveField("rowItemSelected", "onRowItemSelected")
@@ -183,9 +183,8 @@ function buildPlan(tabIndex as Integer) as Object
     return plan
 end function
 
-' The likings that order the rows (none while the picks are off, picksAllowed).
+' The likings that order the rows (TasteOrder).
 function likings() as Object
-    if not m.picksOn then return {}
     return TasteScores()
 end function
 
@@ -200,8 +199,6 @@ function planEntries(list as Object, kind as String, wantNew as Dynamic) as Obje
 end function
 
 sub showTab(tabIndex as Integer)
-    ' Building the rows picked for you and the order of the rest is under the guard too.
-    guardPicks()
     m.tab = tabIndex
     m.tabCursor = tabIndex
     m.generation = m.generation + 1
@@ -222,7 +219,6 @@ sub showTab(tabIndex as Integer)
     styleTabs()
 
     if root.GetChildCount() = 0 then
-        picksDone()
         m.failed = true
         if m.lastError <> "" then
             showLoadError()
@@ -238,12 +234,12 @@ sub showTab(tabIndex as Integer)
     m.status.text = ""
     m.failed = false
     ' The library worker starts a few seconds in, so Home's own rows load first.
-    if m.personal.Count() = 0 or not m.picksOn then
-        picksDone()
-    else if m.global.search <> invalid then
-        askPicks()
-    else
-        m.picksTimer.control = "start"
+    if m.personal.Count() > 0 then
+        if m.global.search <> invalid then
+            askPicks()
+        else
+            m.picksTimer.control = "start"
+        end if
     end if
     if m.firstLoad then
         m.firstLoad = false
@@ -771,7 +767,6 @@ end function
 ' worker builds it the first time), they wait for the next launch.
 
 sub addPersonalRows(root as Object)
-    if not m.picksOn then return
     ' My List first, as name cards until the library worker brings their pictures.
     list = MyList()
     m.listStamp = FormatJson(list)
@@ -798,12 +793,9 @@ sub addPersonalRows(root as Object)
 end sub
 
 sub askPicks()
-    if m.personal.Count() = 0 or not m.picksOn then return
+    if m.personal.Count() = 0 then return
     ' Only with a stored library: building one asks the provider for every category.
-    if m.global.search = invalid and not LibrarySaved() then
-        picksDone()
-        return
-    end if
+    if m.global.search = invalid and not LibrarySaved() then return
     because = []
     list = []
     for each entry in m.personal
@@ -819,7 +811,6 @@ sub askPicks()
         m.watchingPicks = true
         task.ObserveFieldScoped("picked", "onPicks")
     end if
-    guardPicks()
     task.picksRequest = { history: TasteHistory(), watching: ProgressList(), because: because, list: list, forKey: m.picksKey }
 end sub
 
@@ -856,42 +847,6 @@ sub onPicks(event as Object)
         end for
         refreshHero()
     end if
-    picksDone()
-end sub
-
-' --- Guard ---------------------------------------------------------------------------
-'
-' Working out the rows picked for you is a lot for a Roku. In case it ever stops the app
-' (it froze once), taste/guard is set while it's under way and cleared once the answer
-' is on screen, or 30 seconds on; Home's own building of those rows and of the row
-' order is under it too. A launch that finds it still set goes without them (My List,
-' Top picks, Because you watched, the order by what you like) for this version of the
-' app (taste/off holds the version), so the app always opens.
-
-function picksAllowed() as Boolean
-    version = AppUserAgent()
-    if RegRead("taste", "guard") <> invalid then
-        RegDelete("taste", "guard")
-        RegWrite("taste", "off", version)
-    end if
-    return ToStr(RegRead("taste", "off")) <> version
-end function
-
-' Set from building Home's rows at launch until the first picks are on screen
-' (picksAllowed). Only at launch, so leaving the app soon after coming back to Home
-' doesn't count as a stop.
-sub guardPicks()
-    if not m.picksOn or m.guardDone then return
-    RegWrite("taste", "guard", "1")
-    m.guardTimer.control = "stop"
-    m.guardTimer.control = "start"
-end sub
-
-sub picksDone()
-    if m.guardDone then return
-    m.guardDone = true
-    m.guardTimer.control = "stop"
-    RegDelete("taste", "guard")
 end sub
 
 ' Takes a row off, keeping the focus on the same poster when it was below.
@@ -905,7 +860,7 @@ end sub
 ' Watching, keeping the pictures it had and the focus on the same poster.
 sub syncListRow()
     root = m.rows.content
-    if m.tab <> 0 or root = invalid or not m.picksOn then return
+    if m.tab <> 0 or root = invalid then return
     list = MyList()
     stamp = FormatJson(list)
     if stamp = m.listStamp then return
