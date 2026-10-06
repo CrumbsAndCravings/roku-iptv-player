@@ -780,7 +780,7 @@ sub addPersonalRows(root as Object)
         root.AppendChild(row)
         m.personal.Push({ slot: "list", row: row, k: "", n: "" })
     end if
-    if not CreateObject("roFileSystem").Exists(SearchCachePath()) then return
+    if not LibrarySaved() then return
     history = TasteHistory()
     if history.Count() = 0 and ProgressList().Count() = 0 then return
     slots = [{ slot: "picks", title: "Top picks for you", k: "", n: "" }]
@@ -800,7 +800,7 @@ end sub
 sub askPicks()
     if m.personal.Count() = 0 or not m.picksOn then return
     ' Only with a stored library: building one asks the provider for every category.
-    if m.global.search = invalid and not CreateObject("roFileSystem").Exists(SearchCachePath()) then
+    if m.global.search = invalid and not LibrarySaved() then
         picksDone()
         return
     end if

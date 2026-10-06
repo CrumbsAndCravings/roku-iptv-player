@@ -42,6 +42,7 @@ sub ClearAccount()
     RegDelete("taste", "scores")
     RegDelete("mylist", "items")
     DeleteFile(SearchCachePath())
+    RegDelete("search", "saved")
 end sub
 
 ' Player preferences, e.g. { audio: "hin", subtitles: "eng" } (language codes, or "off").
@@ -80,6 +81,13 @@ end sub
 function BuiltInOsAccount() as Dynamic
     if m.builtInOs = invalid then m.builtInOs = { value: OsAccountSettings(ParseJson(ReadAsciiFile("pkg:/source/account.json"))) }
     return m.builtInOs.value
+end function
+
+' Whether the library worker has a library stored on this Roku (tasks/SearchTask.brs
+' sets search/saved when it loads or saves one). Screens check this rather than the file:
+' roFileSystem can't be made on the render thread, which crashes the app.
+function LibrarySaved() as Boolean
+    return RegRead("search", "saved") <> invalid
 end function
 
 ' A login built into this package (src/source/account.json, which git ignores), so a

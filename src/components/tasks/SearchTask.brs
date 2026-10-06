@@ -18,6 +18,8 @@ sub work()
     ' one, and replaces it when complete. Only the very first load makes you wait.
     live = LoadSearchIndex(SearchCachePath(), owner)
     refreshing = live <> invalid
+    ' Home looks for this before asking for picks (LibrarySaved).
+    if refreshing then RegWrite("search", "saved", live.savedAt.ToStr())
     ' A request for picks made as this worker started, before it was listening.
     askedEarly = IsAA(m.top.picksRequest) and m.top.picksRequest.Count() > 0
     if refreshing then
@@ -200,7 +202,7 @@ sub work()
                 ' Keep the library (a few broken categories don't spoil it). A refresh
                 ' that stopped early keeps the saved one and tries again next time.
                 if not stopped and failedLists <= 3 then
-                    SaveSearchIndex(building, SearchCachePath(), owner, NowSeconds())
+                    if SaveSearchIndex(building, SearchCachePath(), owner, NowSeconds()) then RegWrite("search", "saved", NowSeconds().ToStr())
                     live = building
                 end if
             end if
