@@ -321,6 +321,40 @@ function IndexCategoriesOf(index as Object, keys as Object) as Object
     return found
 end function
 
+' My List (common/MyList.brs) as a row, in its order, with the pictures and details the
+' library holds; a title it doesn't hold (another language) keeps its name card.
+function IndexListRow(index as Object, list as Object) as Object
+    sep = searchSeparator()
+    wanted = {}
+    for each entry in list
+        key = FieldStr(entry, "k")
+        if Len(key) > 2 then wanted[Left(key, 1) + sep + Mid(key, 3) + sep] = key
+    end for
+    found = {}
+    if wanted.Count() > 0 then
+        for each record in index.records
+            cut = Instr(3, record, sep)
+            if cut > 0 then
+                key = wanted[Left(record, cut)]
+                if key <> invalid and not found.DoesExist(key) then found[key] = record.Split(sep)
+            end if
+        end for
+    end if
+    row = MyListRow([], {})
+    for each entry in list
+        key = FieldStr(entry, "k")
+        parts = found[key]
+        if parts <> invalid and parts.Count() >= 5 then
+            kind = "movie"
+            if parts[0] = "s" then kind = "series"
+            addSearchItem(row, parts, kind)
+        else
+            row.AppendChild(MyListRow([entry], {}).GetChild(0))
+        end if
+    end for
+    return row
+end function
+
 ' "Top picks for you": titles from the categories you like most (`scores`, LikingFrom),
 ' the more liked and the newer the higher, at most 8 from one category so there's some
 ' variety, each title once, and none you've watched: `exclude` holds their keys ("m:123")

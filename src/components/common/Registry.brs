@@ -40,6 +40,7 @@ sub ClearAccount()
     RegDelete("helper", "titles")
     RegDelete("taste", "history")
     RegDelete("taste", "scores")
+    RegDelete("mylist", "items")
     DeleteFile(SearchCachePath())
 end sub
 

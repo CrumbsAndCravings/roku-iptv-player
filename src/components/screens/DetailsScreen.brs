@@ -40,6 +40,7 @@ sub init()
     m.queue = []
     m.entry = invalid
     m.task = invalid
+    m.rateChoices = []
 
     m.episodes.ObserveField("itemSelected", "onEpisodeSelected")
     m.episodes.ObserveField("itemFocused", "onEpisodeFocused")
@@ -168,9 +169,9 @@ end sub
 sub buildMovieButtons()
     m.entry = ProgressFind("m:" + m.item.itemId)
     if m.entry <> invalid and ToInt(m.entry.pos) > 0 then
-        setButtons(["Resume from " + FormatClock(ToInt(m.entry.pos)), "Play from start", "Remove from Continue Watching"], ["resume", "restart", "forget"])
+        setTitleButtons(["Resume from " + FormatClock(ToInt(m.entry.pos)), "Play from start", "Remove from Continue Watching"], ["resume", "restart", "forget"])
     else
-        setButtons(["Play"], ["play"])
+        setTitleButtons(["Play"], ["play"])
     end if
 end sub
 
@@ -276,9 +277,9 @@ sub refreshSeriesProgress(pickSeason as Boolean)
         ' After an episode finishes, the entry points at the next one with no progress yet.
         verb = "Play "
         if ToInt(m.entry.pos) > 0 then verb = "Resume "
-        setButtons([verb + code, "Episodes", "Remove from Continue Watching"], ["resumeEpisode", "episodes", "forget"])
+        setTitleButtons([verb + code, "Episodes", "Remove from Continue Watching"], ["resumeEpisode", "episodes", "forget"])
     else
-        setButtons(["Play " + m.queue[0].code, "Episodes"], ["playFirst", "episodes"])
+        setTitleButtons(["Play " + m.queue[0].code, "Episodes"], ["playFirst", "episodes"])
     end if
 end sub
 
@@ -337,6 +338,67 @@ sub setButtons(labels as Object, actions as Object)
     styleButtons()
 end sub
 
+' The play buttons, then My List and your rating (common/MyList.brs, common/Taste.brs).
+sub setTitleButtons(labels as Object, actions as Object)
+    key = thisTitleKey()
+    if MyListHas(key) then
+        labels.Push("In My List")
+    else
+        labels.Push("+ My List")
+    end if
+    actions.Push("list")
+    labels.Push(TasteRatingLabel(TasteRating(key)))
+    actions.Push("rate")
+    setButtons(labels, actions)
+end sub
+
+function thisTitleKey() as String
+    if m.kind = "movie" then return "m:" + m.item.itemId
+    return "s:" + m.item.itemId
+end function
+
+' After My List or a rating changes, the buttons say so; the focus stays put.
+sub refreshButtons()
+    if m.kind = "movie" then
+        buildMovieButtons()
+    else if m.seriesNode <> invalid then
+        refreshSeriesProgress(false)
+    end if
+    styleButtons()
+end sub
+
+' "Not for me", "I like this" or "Love this!" (or taking the rating away).
+sub showRateMenu()
+    rating = TasteRating(thisTitleKey())
+    m.rateChoices = [-1, 1, 2]
+    labels = ["Not for me", "I like this", "Love this!"]
+    if rating <> 0 then
+        labels.Push("Take my rating away")
+        m.rateChoices.Push(0)
+    end if
+    dialog = CreateObject("roSGNode", "StandardMessageDialog")
+    dialog.title = m.item.title
+    dialog.message = ["How was it? Your ratings shape Top picks for you and the rows you see first on Home."]
+    dialog.buttons = labels
+    dialog.ObserveField("buttonSelected", "onRateButton")
+    dialog.ObserveField("wasClosed", "onRateClosed")
+    m.top.GetScene().dialog = dialog
+end sub
+
+sub onRateButton()
+    dialog = m.top.GetScene().dialog
+    if dialog = invalid then return
+    choice = dialog.buttonSelected
+    dialog.close = true
+    if choice < 0 or choice >= m.rateChoices.Count() then return
+    TasteRate(thisTitleKey(), m.item.title, m.rateChoices[choice])
+    refreshButtons()
+end sub
+
+sub onRateClosed()
+    enterZone(m.zone)
+end sub
+
 sub styleButtons()
     focus = -1
     if m.zone = "buttons" then focus = m.buttonIndex
@@ -377,6 +439,11 @@ sub activateButton()
         jumpToSavedEpisode()
     else if action = "forget" then
         forgetProgress()
+    else if action = "list" then
+        MyListToggle(thisTitleKey(), m.item.title, m.item.ext)
+        refreshButtons()
+    else if action = "rate" then
+        showRateMenu()
     end if
 end sub
 

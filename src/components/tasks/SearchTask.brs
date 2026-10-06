@@ -279,10 +279,11 @@ sub answerCounts(index as Object)
 end sub
 
 ' Home's rows picked for you (common/Taste.brs): `picksRequest` { history, watching,
-' because: [{ k, n }], forKey } -> `picks`, a ContentNode of rows (Top picks for you,
-' then a "Because you watched" row for each of `because`), each tagged with its `slot`
-' ("picks", or the title's key), and the likings worked out (`scores`, which Home keeps
-' to order its rows). `loading` says the library is still arriving.
+' because: [{ k, n }], list, forKey } -> `picks`, a ContentNode of rows (My List with
+' its pictures, when `list` has titles; Top picks for you; then a "Because you watched"
+' row for each of `because`), each tagged with its `slot` ("list", "picks", or the
+' title's key), and the likings worked out (`scores`, which Home keeps to order its
+' rows). `loading` says the library is still arriving.
 sub answerPicks(index as Object, loading as Boolean)
     request = m.top.picksRequest
     history = Field(request, "history")
@@ -309,6 +310,12 @@ sub answerPicks(index as Object, loading as Boolean)
     now = NowSeconds()
     scores = LikingFrom(history, watching, categories, now)
     root = CreateObject("roSGNode", "ContentNode")
+    list = Field(request, "list")
+    if IsArr(list) and list.Count() > 0 then
+        listRow = IndexListRow(index, list)
+        listRow.AddFields({ slot: "list" })
+        root.AppendChild(listRow)
+    end if
     picks = IndexPicks(index, scores, exclude, 30, now)
     picks.AddFields({ slot: "picks" })
     root.AppendChild(picks)

@@ -62,6 +62,12 @@ sub init()
     m.personal = []
     m.picksKey = ""
     m.watchingPicks = false
+    m.listStamp = ""
+    ' The poster menu (* on a poster) and the menu it opens next, if any.
+    m.menuItem = invalid
+    m.menuActions = []
+    m.rateChoices = []
+    m.nextDialog = ""
     m.picksTimer = m.top.FindNode("picksTimer")
     m.picksTimer.ObserveField("fire", "askPicks")
 
@@ -346,7 +352,7 @@ sub showHero(item as Object)
     if item.caption <> "" then
         meta = "Resume  " + item.caption
     end if
-    if continueItem() <> invalid then meta = meta + "   ·   * to remove"
+    if TitleKey(item) <> "" then meta = meta + "   ·   * for options"
     m.heroMeta.color = "0xC3B8E6FF"
     if item.problem <> "" then
         meta = "Won't play on this " + DeviceWord() + " (" + item.problem + ")   ·   " + meta
@@ -438,6 +444,7 @@ end sub
 sub onTakeFocus()
     if m.tab = 0 and m.rows.content <> invalid then
         refreshContinueWatching()
+        syncListRow()
         ' What you just watched leaves the picks, and may change them.
         if m.global.search <> invalid then askPicks()
     end if
@@ -669,10 +676,11 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
     if m.navFocused then return onNavKey(key, press)
     if not press then return false
     if key = "options" then
-        ' On a Continue Watching poster, * offers to remove it; elsewhere it's the account menu.
-        item = continueItem()
-        if item <> invalid then
-            showContinueMenu(item)
+        ' On a poster, * offers My List, a rating and (on Continue Watching) taking it
+        ' off; elsewhere it's the account menu.
+        item = focusedItem()
+        if TitleKey(item) <> "" then
+            showTitleMenu(item)
         else
             showAccountMenu()
         end if
@@ -750,6 +758,14 @@ end function
 ' worker builds it the first time), they wait for the next launch.
 
 sub addPersonalRows(root as Object)
+    ' My List first, as name cards until the library worker brings their pictures.
+    list = MyList()
+    m.listStamp = FormatJson(list)
+    if list.Count() > 0 then
+        row = MyListRow(list, {})
+        root.AppendChild(row)
+        m.personal.Push({ slot: "list", row: row, k: "", n: "" })
+    end if
     if not CreateObject("roFileSystem").Exists(SearchCachePath()) then return
     history = TasteHistory()
     if history.Count() = 0 and ProgressList().Count() = 0 then return
@@ -769,9 +785,16 @@ end sub
 
 sub askPicks()
     if m.personal.Count() = 0 then return
+    ' Only with a stored library: building one asks the provider for every category.
+    if m.global.search = invalid and not CreateObject("roFileSystem").Exists(SearchCachePath()) then return
     because = []
+    list = []
     for each entry in m.personal
-        if entry.slot <> "picks" then because.Push({ k: entry.k, n: entry.n })
+        if entry.slot = "list" then
+            list = MyList()
+        else if entry.slot <> "picks" then
+            because.Push({ k: entry.k, n: entry.n })
+        end if
     end for
     m.picksKey = m.generation.ToStr() + ":" + NowSeconds().ToStr()
     task = LibraryTask()
@@ -779,7 +802,7 @@ sub askPicks()
         m.watchingPicks = true
         task.ObserveFieldScoped("picks", "onPicks")
     end if
-    task.picksRequest = { history: TasteHistory(), watching: ProgressList(), because: because, forKey: m.picksKey }
+    task.picksRequest = { history: TasteHistory(), watching: ProgressList(), because: because, list: list, forKey: m.picksKey }
 end sub
 
 sub onPicks(event as Object)
@@ -802,17 +825,68 @@ sub onPicks(event as Object)
                     answer.title = entry.row.title
                     root.ReplaceChild(answer, index)
                     entry.row = answer
-                else if index >= 0 then
-                    ' Nothing to pick: the row goes, keeping the focus where it was.
-                    root.RemoveChildIndex(index)
+                else if index >= 0 and entry.slot <> "list" then
+                    ' Nothing to pick: the row goes.
+                    removeRow(root, index)
                     entry.row = invalid
-                    focus = m.rows.rowItemFocused
-                    if focus <> invalid and focus.Count() > 1 and focus[0] > index then m.rows.jumpToRowItem = [focus[0] - 1, focus[1]]
                 end if
             end if
         end for
     end for
     refreshHero()
+end sub
+
+' Takes a row off, keeping the focus on the same poster when it was below.
+sub removeRow(root as Object, index as Integer)
+    root.RemoveChildIndex(index)
+    focus = m.rows.rowItemFocused
+    if focus <> invalid and focus.Count() > 1 and focus[0] > index then m.rows.jumpToRowItem = [focus[0] - 1, focus[1]]
+end sub
+
+' My List changed (on Details, or with * here): its row follows, under Continue
+' Watching, keeping the pictures it had and the focus on the same poster.
+sub syncListRow()
+    root = m.rows.content
+    if m.tab <> 0 or root = invalid then return
+    list = MyList()
+    stamp = FormatJson(list)
+    if stamp = m.listStamp then return
+    m.listStamp = stamp
+    entry = invalid
+    for each candidate in m.personal
+        if candidate.slot = "list" then entry = candidate
+    end for
+    old = invalid
+    if entry <> invalid then old = entry.row
+    oldIndex = -1
+    if old <> invalid then oldIndex = indexOfRow(root, old)
+    if list.Count() = 0 then
+        if oldIndex >= 0 then removeRow(root, oldIndex)
+        if entry <> invalid then entry.row = invalid
+        return
+    end if
+    posters = {}
+    if old <> invalid then
+        for i = 0 to old.GetChildCount() - 1
+            child = old.GetChild(i)
+            posters[TitleKey(child)] = child.HDPosterUrl
+        end for
+    end if
+    row = MyListRow(list, posters)
+    if oldIndex >= 0 then
+        root.ReplaceChild(row, oldIndex)
+    else
+        index = 0
+        if root.GetChildCount() > 0 and root.GetChild(0).HasField("isContinue") then index = 1
+        root.InsertChild(row, index)
+        focus = m.rows.rowItemFocused
+        if focus <> invalid and focus.Count() > 1 and focus[0] >= index then m.rows.jumpToRowItem = [focus[0] + 1, focus[1]]
+    end if
+    if entry = invalid then
+        m.personal.Unshift({ slot: "list", row: row, k: "", n: "" })
+    else
+        entry.row = row
+    end if
 end sub
 
 ' --- Continue Watching ---------------------------------------------------------------
@@ -827,32 +901,100 @@ function continueItem() as Dynamic
     return row.GetChild(focus[1])
 end function
 
-sub showContinueMenu(item as Object)
-    m.continueTarget = item
+' * on a poster: My List, a rating, and on Continue Watching taking it off; Account
+' last, since * on a poster no longer opens it.
+sub showTitleMenu(item as Object)
+    key = TitleKey(item)
+    m.menuItem = item
+    m.menuActions = []
+    labels = []
+    if MyListHas(key) then
+        labels.Push("Remove from My List")
+    else
+        labels.Push("Add to My List")
+    end if
+    m.menuActions.Push("list")
+    rating = TasteRating(key)
+    if rating = 0 then
+        labels.Push("Rate it")
+    else
+        labels.Push("Rated: " + TasteRatingLabel(rating))
+    end if
+    m.menuActions.Push("rate")
+    cw = continueItem()
+    if cw <> invalid and cw.IsSameNode(item) then
+        labels.Push("Remove from Continue Watching")
+        m.menuActions.Push("forget")
+    end if
+    labels.Push("Account")
+    m.menuActions.Push("account")
     dialog = CreateObject("roSGNode", "StandardMessageDialog")
     dialog.title = item.title
-    dialog.message = ["Remove it from Continue Watching? Where you stopped is forgotten."]
-    dialog.buttons = ["Remove from Continue Watching", "Keep it"]
-    dialog.ObserveField("buttonSelected", "onContinueButton")
+    dialog.buttons = labels
+    dialog.ObserveField("buttonSelected", "onTitleMenuButton")
     dialog.ObserveField("wasClosed", "onDialogClosed")
     m.top.GetScene().dialog = dialog
 end sub
 
-sub onContinueButton()
+sub onTitleMenuButton()
+    dialog = m.top.GetScene().dialog
+    if dialog = invalid then return
+    choice = dialog.buttonSelected
+    item = m.menuItem
+    if item = invalid or choice < 0 or choice >= m.menuActions.Count() then return
+    action = m.menuActions[choice]
+    key = TitleKey(item)
+    if action = "rate" then
+        ' The rating choice opens as this menu closes (onDialogClosed).
+        m.nextDialog = "rate"
+    else if action = "account" then
+        m.nextDialog = "account"
+    end if
+    dialog.close = true
+    if action = "list" then
+        Sound("select")
+        MyListToggle(key, item.title, item.ext)
+        syncListRow()
+        askPicks()
+    else if action = "forget" then
+        ' Taken off early, it counts against what it's like.
+        TasteNotForMe(key, item.progress)
+        ProgressRemove(key)
+        refreshContinueWatching()
+        m.top.action = { name: "syncNow" }
+    end if
+end sub
+
+' "Not for me", "I like this" or "Love this!": shapes Top picks, Because you watched and
+' the order of the rows (common/Taste.brs).
+sub showRateMenu(item as Object)
+    m.menuItem = item
+    rating = TasteRating(TitleKey(item))
+    m.rateChoices = [-1, 1, 2]
+    labels = ["Not for me", "I like this", "Love this!"]
+    if rating <> 0 then
+        labels.Push("Take my rating away")
+        m.rateChoices.Push(0)
+    end if
+    dialog = CreateObject("roSGNode", "StandardMessageDialog")
+    dialog.title = item.title
+    dialog.message = ["How was it? Your ratings shape Top picks for you and the rows you see first."]
+    dialog.buttons = labels
+    dialog.ObserveField("buttonSelected", "onRateButton")
+    dialog.ObserveField("wasClosed", "onDialogClosed")
+    m.top.GetScene().dialog = dialog
+end sub
+
+sub onRateButton()
     dialog = m.top.GetScene().dialog
     if dialog = invalid then return
     choice = dialog.buttonSelected
     dialog.close = true
-    item = m.continueTarget
-    m.continueTarget = invalid
-    if choice <> 0 or item = invalid then return
-    key = "m:" + item.itemId
-    if item.kind = "series" then key = "s:" + item.itemId
-    ' Taken off early, it counts against what it's like.
-    TasteNotForMe(key, item.progress)
-    ProgressRemove(key)
-    refreshContinueWatching()
-    m.top.action = { name: "syncNow" }
+    item = m.menuItem
+    if item = invalid or choice < 0 or choice >= m.rateChoices.Count() then return
+    Sound("select")
+    TasteRate(TitleKey(item), item.title, m.rateChoices[choice])
+    askPicks()
 end sub
 
 ' --- Account -----------------------------------------------------------------
@@ -899,7 +1041,17 @@ sub onAccountButton()
     if choice = 4 then m.top.action = { name: "signOut" }
 end sub
 
+' A menu that opens another (Rate it, Account) opens it once it has closed.
 sub onDialogClosed()
+    following = m.nextDialog
+    m.nextDialog = ""
+    if following = "rate" and m.menuItem <> invalid then
+        showRateMenu(m.menuItem)
+        return
+    else if following = "account" then
+        showAccountMenu()
+        return
+    end if
     restoreFocus()
 end sub
 

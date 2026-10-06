@@ -381,6 +381,47 @@ sub Main()
     check("IndexBecause the family first, then the category", titles.Join(", "), "Carry On Jatta 2, Carry On Jatta 3, Jatt & Juliet")
     check("IndexBecause title", more.title, "Because you watched Carry On Jatta")
 
+    ' Ratings (common/Taste.brs)
+    rated = TasteRated([{ k: "m:1", n: "Jawan", w: 2, t: now }], "m:1", "", 2, now + 5)
+    check("TasteRated keeps watching and name", rated[0].n + " " + Str(rated[0].w).Trim() + " " + rated[0].r.ToStr(), "Jawan 2 2")
+    check("TasteRated same is no change", boolText(TasteRated(rated, "m:1", "", 2, now) = invalid), "true")
+    unrated = TasteRated(rated, "m:1", "", 0, now)
+    check("TasteRated takes it away", boolText(unrated[0].DoesExist("r")), "false")
+    check("TasteRated nothing to take", boolText(TasteRated([], "m:9", "X", 0, now) = invalid), "true")
+    fresh = TasteRated([], "m:9", "Pathaan", 1, now)
+    check("TasteRated before watching", fresh[0].k + " " + fresh[0].r.ToStr(), "m:9 1")
+    watchedAfter = TasteWith(fresh, "m:9", "Pathaan", 2, "atLeast", now)
+    checkInt("TasteWith keeps the rating", watchedAfter[0].r, 1)
+    full = [{ k: "m:0", n: "Loved", w: 0, r: 2, t: now }]
+    for i = 1 to TasteMax() + 5
+        full = TasteWith(full, "m:" + (100 + i).ToStr(), "T", 1, "atLeast", now + i)
+    end for
+    kept = false
+    for each entry in full
+        if entry.k = "m:0" then kept = true
+    end for
+    check("rated titles stay in a full history", boolText(kept and full.Count() = TasteMax()), "true")
+    ratedLiking = LikingFrom([{ k: "m:1", w: 3, r: -1, t: now }, { k: "m:2", w: 0, r: 2, t: now }, { k: "m:3", w: 1, r: 1, t: now }], [], { "m:1": "vod:1", "m:2": "vod:2", "m:3": "vod:3" }, now)
+    check("ratings count", Str(ratedLiking["vod:1"]).Trim() + " " + Str(ratedLiking["vod:2"]).Trim() + " " + Str(ratedLiking["vod:3"]).Trim(), "-3 4 2.5")
+    because = TasteBecause([{ k: "m:1", n: "Watched", w: 3 }, { k: "m:2", n: "Hated", w: 3, r: -1 }, { k: "m:3", n: "Loved", w: 0, r: 2 }], 2)
+    check("TasteBecause loved first, never not-for-me", because[0].n + "," + because[1].n, "Loved,Watched")
+    check("TasteRatingLabel", TasteRatingLabel(-1) + "|" + TasteRatingLabel(2) + "|" + TasteRatingLabel(0), "Not for me|Love this!|Rate")
+
+    ' My List (common/MyList.brs)
+    saved = MyListWith([], "m:1", "Jawan", "mkv", true, now)
+    saved = MyListWith(saved, "s:7", "Panchayat", "", true, now + 1)
+    check("MyListWith newest first", saved[0].k + " " + saved[1].k + " " + saved[1].x, "s:7 m:1 mkv")
+    saved = MyListWith(saved, "m:1", "Jawan", "mkv", true, now + 2)
+    checkInt("MyListWith once each", saved.Count(), 2)
+    check("MyListWith readds to the front", saved[0].k, "m:1")
+    saved = MyListWith(saved, "m:1", "", "", false, now)
+    check("MyListWith takes out", saved.Count().ToStr() + " " + saved[0].k, "1 s:7")
+    cards = MyListRow([{ k: "m:5", n: "Die Hard", x: "mp4" }, { k: "s:1", n: "Panchayat" }], { "m:5": "http://p/5.jpg" })
+    check("MyListRow cards", cards.title + ": " + cards.GetChild(0).title + " " + cards.GetChild(0).HDPosterUrl + " " + cards.GetChild(0).ext + ", " + cards.GetChild(1).kind + " " + cards.GetChild(1).seriesId, "My List: Die Hard http://p/5.jpg mp4, series 1")
+    check("TitleKey", TitleKey(cards.GetChild(0)) + " " + TitleKey(cards.GetChild(1)) + " " + TitleKey(invalid), "m:5 s:1 ")
+    listRow = IndexListRow(picksLib, [{ k: "m:4", n: "Jatt & Juliet" }, { k: "m:77", n: "Not Here", x: "avi" }, { k: "s:1", n: "Panchayat" }])
+    check("IndexListRow in order, from the library or as a name card", listRow.GetChild(0).title + ", " + listRow.GetChild(1).title + " " + listRow.GetChild(1).ext + ", " + listRow.GetChild(2).kind, "Jatt & Juliet, Not Here avi, series")
+
     print ""
     if m.failures = 0 then
         print "ALL PASSED (" + m.count.ToStr() + " checks)"

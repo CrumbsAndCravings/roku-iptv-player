@@ -17,7 +17,7 @@
     <!-- Set (any value) to get `counts`: titles per category, keyed "vod:123" / "series:45" -->
     <field id="countsRequest" type="boolean" alwaysNotify="true" />
     <field id="counts" type="assocarray" />
-    <!-- { history, watching, because, forKey } -> `picks`: Home's rows picked for you (answerPicks) -->
+    <!-- { history, watching, because, list, forKey } -> `picks`: Home's rows picked for you (answerPicks) -->
     <field id="picksRequest" type="assocarray" alwaysNotify="true" />
     <field id="picks" type="node" />
   </interface>
@@ -27,6 +27,7 @@
   <script type="text/brightscript" uri="pkg:/components/tasks/XtreamParse.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Categories.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Taste.brs" />
+  <script type="text/brightscript" uri="pkg:/components/common/MyList.brs" />
   <script type="text/brightscript" uri="pkg:/components/tasks/SearchIndex.brs" />
   <script type="text/brightscript" uri="pkg:/components/tasks/SearchTask.brs" />
 </component>

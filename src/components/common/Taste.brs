@@ -11,6 +11,9 @@
 '   w   how much you liked it: 1 started (3 minutes in), 2 half watched, 3 finished;
 '       a series gains half a point an episode, up to 4; -1 taken off Continue
 '       Watching before a fifth of it
+'   r   your rating, when you gave one (Details, or * on Home): -1 "Not for me",
+'       1 "I like this", 2 "Love this!" (TasteRate). It counts for more than watching
+'       (tasteWeight), and rated titles are the last to drop off the history.
 '   t   when (seconds)
 
 function TasteMax() as Integer
@@ -63,11 +66,90 @@ function TasteWith(list as Object, key as String, name as String, weight as Floa
     end if
     if name = "" and old <> invalid then name = FieldStr(old, "n")
     if Len(name) > 32 then name = Left(name, 32)
-    out = [{ k: key, n: name, w: after, t: now }]
-    for each entry in list
-        if FieldStr(entry, "k") <> key and out.Count() < TasteMax() then out.Push(entry)
+    entry = { k: key, n: name, w: after, t: now }
+    if old <> invalid and ToInt(Field(old, "r")) <> 0 then entry.r = ToInt(old.r)
+    return tasteFront(list, entry)
+end function
+
+' `entry` first, then the rest of `list` without its title, at most TasteMax(): when
+' there are too many, the oldest title without a rating goes first.
+function tasteFront(list as Object, entry as Object) as Object
+    out = [entry]
+    for each item in list
+        if FieldStr(item, "k") <> entry.k then out.Push(item)
     end for
+    while out.Count() > TasteMax()
+        drop = out.Count() - 1
+        for i = out.Count() - 1 to 1 step -1
+            if ToInt(Field(out[i], "r")) = 0 then
+                drop = i
+                exit for
+            end if
+        end for
+        out.Delete(drop)
+    end while
     return out
+end function
+
+' `list` with your rating of `key` (-1, 1 or 2; 0 takes it away), the title first.
+' Watching it counts as before. invalid when nothing would change.
+function TasteRated(list as Object, key as String, name as String, rating as Integer, now as Integer) as Dynamic
+    old = invalid
+    for each entry in list
+        if FieldStr(entry, "k") = key then
+            old = entry
+            exit for
+        end if
+    end for
+    if old <> invalid and ToInt(Field(old, "r")) = rating then return invalid
+    if old = invalid and rating = 0 then return invalid
+    entry = { k: key, n: name, w: 0, t: now }
+    if old <> invalid then
+        entry.w = TasteNumber(old.w)
+        if name = "" then entry.n = FieldStr(old, "n")
+    end if
+    if Len(entry.n) > 32 then entry.n = Left(entry.n, 32)
+    if rating <> 0 then entry.r = rating
+    return tasteFront(list, entry)
+end function
+
+' Your rating of a title: -1, 1, 2, or 0 for none.
+function TasteRating(key as String) as Integer
+    for each entry in TasteHistory()
+        if FieldStr(entry, "k") = key then return ToInt(Field(entry, "r"))
+    end for
+    return 0
+end function
+
+' Rates a title (Details, or * on Home): -1 "Not for me", 1 "I like this", 2 "Love
+' this!", 0 for no rating.
+sub TasteRate(key as String, name as String, rating as Integer)
+    if key = "" then return
+    list = TasteRated(TasteHistory(), key, name, rating, NowSeconds())
+    if list <> invalid then RegWrite("taste", "history", FormatJson(list))
+end sub
+
+' The words for a rating, as the buttons say it.
+function TasteRatingLabel(rating as Integer) as String
+    if rating = -1 then return "Not for me"
+    if rating = 1 then return "I like this"
+    if rating = 2 then return "Love this!"
+    return "Rate"
+end function
+
+' How much a title counts towards its category: "Not for me" counts against it, more
+' than leaving early does; a like adds 1.5 and a love 3 to what watching it counted
+' (at least 1, so a title rated before it's watched counts too).
+function tasteWeight(entry as Object) as Dynamic
+    rating = ToInt(Field(entry, "r"))
+    w = TasteNumber(Field(entry, "w"))
+    if rating = -1 then return -3
+    if rating = 1 or rating = 2 then
+        if w < 1 then w = 1
+        if rating = 1 then return w + 1.5
+        return w + 3
+    end if
+    return w
 end function
 
 sub tasteChange(key as String, name as String, weight as Float, mode as String)
@@ -178,7 +260,7 @@ function LikingFrom(history as Object, watching as Object, categories as Object,
     for each entry in history
         key = FieldStr(entry, "k")
         known[key] = true
-        weights.Push({ k: key, w: TasteNumber(entry.w), t: ToInt(entry.t) })
+        weights.Push({ k: key, w: tasteWeight(entry), t: ToInt(entry.t) })
     end for
     for each entry in watching
         key = FieldStr(entry, "k")
@@ -201,22 +283,28 @@ function LikingFrom(history as Object, watching as Object, categories as Object,
     return scores
 end function
 
-' The titles to build "Because you watched" rows on: the latest ones you watched at
-' least half of (or started, when there are none), at most `count`.
+' The titles to build "Because you watched" rows on, at most `count`: the latest ones
+' you loved, then liked, then watched at least half of, then started; never one you
+' said wasn't for you.
 function TasteBecause(history as Object, count as Integer) as Object
     picked = []
-    for each least in [2, 1]
+    chosen = {}
+    for each stage in [{ rating: 2 }, { rating: 1 }, { least: 2 }, { least: 1 }]
         for each entry in history
             if picked.Count() >= count then exit for
-            if TasteNumber(entry.w) >= least and FieldStr(entry, "n") <> "" then
-                seen = false
-                for each chosen in picked
-                    if chosen.k = entry.k then seen = true
-                end for
-                if not seen then picked.Push({ k: FieldStr(entry, "k"), n: FieldStr(entry, "n") })
+            key = FieldStr(entry, "k")
+            rating = ToInt(Field(entry, "r"))
+            fits = false
+            if stage.DoesExist("rating") then
+                fits = rating = stage.rating
+            else
+                fits = rating <> -1 and TasteNumber(entry.w) >= stage.least
+            end if
+            if fits and FieldStr(entry, "n") <> "" and not chosen.DoesExist(key) then
+                chosen[key] = true
+                picked.Push({ k: key, n: FieldStr(entry, "n") })
             end if
         end for
-        if picked.Count() > 0 then exit for
     end for
     return picked
 end function

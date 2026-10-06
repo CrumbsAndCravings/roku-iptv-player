@@ -108,8 +108,8 @@ When the server answers anything other than 200, the error says who answered and
 - Code: `common/Utils.brs` (`HttpDetail`, `BriefText`, `IsCloudflare`, `IsCloudflareBlock`, `CloudflareKind`, `IsRefusalCode`, `UserAgentsToTry`, `UserAgentName`, `BrowserUserAgent`, `AppUserAgent`), `tasks/Http.brs`, `tasks/XtreamTask.brs` (`runAuth`), `screens/LoginScreen.*`.
 
 ### 2.4 Account menu and sign-out
-- `*` on Home, everywhere except a Continue Watching poster (see 9.3), opens: **Keep watching**, **Online subtitles**, **Turn click sounds off** (or on), **Turn the intro off** (or on), **Sign out** (new in 0.5.5: the two switches, §10).
-- **Sign out** clears the login, Continue Watching, the OpenSubtitles account and the saved search library (`ClearAccount`), and stops the library worker. A personal build's own OpenSubtitles account (§8) comes back by itself.
+- `*` on Home's tab bar, or **Account** in the menu `*` opens on a poster (§5.1.2), opens: **Keep watching**, **Online subtitles**, **Turn click sounds off** (or on), **Turn the intro off** (or on), **Sign out** (new in 0.5.5: the two switches, §10).
+- **Sign out** clears the login, Continue Watching, the watch history, ratings and My List, the OpenSubtitles account and the saved search library (`ClearAccount`), and stops the library worker. A personal build's own OpenSubtitles account (§8) comes back by itself.
 
 ## 3. Being gentle with the provider
 New since 0.4.1. **Why:** one provider stopped answering for a while after about 100 requests in a minute; the Samsung app's M0 notes saw the same thing. During a block, sign-in and videos fail too, so every part of the app avoids bursts and stops asking once it is refused.
@@ -227,7 +227,7 @@ Categories whose names hold `xxx`, `adult`, `18+` or `porn`, and titles with `is
   - Left from a row's first poster, or Up from the first row, reaches the tabs.
   - OK on a tab acts on key release, so the release can't land on a poster.
   - Back jumps to the first row, then the tabs, then exits.
-  - `*` opens the account menu, or the Continue Watching menu on those posters.
+  - `*` on a poster opens its menu (My List, rating, Continue Watching, Account; §5.1.2); on the tab bar, the account menu.
 - **See all tile** (new): every category row ends with a "See all ›" card that opens the category page (5.3). It isn't added to Continue Watching. Focusing it keeps the previous hero.
 - **"Won't play"** posters are dimmed, with a badge on the poster.
 
@@ -241,6 +241,12 @@ Home learns from what you watch, as Netflix does. Code: `common/Taste.brs`, `tas
   - They're laid out as placeholders as Home builds, so nothing jumps when they arrive, and refresh when you come back from a video. A row with nothing to pick goes. With no stored library yet (it's built the first time Search, Categories or a "See all" page is used), they wait for a launch that has one. The library worker starts 3 seconds after Home's own rows, so those load first.
 - **Row order:** the likings are kept (`taste/scores`, the 12 most liked categories) and Home moves the categories you like up, most liked first: after the first two rows on the Home tab (new releases, so something new stays near the top), after the first on Movies and Series.
 - Sign-out clears the history and likings.
+
+### 5.1.2 Ratings and My List (new in 0.5.8)
+- **Rating:** on Details, a button after My List says **Rate** (or the rating given); on Home, \* on any poster opens **Add to My List** (or Remove), **Rate it** (or "Rated: …"), **Remove from Continue Watching** on those posters, and **Account** (\* on the tab bar still opens Account straight away). The choices: **Not for me**, **I like this**, **Love this!**, and **Take my rating away** once rated. The menu that leads to another (Rate it, Account) opens it once it has closed.
+- **What a rating does** (stored as `r` on the title's history entry, `TasteRate`): "Not for me" counts −3 for its category whatever was watched; a like adds 1.5 and a love 3 to what watching counted (at least 1, so rating before watching counts). Loved titles come first for "Because you watched", then liked, then watched; a title that's not for you never gets one. Rated titles are the last to drop out of the 30-title history. Home's picks refresh right after a rating.
+- **My List** (`common/MyList.brs`, registry `mylist/items`): **+ My List** / **In My List** on Details, or the \* menu on Home. Newest first, at most 40, each `{ k, n, x, t }` (no pictures, to keep the registry small). Adding a title counts 1 towards its category, as starting it would. Home shows a **My List** row right under Continue Watching: name cards straight away, with pictures from the stored library (`IndexListRow`) when it's there. It follows changes when you come back to Home, keeping the focus on the same poster. Sign-out clears it.
+- Neither is shared between devices yet.
 
 ### 5.2 Categories tab (new)
 - A screen of category cards (210×104: name, plus "Movies · 104"), in rows:
@@ -463,7 +469,8 @@ Unchanged since 0.4.1 apart from where the account is kept; see `samsung-plan.md
 |---|---|
 | Login (registry `account/creds`) | `{ server, username, password, userAgent }`; `userAgent` "" means the device's own |
 | Built-in login stamp | registry `account/builtIn` = `"<server> <username>"` |
-| Watch history (`taste/history`) | `[{ k: "m:<id>" \| "s:<seriesId>", n: name (≤ 32), w: weight, t: seconds }]`, newest first, at most 30 (§5.1.1) |
+| Watch history (`taste/history`) | `[{ k: "m:<id>" \| "s:<seriesId>", n: name (≤ 32), w: weight, r: rating (-1, 1, 2; optional), t: seconds }]`, newest first, at most 30 (§5.1.1, §5.1.2) |
+| My List (`mylist/items`) | `[{ k, n: name (≤ 40), x: extension, t }]`, newest first, at most 40 (§5.1.2) |
 | Category likings (`taste/scores`) | `{ "vod:12": 3.2, "series:7": 1.5 }`, the 12 most liked |
 | Player prefs (`prefs/player`) | `{ audio: lang, subtitles: lang \| "off" \| "online", sounds: "on" \| "off", intro: "on" \| "off" }` (sounds and intro on unless "off") |
 | Global fields (`m.global`) | `creds`, `playing`, `syncedAt`, `search`, `soundsOn`, `introPlaying`, and `sound` (alwaysNotify: the click sound a screen asks for) |
@@ -476,7 +483,7 @@ Unchanged since 0.4.1 apart from where the account is kept; see `samsung-plan.md
 | Titles that need the helper (`helper/titles`) | `["m:<id>", "e:<id>", …]`, newest first, at most 200; cleared on sign-out |
 | Helper requests (`HelperTask`) | `request { mode: "info" \| "hash" \| "start" \| "lastError" \| "stop", url }` → `result { ok, info \| hash \| started \| said \| error }` |
 | Sync service | see [`../sync/README.md`](../sync/README.md) |
-| Library worker fields | `query` → `results` (ContentNode rows: Categories, Movies, Series; tagged `forQuery`); `status` `{ done, total, titles, stopped }`; `browse` `{ kind, categoryId, query }` → `browsed` (ContentNode with `total`, `forKey`, `loading`); `countsRequest` → `counts` `{ "vod:123": 104 }`; `picksRequest` `{ history, watching, because: [{ k, n }], forKey }` → `picks` (ContentNode of rows tagged `slot`, with `scores`, `forKey`, `loading`); `stop` |
+| Library worker fields | `query` → `results` (ContentNode rows: Categories, Movies, Series; tagged `forQuery`); `status` `{ done, total, titles, stopped }`; `browse` `{ kind, categoryId, query }` → `browsed` (ContentNode with `total`, `forKey`, `loading`); `countsRequest` → `counts` `{ "vod:123": 104 }`; `picksRequest` `{ history, watching, because: [{ k, n }], list, forKey }` → `picks` (ContentNode of rows tagged `slot`, with `scores`, `forKey`, `loading`); `stop` |
 | Item fields (ContentNode) | `ItemDefaults()` in `common/Utils.brs`; new ones are `categoryId` and `listKind` (`vod`/`series`) for category and See-all cards; `kind` is also `category` or `seeAll` |
 | Scene actions | `signedIn`, `signOut`, `openDetails`, `play`, `close` (with `helperStop`, the helper's stop address, after a helper stream), `openSearch`, `openSubtitleSetup`, **`openCategory`** `{ kind, categoryId, title }`, **`openCategories`** `{ lists: { vod, series, langs } }`, **`syncNow`**, **`syncSoon`** |
 
@@ -527,7 +534,7 @@ Suggested order, most useful first:
 11. **Picture codecs ignored; audio format labels and unplayable-track swap.**
 12. **Sharp look:** 3 to 5 px corners, posters 10 px apart, badges on the poster, 6% focus lift. At 1080p, multiply Roku sizes by 1.5.
 13. **Motion, glass, sounds and intro** (§10): the web app already has the glass, motion and intro (CSS and Web Audio) to port from; add the click sounds and the Account menu switches too.
-14. **Picked for you** (§5.1.1): the watch history, category likings, Top picks and Because you watched rows, and the row order. Sharing the history through the sync service would let every device learn from all of them.
+14. **Picked for you, ratings and My List** (§5.1.1, §5.1.2): the watch history, ratings, category likings, Top picks and Because you watched rows, the row order, and My List. Sharing the history through the sync service would let every device learn from all of them.
 
 The helper on a computer at home (§15) needs no port: Samsung has it, and the Roku came second.
 

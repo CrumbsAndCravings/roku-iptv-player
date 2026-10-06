@@ -61,5 +61,6 @@
   <script type="text/brightscript" uri="pkg:/components/common/Pills.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Motion.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Taste.brs" />
+  <script type="text/brightscript" uri="pkg:/components/common/MyList.brs" />
   <script type="text/brightscript" uri="pkg:/components/screens/DetailsScreen.brs" />
 </component>
