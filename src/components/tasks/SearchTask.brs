@@ -279,11 +279,11 @@ sub answerCounts(index as Object)
 end sub
 
 ' Home's rows picked for you (common/Taste.brs): `picksRequest` { history, watching,
-' because: [{ k, n }], list, forKey } -> `picks`, a ContentNode of rows (My List with
-' its pictures, when `list` has titles; Top picks for you; then a "Because you watched"
-' row for each of `because`), each tagged with its `slot` ("list", "picks", or the
-' title's key), and the likings worked out (`scores`, which Home keeps to order its
-' rows). `loading` says the library is still arriving.
+' because: [{ k, n }], list, forKey } -> `picked` { forKey, scores, loading, rows },
+' where rows are plain lists of fields, not nodes, which Home makes into rows itself:
+' [{ slot, title, items }], My List (when `list` has titles), Top picks for you, then a
+' "Because you watched" row for each of `because`. `scores` are the likings worked out
+' (Home keeps them to order its rows); `loading` says the library is still arriving.
 sub answerPicks(index as Object, loading as Boolean)
     request = m.top.picksRequest
     history = Field(request, "history")
@@ -292,9 +292,11 @@ sub answerPicks(index as Object, loading as Boolean)
     if not IsArr(watching) then watching = []
     because = Field(request, "because")
     if not IsArr(because) then because = []
+    list = Field(request, "list")
+    if not IsArr(list) then list = []
     keys = []
     exclude = {}
-    for each source in [history, watching]
+    for each source in [history, watching, list]
         for each entry in source
             key = FieldStr(entry, "k")
             if key <> "" then
@@ -306,30 +308,26 @@ sub answerPicks(index as Object, loading as Boolean)
             if name <> "" then exclude[" " + NormalizeSearch(name)] = true
         end for
     end for
-    categories = IndexCategoriesOf(index, keys)
+    found = IndexFind(index, keys)
+    categories = CategoriesFrom(found)
     now = NowSeconds()
     scores = LikingFrom(history, watching, categories, now)
-    root = CreateObject("roSGNode", "ContentNode")
-    list = Field(request, "list")
-    if IsArr(list) and list.Count() > 0 then
-        listRow = IndexListRow(index, list)
-        listRow.AddFields({ slot: "list" })
-        root.AppendChild(listRow)
-    end if
-    picks = IndexPicks(index, scores, exclude, 30, now)
-    picks.AddFields({ slot: "picks" })
-    root.AppendChild(picks)
+    titles = []
     for each title in because
-        key = FieldStr(title, "k")
-        category = categories[key]
-        if category <> invalid then
-            row = IndexBecause(index, key, FieldStr(title, "n"), category, exclude, 20)
-        else
-            row = CreateObject("roSGNode", "ContentNode")
-        end if
-        row.AddFields({ slot: key })
-        root.AppendChild(row)
+        category = categories[FieldStr(title, "k")]
+        if category <> invalid then titles.Push({ k: FieldStr(title, "k"), n: FieldStr(title, "n"), category: category })
     end for
-    root.AddFields({ forKey: FieldStr(request, "forKey"), scores: scores, loading: loading })
-    m.top.picks = root
+    personal = IndexPersonal(index, scores, exclude, titles, now)
+
+    rows = []
+    if list.Count() > 0 then rows.Push({ slot: "list", title: "My List", items: ListItems(list, found) })
+    rows.Push({ slot: "picks", title: "Top picks for you", items: personal.picks })
+    for each title in because
+        items = []
+        for i = 0 to titles.Count() - 1
+            if titles[i].k = FieldStr(title, "k") then items = personal.because[i]
+        end for
+        rows.Push({ slot: FieldStr(title, "k"), title: "Because you watched " + FieldStr(title, "n"), items: items })
+    end for
+    m.top.picked = { forKey: FieldStr(request, "forKey"), scores: scores, loading: loading, rows: rows }
 end sub

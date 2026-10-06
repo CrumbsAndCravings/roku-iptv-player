@@ -70,6 +70,10 @@ sub init()
     m.nextDialog = ""
     m.picksTimer = m.top.FindNode("picksTimer")
     m.picksTimer.ObserveField("fire", "askPicks")
+    m.guardTimer = m.top.FindNode("guardTimer")
+    m.guardTimer.ObserveField("fire", "picksDone")
+    m.picksOn = picksAllowed()
+    m.guardDone = false
 
     m.rows.ObserveField("rowItemFocused", "onRowItemFocused")
     m.rows.ObserveField("rowItemSelected", "onRowItemSelected")
@@ -161,7 +165,7 @@ function buildPlan(tabIndex as Integer) as Object
         rest = LanguageTurns(TakeTurns(planEntries(vod, "vod", false), planEntries(series, "series", false)), langs)
         newest.Append(rest)
         ' Then the categories you watch move up, after the first two (common/Taste.brs).
-        newest = TasteOrder(newest, TasteScores(), 2)
+        newest = TasteOrder(newest, likings(), 2)
         for each entry in newest
             if plan.Count() >= 18 then exit for
             if entry.kind = "series" then
@@ -172,11 +176,17 @@ function buildPlan(tabIndex as Integer) as Object
             plan.Push(entry)
         end for
     else if tabIndex = 1 then
-        plan = TasteOrder(planEntries(vod, "vod", invalid), TasteScores(), 1)
+        plan = TasteOrder(planEntries(vod, "vod", invalid), likings(), 1)
     else
-        plan = TasteOrder(planEntries(series, "series", invalid), TasteScores(), 1)
+        plan = TasteOrder(planEntries(series, "series", invalid), likings(), 1)
     end if
     return plan
+end function
+
+' The likings that order the rows (none while the picks are off, picksAllowed).
+function likings() as Object
+    if not m.picksOn then return {}
+    return TasteScores()
 end function
 
 ' Plan entries for organized categories of one kind; with wantNew true or false, only
@@ -190,6 +200,8 @@ function planEntries(list as Object, kind as String, wantNew as Dynamic) as Obje
 end function
 
 sub showTab(tabIndex as Integer)
+    ' Building the rows picked for you and the order of the rest is under the guard too.
+    guardPicks()
     m.tab = tabIndex
     m.tabCursor = tabIndex
     m.generation = m.generation + 1
@@ -210,6 +222,7 @@ sub showTab(tabIndex as Integer)
     styleTabs()
 
     if root.GetChildCount() = 0 then
+        picksDone()
         m.failed = true
         if m.lastError <> "" then
             showLoadError()
@@ -225,12 +238,12 @@ sub showTab(tabIndex as Integer)
     m.status.text = ""
     m.failed = false
     ' The library worker starts a few seconds in, so Home's own rows load first.
-    if m.personal.Count() > 0 then
-        if m.global.search <> invalid then
-            askPicks()
-        else
-            m.picksTimer.control = "start"
-        end if
+    if m.personal.Count() = 0 or not m.picksOn then
+        picksDone()
+    else if m.global.search <> invalid then
+        askPicks()
+    else
+        m.picksTimer.control = "start"
     end if
     if m.firstLoad then
         m.firstLoad = false
@@ -758,6 +771,7 @@ end function
 ' worker builds it the first time), they wait for the next launch.
 
 sub addPersonalRows(root as Object)
+    if not m.picksOn then return
     ' My List first, as name cards until the library worker brings their pictures.
     list = MyList()
     m.listStamp = FormatJson(list)
@@ -784,9 +798,12 @@ sub addPersonalRows(root as Object)
 end sub
 
 sub askPicks()
-    if m.personal.Count() = 0 then return
+    if m.personal.Count() = 0 or not m.picksOn then return
     ' Only with a stored library: building one asks the provider for every category.
-    if m.global.search = invalid and not CreateObject("roFileSystem").Exists(SearchCachePath()) then return
+    if m.global.search = invalid and not CreateObject("roFileSystem").Exists(SearchCachePath()) then
+        picksDone()
+        return
+    end if
     because = []
     list = []
     for each entry in m.personal
@@ -800,40 +817,81 @@ sub askPicks()
     task = LibraryTask()
     if not m.watchingPicks then
         m.watchingPicks = true
-        task.ObserveFieldScoped("picks", "onPicks")
+        task.ObserveFieldScoped("picked", "onPicks")
     end if
+    guardPicks()
     task.picksRequest = { history: TasteHistory(), watching: ProgressList(), because: because, list: list, forKey: m.picksKey }
 end sub
 
+' The library worker's answer: plain lists of fields (answerPicks), made into rows here
+' and put in place of the placeholders.
 sub onPicks(event as Object)
-    picks = event.GetData()
-    if picks = invalid or not picks.HasField("forKey") then return
-    if picks.forKey <> m.picksKey then return
+    picked = event.GetData()
+    if not IsAA(picked) or FieldStr(picked, "forKey") <> m.picksKey then return
     ' Kept to order the rows next time (TasteOrder).
-    TasteSaveScores(picks.scores)
+    TasteSaveScores(picked.scores)
     root = m.rows.content
-    if root = invalid then return
-    answers = []
-    for i = 0 to picks.GetChildCount() - 1
-        answers.Push(picks.GetChild(i))
-    end for
-    for each answer in answers
-        for each entry in m.personal
-            if entry.row <> invalid and answer.HasField("slot") and entry.slot = answer.slot then
-                index = indexOfRow(root, entry.row)
-                if index >= 0 and answer.GetChildCount() > 0 then
-                    answer.title = entry.row.title
-                    root.ReplaceChild(answer, index)
-                    entry.row = answer
-                else if index >= 0 and entry.slot <> "list" then
-                    ' Nothing to pick: the row goes.
-                    removeRow(root, index)
-                    entry.row = invalid
+    answers = Field(picked, "rows")
+    if root <> invalid and IsArr(answers) then
+        for each answer in answers
+            for each entry in m.personal
+                if entry.row <> invalid and entry.slot = FieldStr(answer, "slot") then
+                    index = indexOfRow(root, entry.row)
+                    items = Field(answer, "items")
+                    if index >= 0 and IsArr(items) and items.Count() > 0 then
+                        row = CreateObject("roSGNode", "ContentNode")
+                        row.title = entry.row.title
+                        for each values in items
+                            MakeItem(row, values)
+                        end for
+                        root.ReplaceChild(row, index)
+                        entry.row = row
+                    else if index >= 0 and entry.slot <> "list" then
+                        ' Nothing to pick: the row goes.
+                        removeRow(root, index)
+                        entry.row = invalid
+                    end if
                 end if
-            end if
+            end for
         end for
-    end for
-    refreshHero()
+        refreshHero()
+    end if
+    picksDone()
+end sub
+
+' --- Guard ---------------------------------------------------------------------------
+'
+' Working out the rows picked for you is a lot for a Roku. In case it ever stops the app
+' (it froze once), taste/guard is set while it's under way and cleared once the answer
+' is on screen, or 30 seconds on; Home's own building of those rows and of the row
+' order is under it too. A launch that finds it still set goes without them (My List,
+' Top picks, Because you watched, the order by what you like) for this version of the
+' app (taste/off holds the version), so the app always opens.
+
+function picksAllowed() as Boolean
+    version = AppUserAgent()
+    if RegRead("taste", "guard") <> invalid then
+        RegDelete("taste", "guard")
+        RegWrite("taste", "off", version)
+    end if
+    return ToStr(RegRead("taste", "off")) <> version
+end function
+
+' Set from building Home's rows at launch until the first picks are on screen
+' (picksAllowed). Only at launch, so leaving the app soon after coming back to Home
+' doesn't count as a stop.
+sub guardPicks()
+    if not m.picksOn or m.guardDone then return
+    RegWrite("taste", "guard", "1")
+    m.guardTimer.control = "stop"
+    m.guardTimer.control = "start"
+end sub
+
+sub picksDone()
+    if m.guardDone then return
+    m.guardDone = true
+    m.guardTimer.control = "stop"
+    RegDelete("taste", "guard")
 end sub
 
 ' Takes a row off, keeping the focus on the same poster when it was below.
@@ -847,7 +905,7 @@ end sub
 ' Watching, keeping the pictures it had and the focus on the same poster.
 sub syncListRow()
     root = m.rows.content
-    if m.tab <> 0 or root = invalid then return
+    if m.tab <> 0 or root = invalid or not m.picksOn then return
     list = MyList()
     stamp = FormatJson(list)
     if stamp = m.listStamp then return

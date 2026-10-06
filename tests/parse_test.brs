@@ -361,25 +361,17 @@ sub Main()
     IndexSetCategories(picksLib, "vod", [{ id: "7", name: "PUNJABI MOVIES" }, { id: "8", name: "EN | ACTION" }], 2026)
     IndexAdd(picksLib, [{ name: "Carry On Jatta", stream_id: 1, category_id: "7", added: now - 400 * 86400 }, { name: "Carry On Jatta 2", stream_id: 2, category_id: "7", added: now - 200 * 86400 }, { name: "Carry On Jatta 3", stream_id: 3, category_id: "8", added: now - 10 * 86400 }, { name: "Jatt & Juliet", stream_id: 4, category_id: "7", added: now - 5 * 86400 }, { name: "Die Hard", stream_id: 5, category_id: "8", added: now }, { name: "Carry On Jatta 2", stream_id: 6, category_id: "8", added: now }], "vod")
     IndexAdd(picksLib, [{ name: "Panchayat", series_id: 1, category_id: "7" }], "series")
-    found = IndexCategoriesOf(picksLib, ["m:1", "m:5", "s:1", "m:99"])
-    check("IndexCategoriesOf", found["m:1"] + " " + found["m:5"] + " " + found["s:1"] + " " + boolText(found["m:99"] = invalid), "vod:7 vod:8 series:7 true")
+    found = IndexFind(picksLib, ["m:1", "m:5", "s:1", "m:99"])
+    cats = CategoriesFrom(found)
+    check("IndexFind and CategoriesFrom", cats["m:1"] + " " + cats["m:5"] + " " + cats["s:1"] + " " + boolText(found["m:99"] = invalid), "vod:7 vod:8 series:7 true")
     exclude = { "m:1": true }
     exclude[" " + NormalizeSearch("Carry On Jatta")] = true
-    picks = IndexPicks(picksLib, { "vod:7": 3, "vod:8": 0.5 }, exclude, 10, now)
-    titles = []
-    for i = 0 to picks.GetChildCount() - 1
-        titles.Push(picks.GetChild(i).title)
-    end for
-    check("IndexPicks liked and new first, each title once", titles.Join(", "), "Jatt & Juliet, Carry On Jatta 2, Die Hard, Carry On Jatta 3")
-    checkInt("IndexPicks nothing liked", IndexPicks(picksLib, {}, {}, 10, now).GetChildCount(), 0)
+    personal = IndexPersonal(picksLib, { "vod:7": 3, "vod:8": 0.5 }, exclude, [{ k: "m:1", n: "Carry On Jatta", category: "vod:7" }], now)
+    check("IndexPersonal picks: liked and new first, each title once", fieldList(personal.picks), "Jatt & Juliet, Carry On Jatta 2, Die Hard, Carry On Jatta 3")
+    check("IndexPersonal because: the family first, then the category", fieldList(personal.because[0]), "Carry On Jatta 2, Carry On Jatta 3, Jatt & Juliet")
+    nothing = IndexPersonal(picksLib, {}, {}, [], now)
+    checkInt("IndexPersonal nothing liked", nothing.picks.Count() + nothing.because.Count(), 0)
     check("titleStem", titleStem("The Carry On Jatta") + "|" + titleStem("Jawan") + "|" + titleStem("Up"), " carry on| jawan|")
-    more = IndexBecause(picksLib, "m:1", "Carry On Jatta", "vod:7", { "m:1": true }, 10)
-    titles = []
-    for i = 0 to more.GetChildCount() - 1
-        titles.Push(more.GetChild(i).title)
-    end for
-    check("IndexBecause the family first, then the category", titles.Join(", "), "Carry On Jatta 2, Carry On Jatta 3, Jatt & Juliet")
-    check("IndexBecause title", more.title, "Because you watched Carry On Jatta")
 
     ' Ratings (common/Taste.brs)
     rated = TasteRated([{ k: "m:1", n: "Jawan", w: 2, t: now }], "m:1", "", 2, now + 5)
@@ -419,8 +411,9 @@ sub Main()
     cards = MyListRow([{ k: "m:5", n: "Die Hard", x: "mp4" }, { k: "s:1", n: "Panchayat" }], { "m:5": "http://p/5.jpg" })
     check("MyListRow cards", cards.title + ": " + cards.GetChild(0).title + " " + cards.GetChild(0).HDPosterUrl + " " + cards.GetChild(0).ext + ", " + cards.GetChild(1).kind + " " + cards.GetChild(1).seriesId, "My List: Die Hard http://p/5.jpg mp4, series 1")
     check("TitleKey", TitleKey(cards.GetChild(0)) + " " + TitleKey(cards.GetChild(1)) + " " + TitleKey(invalid), "m:5 s:1 ")
-    listRow = IndexListRow(picksLib, [{ k: "m:4", n: "Jatt & Juliet" }, { k: "m:77", n: "Not Here", x: "avi" }, { k: "s:1", n: "Panchayat" }])
-    check("IndexListRow in order, from the library or as a name card", listRow.GetChild(0).title + ", " + listRow.GetChild(1).title + " " + listRow.GetChild(1).ext + ", " + listRow.GetChild(2).kind, "Jatt & Juliet, Not Here avi, series")
+    saved = [{ k: "m:4", n: "Jatt & Juliet" }, { k: "m:77", n: "Not Here", x: "avi" }, { k: "s:1", n: "Panchayat" }]
+    listItems = ListItems(saved, IndexFind(picksLib, ["m:4", "m:77", "s:1"]))
+    check("ListItems in order, from the library or as a name card", listItems[0].title + ", " + listItems[1].title + " " + listItems[1].ext + ", " + listItems[2].kind, "Jatt & Juliet, Not Here avi, series")
 
     print ""
     if m.failures = 0 then
@@ -429,6 +422,15 @@ sub Main()
         print "FAILED: " + m.failures.ToStr() + " of " + m.count.ToStr() + " checks"
     end if
 end sub
+
+' The titles in a list of item fields, joined.
+function fieldList(items as Object) as String
+    titles = []
+    for each item in items
+        titles.Push(item.title)
+    end for
+    return titles.Join(", ")
+end function
 
 function boolText(value as Boolean) as String
     if value then return "true"

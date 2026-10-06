@@ -17,9 +17,9 @@
     <!-- Set (any value) to get `counts`: titles per category, keyed "vod:123" / "series:45" -->
     <field id="countsRequest" type="boolean" alwaysNotify="true" />
     <field id="counts" type="assocarray" />
-    <!-- { history, watching, because, list, forKey } -> `picks`: Home's rows picked for you (answerPicks) -->
+    <!-- { history, watching, because, list, forKey } -> `picked`: Home's rows picked for you, as plain data (answerPicks) -->
     <field id="picksRequest" type="assocarray" alwaysNotify="true" />
-    <field id="picks" type="node" />
+    <field id="picked" type="assocarray" />
   </interface>
   <script type="text/brightscript" uri="pkg:/components/common/Utils.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Registry.brs" />

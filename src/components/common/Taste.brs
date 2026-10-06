@@ -1,7 +1,7 @@
 ' What you watch, so Home puts what you like first, as Netflix does. A short history
 ' lives in the registry (taste/history). The library worker (tasks/SearchTask.brs) turns
 ' it into a liking for each category, since it knows every title's category from the
-' library stored on the Roku (TasteScores, IndexPicks in tasks/SearchIndex.brs), and
+' library stored on the Roku (LikingFrom here, IndexPersonal in tasks/SearchIndex.brs), and
 ' picks titles from there, so none of this asks the provider for anything. Home saves
 ' the likings (taste/scores) to order its rows. Tested in tests/parse_test.brs.
 '
@@ -156,12 +156,6 @@ sub tasteChange(key as String, name as String, weight as Float, mode as String)
     if key = "" then return
     list = TasteWith(TasteHistory(), key, name, weight, mode, NowSeconds())
     if list = invalid then return
-    ' The registry holds about 16 KB for everything; keep the history short when it's full.
-    if CreateObject("roRegistry").GetSpaceAvailable() < 1500 then
-        while list.Count() > 10
-            list.Pop()
-        end while
-    end if
     RegWrite("taste", "history", FormatJson(list))
 end sub
 
@@ -253,7 +247,7 @@ end function
 ' every 30 days, added to its category. `history` is TasteHistory()'s; `watching` is
 ' Continue Watching ({ k, at, pos, dur }), which also holds what you watched on your
 ' other devices: a title there and not in the history counts 1 (2 from half way).
-' `categories` says each title's category ({ "m:123": "vod:12" }, IndexCategoriesOf).
+' `categories` says each title's category ({ "m:123": "vod:12" }, CategoriesFrom).
 function LikingFrom(history as Object, watching as Object, categories as Object, now as Integer) as Object
     weights = []
     known = {}
