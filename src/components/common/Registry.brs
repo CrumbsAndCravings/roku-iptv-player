@@ -38,6 +38,8 @@ sub ClearAccount()
     RegDelete("progress", "removed")
     RegDelete("opensubtitles", "account")
     RegDelete("helper", "titles")
+    RegDelete("taste", "history")
+    RegDelete("taste", "scores")
     DeleteFile(SearchCachePath())
 end sub
 

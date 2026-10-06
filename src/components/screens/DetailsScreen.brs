@@ -383,6 +383,10 @@ end sub
 ' Takes this title off Continue Watching, and the buttons back to a plain Play.
 sub forgetProgress()
     m.buttonIndex = 0
+    ' Taken off early, it counts against what it's like (common/Taste.brs).
+    key = "m:" + m.item.itemId
+    if m.kind <> "movie" then key = "s:" + m.item.itemId
+    TasteNotForMe(key, ProgressFraction(m.entry))
     if m.kind = "movie" then
         ProgressRemove("m:" + m.item.itemId)
         buildMovieButtons()

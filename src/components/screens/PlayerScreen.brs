@@ -109,6 +109,8 @@ sub init()
     m.playback = invalid
     m.kind = "movie"
     m.index = 0
+    ' The episode already counted as finished (noteTaste, markFinished).
+    m.tasteEpisode = -1
     m.startAt = 0
     m.lastSaved = 0
     m.closing = false
@@ -336,6 +338,7 @@ sub saveProgress()
     duration = Int(durationSecs())
     if position < 10 then return
     m.lastSaved = position
+    noteTaste(position, duration)
     if duration > 0 and position >= duration * 0.95 then
         markFinished()
         return
@@ -375,9 +378,27 @@ function entryFor(index as Integer, position as Integer, duration as Integer) as
     }
 end function
 
+' What you're watching, for the rows picked for you (common/Taste.brs): a movie by how
+' far you are, a series once you're 3 minutes into an episode.
+sub noteTaste(position as Integer, duration as Integer)
+    p = m.playback
+    if m.kind = "movie" then
+        TasteWatched(FieldStr(p.entry, "k"), FieldStr(p.entry, "name"), TasteWeightFor(position, duration))
+    else if position >= 180 then
+        TasteWatched("s:" + p.seriesId, p.seriesName, 1)
+    end if
+end sub
+
 ' Movies drop out of Continue Watching; series move on to the next episode.
 sub markFinished()
     p = m.playback
+    ' Watched to the end: a movie counts most, a series a little more each episode.
+    if m.kind = "movie" then
+        TasteFinished(FieldStr(p.entry, "k"), FieldStr(p.entry, "name"))
+    else if m.tasteEpisode <> m.index then
+        m.tasteEpisode = m.index
+        TasteEpisodeDone("s:" + p.seriesId, p.seriesName)
+    end if
     if m.kind = "movie" then
         ProgressRemove(p.entry.k)
     else if hasNextEpisode() then

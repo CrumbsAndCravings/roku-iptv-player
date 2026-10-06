@@ -8,6 +8,7 @@ sub work()
     m.top.ObserveField("stop", port)
     m.top.ObserveField("browse", port)
     m.top.ObserveField("countsRequest", port)
+    m.top.ObserveField("picksRequest", port)
     creds = m.global.creds
     owner = FieldStr(creds, "server") + " " + FieldStr(creds, "username")
     lastQuery = m.top.query
@@ -17,9 +18,12 @@ sub work()
     ' one, and replaces it when complete. Only the very first load makes you wait.
     live = LoadSearchIndex(SearchCachePath(), owner)
     refreshing = live <> invalid
+    ' A request for picks made as this worker started, before it was listening.
+    askedEarly = IsAA(m.top.picksRequest) and m.top.picksRequest.Count() > 0
     if refreshing then
         report(1, 1, live)
         if lastQuery <> "" then publish(live, lastQuery)
+        if askedEarly then answerPicks(live, false)
         if NowSeconds() - live.savedAt < 86400 then
             answerQueries(port, live, lastQuery)
             return
@@ -28,6 +32,7 @@ sub work()
     else
         live = NewSearchIndex()
         building = live
+        if askedEarly then answerPicks(live, true)
     end if
 
     ' Gentle on the provider, which stopped answering after bursts of requests: at most
@@ -148,6 +153,8 @@ sub work()
                 answerBrowse(live, not refreshing and not complete)
             else if msg.GetField() = "countsRequest" then
                 answerCounts(live)
+            else if msg.GetField() = "picksRequest" then
+                answerPicks(live, not refreshing and not complete)
             else if m.top.query <> lastQuery then
                 ' Typing queues several queries; only the latest matters.
                 lastQuery = m.top.query
@@ -219,6 +226,8 @@ sub answerQueries(port as Object, index as Object, lastQuery as String)
                 answerBrowse(index, false)
             else if msg.GetField() = "countsRequest" then
                 answerCounts(index)
+            else if msg.GetField() = "picksRequest" then
+                answerPicks(index, false)
             else if m.top.query <> lastQuery then
                 ' Typing queues several queries; only the latest matters.
                 lastQuery = m.top.query
@@ -267,4 +276,53 @@ sub answerCounts(index as Object)
         counts[category.kind + ":" + category.id] = category.count
     end for
     m.top.counts = counts
+end sub
+
+' Home's rows picked for you (common/Taste.brs): `picksRequest` { history, watching,
+' because: [{ k, n }], forKey } -> `picks`, a ContentNode of rows (Top picks for you,
+' then a "Because you watched" row for each of `because`), each tagged with its `slot`
+' ("picks", or the title's key), and the likings worked out (`scores`, which Home keeps
+' to order its rows). `loading` says the library is still arriving.
+sub answerPicks(index as Object, loading as Boolean)
+    request = m.top.picksRequest
+    history = Field(request, "history")
+    if not IsArr(history) then history = []
+    watching = Field(request, "watching")
+    if not IsArr(watching) then watching = []
+    because = Field(request, "because")
+    if not IsArr(because) then because = []
+    keys = []
+    exclude = {}
+    for each source in [history, watching]
+        for each entry in source
+            key = FieldStr(entry, "k")
+            if key <> "" then
+                keys.Push(key)
+                exclude[key] = true
+            end if
+            name = FieldStr(entry, "n")
+            if name = "" then name = FieldStr(entry, "name")
+            if name <> "" then exclude[" " + NormalizeSearch(name)] = true
+        end for
+    end for
+    categories = IndexCategoriesOf(index, keys)
+    now = NowSeconds()
+    scores = LikingFrom(history, watching, categories, now)
+    root = CreateObject("roSGNode", "ContentNode")
+    picks = IndexPicks(index, scores, exclude, 30, now)
+    picks.AddFields({ slot: "picks" })
+    root.AppendChild(picks)
+    for each title in because
+        key = FieldStr(title, "k")
+        category = categories[key]
+        if category <> invalid then
+            row = IndexBecause(index, key, FieldStr(title, "n"), category, exclude, 20)
+        else
+            row = CreateObject("roSGNode", "ContentNode")
+        end if
+        row.AddFields({ slot: key })
+        root.AppendChild(row)
+    end for
+    root.AddFields({ forKey: FieldStr(request, "forKey"), scores: scores, loading: loading })
+    m.top.picks = root
 end sub

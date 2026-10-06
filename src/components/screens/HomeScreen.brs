@@ -58,6 +58,12 @@ sub init()
     m.focusedItem = invalid
     m.failed = false
     m.lastError = ""
+    ' Rows picked for you: [{ slot, row, k, n }] (addPersonalRows).
+    m.personal = []
+    m.picksKey = ""
+    m.watchingPicks = false
+    m.picksTimer = m.top.FindNode("picksTimer")
+    m.picksTimer.ObserveField("fire", "askPicks")
 
     m.rows.ObserveField("rowItemFocused", "onRowItemFocused")
     m.rows.ObserveField("rowItemSelected", "onRowItemSelected")
@@ -148,6 +154,8 @@ function buildPlan(tabIndex as Integer) as Object
         newest = TakeTurns(planEntries(vod, "vod", true), planEntries(series, "series", true))
         rest = LanguageTurns(TakeTurns(planEntries(vod, "vod", false), planEntries(series, "series", false)), langs)
         newest.Append(rest)
+        ' Then the categories you watch move up, after the first two (common/Taste.brs).
+        newest = TasteOrder(newest, TasteScores(), 2)
         for each entry in newest
             if plan.Count() >= 18 then exit for
             if entry.kind = "series" then
@@ -158,9 +166,9 @@ function buildPlan(tabIndex as Integer) as Object
             plan.Push(entry)
         end for
     else if tabIndex = 1 then
-        plan = planEntries(vod, "vod", invalid)
+        plan = TasteOrder(planEntries(vod, "vod", invalid), TasteScores(), 1)
     else
-        plan = planEntries(series, "series", invalid)
+        plan = TasteOrder(planEntries(series, "series", invalid), TasteScores(), 1)
     end if
     return plan
 end function
@@ -185,9 +193,11 @@ sub showTab(tabIndex as Integer)
     m.planIndex = 0
 
     root = CreateObject("roSGNode", "ContentNode")
+    m.personal = []
     if tabIndex = 0 then
         continueRow = ContinueWatchingRow()
         if continueRow <> invalid then root.AppendChild(continueRow)
+        addPersonalRows(root)
     end if
     appendRows(root, 5)
     m.rows.content = root
@@ -208,6 +218,14 @@ sub showTab(tabIndex as Integer)
 
     m.status.text = ""
     m.failed = false
+    ' The library worker starts a few seconds in, so Home's own rows load first.
+    if m.personal.Count() > 0 then
+        if m.global.search <> invalid then
+            askPicks()
+        else
+            m.picksTimer.control = "start"
+        end if
+    end if
     if m.firstLoad then
         m.firstLoad = false
         focusRows()
@@ -418,7 +436,11 @@ sub onRowItemSelected()
 end sub
 
 sub onTakeFocus()
-    if m.tab = 0 and m.rows.content <> invalid then refreshContinueWatching()
+    if m.tab = 0 and m.rows.content <> invalid then
+        refreshContinueWatching()
+        ' What you just watched leaves the picks, and may change them.
+        if m.global.search <> invalid then askPicks()
+    end if
     ' Pick up what other devices watched (at most once a minute).
     m.top.action = { name: "syncSoon" }
     restoreFocus()
@@ -719,6 +741,80 @@ function onNavKey(key as String, press as Boolean) as Boolean
     return true
 end function
 
+' --- Picked for you -----------------------------------------------------------------
+'
+' "Top picks for you" and "Because you watched" rows under Continue Watching, from what
+' you watch (common/Taste.brs) and the library stored on the Roku (the library worker's
+' answerPicks), so they cost the provider nothing. They're laid out as placeholders
+' straight away, so nothing jumps when they arrive. With no stored library yet (the
+' worker builds it the first time), they wait for the next launch.
+
+sub addPersonalRows(root as Object)
+    if not CreateObject("roFileSystem").Exists(SearchCachePath()) then return
+    history = TasteHistory()
+    if history.Count() = 0 and ProgressList().Count() = 0 then return
+    slots = [{ slot: "picks", title: "Top picks for you", k: "", n: "" }]
+    for each title in TasteBecause(history, 2)
+        slots.Push({ slot: title.k, title: "Because you watched " + title.n, k: title.k, n: title.n })
+    end for
+    for each slot in slots
+        row = root.CreateChild("ContentNode")
+        row.title = slot.title
+        for i = 0 to 7
+            MakeItem(row, { placeholder: true })
+        end for
+        m.personal.Push({ slot: slot.slot, row: row, k: slot.k, n: slot.n })
+    end for
+end sub
+
+sub askPicks()
+    if m.personal.Count() = 0 then return
+    because = []
+    for each entry in m.personal
+        if entry.slot <> "picks" then because.Push({ k: entry.k, n: entry.n })
+    end for
+    m.picksKey = m.generation.ToStr() + ":" + NowSeconds().ToStr()
+    task = LibraryTask()
+    if not m.watchingPicks then
+        m.watchingPicks = true
+        task.ObserveFieldScoped("picks", "onPicks")
+    end if
+    task.picksRequest = { history: TasteHistory(), watching: ProgressList(), because: because, forKey: m.picksKey }
+end sub
+
+sub onPicks(event as Object)
+    picks = event.GetData()
+    if picks = invalid or not picks.HasField("forKey") then return
+    if picks.forKey <> m.picksKey then return
+    ' Kept to order the rows next time (TasteOrder).
+    TasteSaveScores(picks.scores)
+    root = m.rows.content
+    if root = invalid then return
+    answers = []
+    for i = 0 to picks.GetChildCount() - 1
+        answers.Push(picks.GetChild(i))
+    end for
+    for each answer in answers
+        for each entry in m.personal
+            if entry.row <> invalid and answer.HasField("slot") and entry.slot = answer.slot then
+                index = indexOfRow(root, entry.row)
+                if index >= 0 and answer.GetChildCount() > 0 then
+                    answer.title = entry.row.title
+                    root.ReplaceChild(answer, index)
+                    entry.row = answer
+                else if index >= 0 then
+                    ' Nothing to pick: the row goes, keeping the focus where it was.
+                    root.RemoveChildIndex(index)
+                    entry.row = invalid
+                    focus = m.rows.rowItemFocused
+                    if focus <> invalid and focus.Count() > 1 and focus[0] > index then m.rows.jumpToRowItem = [focus[0] - 1, focus[1]]
+                end if
+            end if
+        end for
+    end for
+    refreshHero()
+end sub
+
 ' --- Continue Watching ---------------------------------------------------------------
 
 ' The focused poster when it's in the Continue Watching row, else invalid.
@@ -750,11 +846,11 @@ sub onContinueButton()
     item = m.continueTarget
     m.continueTarget = invalid
     if choice <> 0 or item = invalid then return
-    if item.kind = "series" then
-        ProgressRemove("s:" + item.itemId)
-    else
-        ProgressRemove("m:" + item.itemId)
-    end if
+    key = "m:" + item.itemId
+    if item.kind = "series" then key = "s:" + item.itemId
+    ' Taken off early, it counts against what it's like.
+    TasteNotForMe(key, item.progress)
+    ProgressRemove(key)
     refreshContinueWatching()
     m.top.action = { name: "syncNow" }
 end sub

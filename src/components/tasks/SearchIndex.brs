@@ -289,6 +289,191 @@ sub addSearchItem(row as Object, parts as Object, kind as String)
     MakeItem(row, values)
 end sub
 
+' --- Picked for you -----------------------------------------------------------------
+'
+' Home's "Top picks for you" and "Because you watched" rows, from the stored library and
+' what you watch (common/Taste.brs), so nothing is asked of the provider.
+
+' The category of each title in `keys` ("m:<id>" or "s:<id>"): { "m:123": "vod:12" }.
+' Titles the library doesn't hold (other languages) are left out.
+function IndexCategoriesOf(index as Object, keys as Object) as Object
+    sep = searchSeparator()
+    wanted = {}
+    for each key in keys
+        if Len(key) > 2 then wanted[Left(key, 1) + sep + Mid(key, 3) + sep] = key
+    end for
+    found = {}
+    if wanted.Count() = 0 then return found
+    for each record in index.records
+        cut = Instr(3, record, sep)
+        if cut > 0 then
+            key = wanted[Left(record, cut)]
+            if key <> invalid then
+                parts = record.Split(sep)
+                if parts.Count() >= 6 and parts[5] <> "-" then
+                    kind = "vod"
+                    if parts[0] = "s" then kind = "series"
+                    found[key] = kind + ":" + parts[5]
+                end if
+            end if
+        end if
+    end for
+    return found
+end function
+
+' "Top picks for you": titles from the categories you like most (`scores`, LikingFrom),
+' the more liked and the newer the higher, at most 8 from one category so there's some
+' variety, each title once, and none you've watched: `exclude` holds their keys ("m:123")
+' and their names as the index writes them (" carry on jatta"), for their other copies.
+function IndexPicks(index as Object, scores as Object, exclude as Object, limit as Integer, now as Integer) as Object
+    row = CreateObject("roSGNode", "ContentNode")
+    row.title = "Top picks for you"
+    ranked = []
+    for each key in scores
+        if TasteNumber(scores[key]) > 0 then ranked.Push({ order: 0 - TasteNumber(scores[key]), key: key })
+    end for
+    if ranked.Count() = 0 then return row
+    ranked.SortBy("order")
+    top = {}
+    best = 0 - ranked[0].order
+    for each item in ranked
+        if top.Count() >= 6 then exit for
+        top[item.key] = (0 - item.order) / best
+    end for
+
+    ' A quick look for each liked category's id before splitting keeps big libraries fast.
+    sep = searchSeparator()
+    markers = { m: [], s: [] }
+    for each key in top
+        cut = Instr(1, key, ":")
+        letter = "m"
+        if Left(key, cut - 1) = "series" then letter = "s"
+        markers[letter].Push(sep + Mid(key, cut + 1) + sep)
+    end for
+    found = []
+    records = index.records
+    for i = 0 to records.Count() - 1
+        record = records[i]
+        hit = false
+        wanted = markers[Left(record, 1)]
+        if wanted <> invalid then
+            for each marker in wanted
+                if Instr(1, record, marker) > 0 then
+                    hit = true
+                    exit for
+                end if
+            end for
+        end if
+        if hit then
+            parts = record.Split(sep)
+            if parts.Count() >= 7 then
+                kind = "vod"
+                if parts[0] = "s" then kind = "series"
+                liking = top[kind + ":" + parts[5]]
+                if liking <> invalid and not exclude.DoesExist(parts[0] + ":" + parts[1]) then
+                    found.Push({ order: 0 - liking * freshness(parts, now), at: i, category: kind + ":" + parts[5] })
+                end if
+            end if
+        end if
+    end for
+    found.SortBy("order")
+    perCategory = {}
+    names = {}
+    for each match in found
+        if row.GetChildCount() >= limit then exit for
+        name = index.names[match.at]
+        taken = TasteNumber(perCategory[match.category])
+        if taken < 8 and not names.DoesExist(name) and not exclude.DoesExist(name) then
+            names[name] = true
+            perCategory[match.category] = taken + 1
+            parts = records[match.at].Split(sep)
+            itemKind = "movie"
+            if parts[0] = "s" then itemKind = "series"
+            addSearchItem(row, parts, itemKind)
+        end if
+    end for
+    return row
+end function
+
+' How new a title is, from 1 (just added) down towards 0: halving every 90 days since
+' it was added, or by its year when the date is missing.
+function freshness(parts as Object, now as Integer) as Float
+    added = parts[6].ToInt()
+    if added > 0 then
+        days = (now - added) / 86400
+        if days < 0 then days = 0
+        return 0.5 ^ (days / 90)
+    end if
+    year = 0
+    if parts.Count() >= 8 then year = fromDash(parts[7]).ToInt()
+    thisYear = CreateObject("roDateTime").GetYear()
+    if year >= thisYear - 1 then return 0.5
+    return 0.1
+end function
+
+' "Because you watched <name>": first the same series of films (titles starting with
+' the same words, like "Carry On Jatta 2" after "Carry On Jatta"), then the newest from
+' the same category. `key` is the title watched ("m:123"), `category` its category
+' ("vod:12"); none from `exclude`, each title once.
+function IndexBecause(index as Object, key as String, name as String, category as String, exclude as Object, limit as Integer) as Object
+    row = CreateObject("roSGNode", "ContentNode")
+    row.title = "Because you watched " + name
+    sep = searchSeparator()
+    letter = Left(key, 1)
+    categoryId = Mid(category, Instr(1, category, ":") + 1)
+    stem = titleStem(name)
+    found = []
+    records = index.records
+    names = index.names
+    for i = 0 to records.Count() - 1
+        record = records[i]
+        if Left(record, 1) = letter then
+            family = stem <> "" and Left(names[i], Len(stem)) = stem
+            sameCategory = Instr(1, record, sep + categoryId + sep) > 0
+            if family or sameCategory then
+                parts = record.Split(sep)
+                if parts.Count() >= 7 and parts[0] + ":" + parts[1] <> key and not exclude.DoesExist(parts[0] + ":" + parts[1]) then
+                    if family or parts[5] = categoryId then
+                        ' The family first (in tens of billions), then the newest.
+                        order = 0# - parts[6].ToInt()
+                        if not family then order = order + 10000000000#
+                        found.Push({ order: order, at: i })
+                    end if
+                end if
+            end if
+        end if
+    end for
+    found.SortBy("order")
+    seen = {}
+    seen[" " + NormalizeSearch(name)] = true
+    for each match in found
+        if row.GetChildCount() >= limit then exit for
+        title = names[match.at]
+        if not seen.DoesExist(title) and not exclude.DoesExist(title) then
+            seen[title] = true
+            parts = records[match.at].Split(sep)
+            itemKind = "movie"
+            if parts[0] = "s" then itemKind = "series"
+            addSearchItem(row, parts, itemKind)
+        end if
+    end for
+    return row
+end function
+
+' The start of a title that its sequels share: its first two words (a leading "the" or
+' "a" aside), or its one word when it has only one of four letters or more, as the
+' index writes names (" carry on"); "" when there's nothing distinctive.
+function titleStem(name as String) as String
+    words = []
+    for each word in NormalizeSearch(name).Split(" ")
+        if word <> "" then words.Push(word)
+    end for
+    if words.Count() > 1 and (words[0] = "the" or words[0] = "a" or words[0] = "an") then words.Shift()
+    if words.Count() >= 2 then return " " + words[0] + " " + words[1]
+    if words.Count() = 1 and Len(words[0]) >= 4 then return " " + words[0]
+    return ""
+end function
+
 ' --- Keeping the index between launches ---------------------------------------------
 '
 ' Loading a whole library from the provider takes minutes, so a finished index is

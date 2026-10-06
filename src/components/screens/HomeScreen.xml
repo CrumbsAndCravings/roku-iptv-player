@@ -80,6 +80,8 @@
     <Label id="status" translation="[140, 450]" width="1000" horizAlign="center" wrap="true" maxLines="3" lineSpacing="4" color="0xC3B8E6FF" />
 
     <Timer id="heroTimer" duration="0.6" repeat="false" />
+    <!-- Starts the library worker for the rows picked for you, once Home's own rows are under way. -->
+    <Timer id="picksTimer" duration="3" repeat="false" />
 
     <Animation id="backdropIn" duration="0.5" easeFunction="outQuad">
       <FloatFieldInterpolator id="backdropFade" key="[0.0, 1.0]" keyValue="[0.0, 1.0]" fieldToInterp="backdrop.opacity" />
@@ -90,6 +92,7 @@
   <script type="text/brightscript" uri="pkg:/components/common/Compat.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Progress.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Motion.brs" />
+  <script type="text/brightscript" uri="pkg:/components/common/Taste.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Categories.brs" />
   <script type="text/brightscript" uri="pkg:/components/screens/HomeScreen.brs" />
 </component>

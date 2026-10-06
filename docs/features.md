@@ -231,6 +231,17 @@ Categories whose names hold `xxx`, `adult`, `18+` or `porn`, and titles with `is
 - **See all tile** (new): every category row ends with a "See all ›" card that opens the category page (5.3). It isn't added to Continue Watching. Focusing it keeps the previous hero.
 - **"Won't play"** posters are dimmed, with a badge on the poster.
 
+### 5.1.1 Picked for you (new in 0.5.7)
+Home learns from what you watch, as Netflix does. Code: `common/Taste.brs`, `tasks/SearchIndex.brs` (`IndexCategoriesOf`, `IndexPicks`, `IndexBecause`), `tasks/SearchTask.brs` (`answerPicks`), `screens/HomeScreen.brs` (`addPersonalRows`, `askPicks`, `onPicks`); tested in `tests/parse_test.brs`.
+- **What counts** (registry `taste/history`, newest first, at most 30): a movie counts 1 once you're 3 minutes in, 2 from half way, 3 when finished; a series counts 1 while you watch it and half a point more for each episode finished, up to 4; taking a title off Continue Watching before a fifth of it counts −1. Continue Watching also counts (1, or 2 from half way) for what isn't in the history, which brings in what you watched on your other devices through sync. When the registry is nearly full, the history keeps only 10.
+- **Liking a category:** each title's weight, halving every 30 days, added to its category. The library worker knows every title's category from the stored library, so no request goes to the provider.
+- **Rows under Continue Watching** on the Home tab:
+  - **Top picks for you:** titles from the 6 categories you like most, scored by how much you like the category times how new the title is (halving every 90 days since it was added, or by year), at most 8 from one category, 30 in all, each title once, nothing you've watched (by key, and by name for its other copies).
+  - **Because you watched …:** for your 2 latest titles watched at least half way (or started, when there are none): first the rest of its series of films (titles starting with the same first two words, or its one word of four letters or more, a leading "the" aside, like "Carry On Jatta 2" after "Carry On Jatta"), then the newest from its category. 20 in all.
+  - They're laid out as placeholders as Home builds, so nothing jumps when they arrive, and refresh when you come back from a video. A row with nothing to pick goes. With no stored library yet (it's built the first time Search, Categories or a "See all" page is used), they wait for a launch that has one. The library worker starts 3 seconds after Home's own rows, so those load first.
+- **Row order:** the likings are kept (`taste/scores`, the 12 most liked categories) and Home moves the categories you like up, most liked first: after the first two rows on the Home tab (new releases, so something new stays near the top), after the first on Movies and Series.
+- Sign-out clears the history and likings.
+
 ### 5.2 Categories tab (new)
 - A screen of category cards (210×104: name, plus "Movies · 104"), in rows:
   1. **New releases**
@@ -452,6 +463,8 @@ Unchanged since 0.4.1 apart from where the account is kept; see `samsung-plan.md
 |---|---|
 | Login (registry `account/creds`) | `{ server, username, password, userAgent }`; `userAgent` "" means the device's own |
 | Built-in login stamp | registry `account/builtIn` = `"<server> <username>"` |
+| Watch history (`taste/history`) | `[{ k: "m:<id>" \| "s:<seriesId>", n: name (≤ 32), w: weight, t: seconds }]`, newest first, at most 30 (§5.1.1) |
+| Category likings (`taste/scores`) | `{ "vod:12": 3.2, "series:7": 1.5 }`, the 12 most liked |
 | Player prefs (`prefs/player`) | `{ audio: lang, subtitles: lang \| "off" \| "online", sounds: "on" \| "off", intro: "on" \| "off" }` (sounds and intro on unless "off") |
 | Global fields (`m.global`) | `creds`, `playing`, `syncedAt`, `search`, `soundsOn`, `introPlaying`, and `sound` (alwaysNotify: the click sound a screen asks for) |
 | Language prefs (`prefs/languages`) | `["en", "hi", "pa"]` |
@@ -463,7 +476,7 @@ Unchanged since 0.4.1 apart from where the account is kept; see `samsung-plan.md
 | Titles that need the helper (`helper/titles`) | `["m:<id>", "e:<id>", …]`, newest first, at most 200; cleared on sign-out |
 | Helper requests (`HelperTask`) | `request { mode: "info" \| "hash" \| "start" \| "lastError" \| "stop", url }` → `result { ok, info \| hash \| started \| said \| error }` |
 | Sync service | see [`../sync/README.md`](../sync/README.md) |
-| Library worker fields | `query` → `results` (ContentNode rows: Categories, Movies, Series; tagged `forQuery`); `status` `{ done, total, titles, stopped }`; `browse` `{ kind, categoryId, query }` → `browsed` (ContentNode with `total`, `forKey`, `loading`); `countsRequest` → `counts` `{ "vod:123": 104 }`; `stop` |
+| Library worker fields | `query` → `results` (ContentNode rows: Categories, Movies, Series; tagged `forQuery`); `status` `{ done, total, titles, stopped }`; `browse` `{ kind, categoryId, query }` → `browsed` (ContentNode with `total`, `forKey`, `loading`); `countsRequest` → `counts` `{ "vod:123": 104 }`; `picksRequest` `{ history, watching, because: [{ k, n }], forKey }` → `picks` (ContentNode of rows tagged `slot`, with `scores`, `forKey`, `loading`); `stop` |
 | Item fields (ContentNode) | `ItemDefaults()` in `common/Utils.brs`; new ones are `categoryId` and `listKind` (`vod`/`series`) for category and See-all cards; `kind` is also `category` or `seeAll` |
 | Scene actions | `signedIn`, `signOut`, `openDetails`, `play`, `close` (with `helperStop`, the helper's stop address, after a helper stream), `openSearch`, `openSubtitleSetup`, **`openCategory`** `{ kind, categoryId, title }`, **`openCategories`** `{ lists: { vod, series, langs } }`, **`syncNow`**, **`syncSoon`** |
 
@@ -514,6 +527,7 @@ Suggested order, most useful first:
 11. **Picture codecs ignored; audio format labels and unplayable-track swap.**
 12. **Sharp look:** 3 to 5 px corners, posters 10 px apart, badges on the poster, 6% focus lift. At 1080p, multiply Roku sizes by 1.5.
 13. **Motion, glass, sounds and intro** (§10): the web app already has the glass, motion and intro (CSS and Web Audio) to port from; add the click sounds and the Account menu switches too.
+14. **Picked for you** (§5.1.1): the watch history, category likings, Top picks and Because you watched rows, and the row order. Sharing the history through the sync service would let every device learn from all of them.
 
 The helper on a computer at home (§15) needs no port: Samsung has it, and the Roku came second.
 
