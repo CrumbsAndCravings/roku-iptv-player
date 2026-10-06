@@ -10,7 +10,7 @@ run() {
 }
 
 status=0
-run $C/common/Utils.brs $C/common/Tracks.brs $C/common/Playback.brs $C/common/Subtitles.brs $C/common/Categories.brs $C/common/Helper.brs $C/common/Motion.brs tests/utils_test.brs
+run $C/common/Utils.brs $C/common/Tracks.brs $C/common/Playback.brs $C/common/Subtitles.brs $C/common/Categories.brs $C/common/Helper.brs $C/common/Motion.brs $C/common/Slides.brs tests/utils_test.brs
 run $C/common/Utils.brs tests/fake_registry.brs $C/common/Progress.brs $C/common/Categories.brs $C/common/Tracks.brs $C/common/Helper.brs $C/common/Taste.brs $C/common/MyList.brs $C/tasks/XtreamParse.brs $C/tasks/SearchIndex.brs tests/parse_test.brs
 # Objects a Roku only allows on the main thread and in tasks crash the app when a screen
 # creates one (0.5.7 to 0.5.9 froze on roFileSystem). Screens, items, the scene, the

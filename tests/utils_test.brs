@@ -464,6 +464,18 @@ sub Main()
     checkInt("titles capped", AddHelperTitle(many, "e:9").Count(), 200)
     checkInt("titles from nothing", AddHelperTitle(invalid, "m:7").Count(), 1)
 
+    ' The moving banner's pictures (Utils.brs BackdropList, Slides.brs BackdropPictures)
+    list = BackdropList(["https://image.tmdb.org/t/p/w1280/x.jpg", "", "https://image.tmdb.org/t/p/original/x.jpg", "http://h/y.jpg"])
+    check("BackdropList sized, each once", list.Replace(Chr(10), " | "), "https://image.tmdb.org/t/p/w780/x.jpg | http://h/y.jpg")
+    check("BackdropList one URL", BackdropList("http://h/z.jpg"), "http://h/z.jpg")
+    check("BackdropList none", BackdropList(invalid), "")
+    shown = CreateObject("roSGNode", "ContentNode")
+    shown.AddFields({ backdrop: "a", backdrops: "a" + Chr(10) + "b" + Chr(10) + "c" })
+    check("BackdropPictures the one showing first", BackdropPictures(shown).Join(","), "a,b,c")
+    bare = CreateObject("roSGNode", "ContentNode")
+    bare.AddFields({ backdrop: "", backdrops: "b" })
+    checkInt("BackdropPictures none without a backdrop", BackdropPictures(bare).Count(), 0)
+
     ' Motion: the web app's spring and jelly curves, and values along them
     spring = SpringCurve()
     jelly = JellyCurve()

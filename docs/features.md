@@ -223,6 +223,7 @@ Categories whose names hold `xxx`, `adult`, `18+` or `porn`, and titles with `is
 ### 5.1 Home
 - **Tabs:** Home, Movies, Series, **Categories** (new), Search, on a floating glass bar with a glass lens on the current tab (new in 0.5.5, §10).
 - **Hero:** backdrop, title, meta (year · runtime · genre · ★ rating), plot. Resting 0.6 s on a movie fetches `get_vod_info` for runtime, backdrop and codecs.
+- **Moving banner** (new in 0.5.12, `common/Slides.brs`): the provider's details list several backdrops for most titles (`backdrop_path`; up to 5 kept, sized w780, in the item's `backdrops` field, `BackdropList`). Resting on a title with more than one, they take turns every 7 seconds, cross-fading over 1.4 s, each slowly zooming in to 106 % (a little longer than it shows). It starts once the details are in (straight away for series, whose lists carry them), stops when the focus moves, and waits while another screen is on top. The same on Details. The pictures come from the image hosts, not the provider's video connection.
 - **Keys:**
   - Left from a row's first poster, or Up from the first row, reaches the tabs.
   - OK on a tab acts on key release, so the release can't land on a poster.

@@ -12,6 +12,8 @@
     <Rectangle width="1280" height="720" color="0x151028FF" />
     <!-- Settles from a little bigger as it fades in; grows from its left edge, which the fade covers. -->
     <Poster id="backdrop" translation="[340, 0]" width="940" height="529" loadWidth="940" loadHeight="529" loadDisplayMode="scaleToZoom" scaleRotateCenter="[0, 264]" />
+    <!-- The moving banner's other picture (common/Slides.brs). -->
+    <Poster id="backdropFront" translation="[340, 0]" width="940" height="529" loadWidth="940" loadHeight="529" loadDisplayMode="scaleToZoom" scaleRotateCenter="[0, 264]" opacity="0" />
     <Poster translation="[340, 0]" width="440" height="540" uri="pkg:/images/fade_left.png" />
     <Poster translation="[320, 280]" width="960" height="260" uri="pkg:/images/fade_bottom.png" />
     <Rectangle translation="[0, 528]" width="1280" height="192" color="0x151028FF" />
@@ -80,6 +82,7 @@
     <Label id="status" translation="[140, 450]" width="1000" horizAlign="center" wrap="true" maxLines="3" lineSpacing="4" color="0xC3B8E6FF" />
 
     <Timer id="heroTimer" duration="0.6" repeat="false" />
+    <Timer id="slideTimer" duration="7" repeat="true" />
     <!-- Starts the library worker for the rows picked for you, once Home and its own rows are up. -->
     <Timer id="picksTimer" duration="6" repeat="false" />
 
@@ -92,6 +95,7 @@
   <script type="text/brightscript" uri="pkg:/components/common/Compat.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Progress.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Motion.brs" />
+  <script type="text/brightscript" uri="pkg:/components/common/Slides.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Taste.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/MyList.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Categories.brs" />

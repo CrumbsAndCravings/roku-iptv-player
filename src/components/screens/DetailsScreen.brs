@@ -21,6 +21,7 @@ sub init()
     m.backdropTarget = 1.0
     m.settled = false
     m.backdrop.ObserveField("loadStatus", "onBackdropLoaded")
+    SlidesInit(m.backdrop, m.top.FindNode("backdropFront"), m.top.FindNode("slideTimer"))
 
     m.title.font = MakeFont("Fredoka-SemiBold", 42)
     m.meta.font = MakeFont("Nunito-ExtraBold", 18)
@@ -89,11 +90,18 @@ sub showInfo()
     if item.starring <> "" then credits.Push("Starring " + item.starring)
     if item.directedBy <> "" then credits.Push("Directed by " + item.directedBy)
     m.credits.text = credits.Join("   ·   ")
-    m.backdropIn.control = "stop"
-    m.backdropTarget = ShowBackdrop(m.backdrop, item.backdrop, item.HDPosterUrl)
+    ' Once its pictures are turning, more details arriving leave them be.
+    if not SlidesRunning() then
+        m.backdropIn.control = "stop"
+        m.backdropTarget = ShowBackdrop(m.backdrop, item.backdrop, item.HDPosterUrl)
+        ' With more than one backdrop, they take turns (common/Slides.brs).
+        SlidesStart(BackdropPictures(item), m.backdropTarget)
+    end if
 end sub
 
 sub onBackdropLoaded()
+    ' The moving banner's next picture is its own to show.
+    if SlidesBackLoaded() then return
     if m.backdrop.loadStatus <> "ready" then return
     m.backdropFade.keyValue = [0.0, m.backdropTarget]
     m.backdropIn.control = "start"

@@ -24,6 +24,7 @@ sub init()
     m.backdropTarget = 1.0
     m.settleBackdrop = false
     m.backdrop.ObserveField("loadStatus", "onBackdropLoaded")
+    SlidesInit(m.backdrop, m.top.FindNode("backdropFront"), m.top.FindNode("slideTimer"))
 
     m.heroTitle.font = MakeFont("Fredoka-SemiBold", 40)
     m.heroMeta.font = MakeFont("Nunito-ExtraBold", 18)
@@ -383,12 +384,20 @@ sub showHero(item as Object)
             delay = delay + 0.07
         end for
         m.settleBackdrop = true
+        SlidesStop()
     end if
-    m.backdropIn.control = "stop"
-    m.backdropTarget = ShowBackdrop(m.backdrop, item.backdrop, item.HDPosterUrl)
+    ' The same title again (its details arrived) keeps its pictures turning.
+    if isNew or not SlidesRunning() then
+        m.backdropIn.control = "stop"
+        m.backdropTarget = ShowBackdrop(m.backdrop, item.backdrop, item.HDPosterUrl)
+    end if
+    ' With more than one backdrop, they take turns (common/Slides.brs).
+    if not SlidesRunning() then SlidesStart(BackdropPictures(item), m.backdropTarget)
 end sub
 
 sub onBackdropLoaded()
+    ' The moving banner's next picture is its own to show.
+    if SlidesBackLoaded() then return
     if m.backdrop.loadStatus <> "ready" then return
     m.backdropFade.keyValue = [0.0, m.backdropTarget]
     m.backdropIn.control = "start"
@@ -399,6 +408,7 @@ sub onBackdropLoaded()
 end sub
 
 sub clearHero()
+    SlidesStop()
     m.heroTitle.text = ""
     m.heroMeta.text = ""
     m.heroPlot.text = ""

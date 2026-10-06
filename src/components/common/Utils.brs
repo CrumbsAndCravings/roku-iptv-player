@@ -62,6 +62,23 @@ function FirstUrl(value as Dynamic) as String
     return ToStr(value).Trim()
 end function
 
+' Up to 5 backdrops from backdrop_path (a list, or one URL), sized for the screen and
+' each once, one per line: the pictures of a title's moving banner (common/Slides.brs).
+function BackdropList(value as Dynamic) as String
+    list = value
+    if not IsArr(list) then list = [value]
+    urls = []
+    seen = {}
+    for each entry in list
+        url = SizedImage(ToStr(entry).Trim(), "w780")
+        if url <> "" and not seen.DoesExist(url) and urls.Count() < 5 then
+            seen[url] = true
+            urls.Push(url)
+        end if
+    end for
+    return urls.Join(Chr(10))
+end function
+
 ' TMDB serves every size from the same path, so ask for one that fits a 720p screen.
 function SizedImage(url as String, size as String) as String
     marker = "image.tmdb.org/t/p/"
@@ -255,7 +272,7 @@ end function
 
 ' How ARAN+ introduces itself when a provider turns away requests that say "Roku".
 function AppUserAgent() as String
-    return "ARANplus/0.5.11"
+    return "ARANplus/0.5.12"
 end function
 
 ' A plain desktop web browser, for providers whose servers only answer browsers (a
@@ -361,6 +378,7 @@ function ItemDefaults() as Object
         seriesId: ""
         ext: ""
         backdrop: ""
+        backdrops: ""
         year: ""
         genre: ""
         score: ""
@@ -394,7 +412,7 @@ end function
 ' Copies details fetched from get_vod_info / get_series_info onto an item node.
 sub ApplyInfo(item as Object, info as Dynamic)
     if not IsAA(info) then return
-    for each key in ["description", "year", "genre", "score", "starring", "directedBy", "backdrop", "ext", "videoCodec", "videoProfile", "audioCodec", "tmdbId"]
+    for each key in ["description", "year", "genre", "score", "starring", "directedBy", "backdrop", "backdrops", "ext", "videoCodec", "videoProfile", "audioCodec", "tmdbId"]
         value = FieldStr(info, key)
         if value <> "" then item.SetField(key, value)
     end for
