@@ -464,6 +464,15 @@ sub Main()
     checkInt("titles capped", AddHelperTitle(many, "e:9").Count(), 200)
     checkInt("titles from nothing", AddHelperTitle(invalid, "m:7").Count(), 1)
 
+    ' A provider moving to a new address (LoginChange)
+    last = { server: "http://a.old.example", username: "user1", pass: "stamp1" }
+    check("LoginChange same", LoginChange(last, { server: "HTTP://A.OLD.EXAMPLE/", username: "user1", pass: "stamp1" }), "same")
+    check("LoginChange moved", LoginChange(last, { server: "http://a.new.example", username: "user1", pass: "stamp1" }), "moved")
+    check("LoginChange another password", LoginChange(last, { server: "http://a.new.example", username: "user1", pass: "stamp2" }), "other")
+    check("LoginChange another user", LoginChange(last, { server: "http://a.old.example", username: "user2", pass: "stamp1" }), "other")
+    check("LoginChange no last", LoginChange(invalid, { server: "http://a.old.example", username: "user1", pass: "stamp1" }), "other")
+    check("SyncSpaceText follows the address", boolText(SyncSpaceText({ server: "http://a.old.example", username: "u" }) <> SyncSpaceText({ server: "http://a.new.example", username: "u" })), "true")
+
     ' The moving banner's pictures (Utils.brs BackdropList, Slides.brs BackdropPictures)
     list = BackdropList(["https://image.tmdb.org/t/p/w1280/x.jpg", "", "https://image.tmdb.org/t/p/original/x.jpg", "http://h/y.jpg"])
     check("BackdropList sized, each once", list.Replace(Chr(10), " | "), "https://image.tmdb.org/t/p/w780/x.jpg | http://h/y.jpg")

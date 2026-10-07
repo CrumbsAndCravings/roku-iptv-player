@@ -373,6 +373,12 @@ sub Main()
     checkInt("IndexPersonal nothing liked", nothing.picks.Count() + nothing.because.Count(), 0)
     check("titleStem", titleStem("The Carry On Jatta") + "|" + titleStem("Jawan") + "|" + titleStem("Up"), " carry on| jawan|")
 
+    ' A saved library after the provider moved (SameOwner)
+    check("SameOwner same", boolText(SameOwner("http://a.old.example user1", "http://a.old.example user1")), "true")
+    check("SameOwner moved", boolText(SameOwner("http://a.old.example user1", "http://a.new.example user1")), "true")
+    check("SameOwner another account", boolText(SameOwner("http://a.old.example user1", "http://a.old.example user2")), "false")
+    check("SameOwner odd", boolText(SameOwner("", "http://a.old.example user1")), "false")
+
     ' Ratings (common/Taste.brs)
     rated = TasteRated([{ k: "m:1", n: "Jawan", w: 2, t: now }], "m:1", "", 2, now + 5)
     check("TasteRated keeps watching and name", rated[0].n + " " + Str(rated[0].w).Trim() + " " + rated[0].r.ToStr(), "Jawan 2 2")

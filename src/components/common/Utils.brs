@@ -208,6 +208,17 @@ function SameLogin(a as Dynamic, b as Dynamic) as Boolean
     return FieldStr(a, "username") = FieldStr(b, "username")
 end function
 
+' How a login compares with the last one on this TV, both { server, username, pass }
+' (pass being PasswordStamp's, not the password): "same" account at the same address;
+' "moved", the same username and password at another address (the provider moved,
+' as providers do), so everything stays and Continue Watching follows; or "other".
+function LoginChange(last as Dynamic, now as Dynamic) as String
+    if FieldStr(last, "username") = "" or FieldStr(last, "username") <> FieldStr(now, "username") then return "other"
+    if SameLogin(last, now) then return "same"
+    if FieldStr(last, "pass") <> "" and FieldStr(last, "pass") = FieldStr(now, "pass") then return "moved"
+    return "other"
+end function
+
 ' Pulls server, username and password out of a pasted link: get.php or player_api.php
 ' with ?username=&password=, or a path like /playlist/<user>/<pass>/m3u_plus (also
 ' /live/, /movie/ and /series/ stream links).
@@ -272,7 +283,7 @@ end function
 
 ' How ARAN+ introduces itself when a provider turns away requests that say "Roku".
 function AppUserAgent() as String
-    return "ARANplus/0.5.12"
+    return "ARANplus/0.5.13"
 end function
 
 ' A plain desktop web browser, for providers whose servers only answer browsers (a

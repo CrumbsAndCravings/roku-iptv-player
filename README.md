@@ -19,7 +19,7 @@ Built for a 720p Roku TV (TCL 32S357, Roku OS 15), so the UI is laid out at 1280
 - **Audio & subtitles:** pick an audio track or turn on subtitles built into the file. Your language choice is remembered and applied to the next video automatically.
 - Adult categories and titles are hidden.
 
-Remote shortcuts: **Left** from a row's first poster (or **Up** from the first row) reaches the tabs, **Back** jumps to the top row, then the tabs, then exits, **\*** (options) opens the account menu with Sign out, **Play** on a details page starts the main button.
+Remote shortcuts: **Left** from a row's first poster (or **Up** from the first row) reaches the tabs, **Back** jumps to the top row, then the tabs, then exits, **\*** (options) opens the account menu (Change server address, for when the provider moves, keeps everything; Sign out), **Play** on a details page starts the main button.
 
 ## Player controls
 

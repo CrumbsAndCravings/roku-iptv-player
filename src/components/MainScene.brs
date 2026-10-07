@@ -35,13 +35,20 @@ sub init()
     creds = LoadCreds()
     ' A personal build with a different login inside replaces the saved login (and its
     ' Continue Watching, which belongs to the old provider). Online subtitles stay. The
-    ' same account, signed in by hand or by an earlier build, keeps everything; only its
-    ' password follows the build.
+    ' same account, signed in by hand or by an earlier build, keeps everything; its
+    ' address and password follow the build. When the build's address moved (the
+    ' provider changed its domain), Continue Watching follows from the old one.
     builtIn = BuiltInCreds()
     if builtIn <> invalid then
         stamp = builtIn.server + " " + builtIn.username
+        oldStamp = ToStr(RegRead("account", "builtIn")).Split(" ")
         if ToStr(RegRead("account", "builtIn")) <> stamp then
-            if SameLogin(creds, builtIn) then
+            if oldStamp.Count() = 2 and oldStamp[1] = builtIn.username and LCase(oldStamp[0]) <> LCase(builtIn.server) then NoteMovedFrom(oldStamp[0], builtIn)
+            sameAccount = SameLogin(creds, builtIn)
+            if creds <> invalid and not sameAccount then sameAccount = FieldStr(creds, "username") = builtIn.username and FieldStr(creds, "password") = builtIn.password
+            if sameAccount then
+                if not SameLogin(creds, builtIn) then NoteMovedFrom(NormalizeServer(FieldStr(creds, "server")), builtIn)
+                creds.server = builtIn.server
                 creds.password = builtIn.password
                 SaveCreds(creds)
             else
@@ -59,6 +66,7 @@ sub init()
         if BuiltInCreds() <> invalid then m.screens.Peek().autoSignIn = true
     else
         m.global.creds = creds
+        NoteLogin(creds)
         resetTo("HomeScreen")
         requestSync(true)
     end if
@@ -290,6 +298,10 @@ sub onAction(event as Object)
     action = event.GetData()
     name = FieldStr(action, "name")
     if name = "signedIn" then
+        ' A new address for the same account (Change server address, or signing in again)
+        ' keeps everything; the library worker starts again for the new address.
+        stopSearch()
+        NoteLogin(action.creds)
         m.global.creds = action.creds
         resetTo("HomeScreen")
         requestSync(true)
@@ -351,7 +363,8 @@ sub requestSync(force as Boolean)
     if m.syncClock = invalid then m.syncClock = CreateObject("roTimespan")
     m.syncClock.Mark()
     m.syncTask = CreateObject("roSGNode", "SyncTask")
-    m.syncTask.request = { url: config.url, key: config.key, space: SyncSpace(creds), entries: ProgressList(), removed: ProgressRemovedList() }
+    ' After the account moved to a new address, the old address's list comes too, once.
+    m.syncTask.request = { url: config.url, key: config.key, space: SyncSpace(creds), previous: ToStr(RegRead("sync", "previous")), entries: ProgressList(), removed: ProgressRemovedList() }
     m.syncTask.ObserveField("result", "onSynced")
     m.syncTask.control = "RUN"
 end sub
@@ -361,6 +374,7 @@ sub onSynced(event as Object)
     m.syncTask.UnobserveField("result")
     m.syncTask = invalid
     if IsAA(result) and result.ok = true then
+        if ToStr(Field(result, "movedIn")) = "true" then RegDelete("sync", "previous")
         before = FormatJson(ProgressList())
         merged = MergeProgress(ProgressList(), ProgressRemovedList(), result.state)
         ProgressSave(merged.entries, merged.removed)

@@ -32,18 +32,67 @@ sub SaveCreds(creds as Object)
     RegWrite("account", "creds", FormatJson(creds))
 end sub
 
+' Sign-out. The watch history, ratings and My List stay for the same account signing
+' back in (at a new address too); another account signing in clears them (NoteLogin).
+' Continue Watching comes back from the sync service.
 sub ClearAccount()
     RegDelete("account", "creds")
     RegDelete("progress", "items")
     RegDelete("progress", "removed")
     RegDelete("opensubtitles", "account")
     RegDelete("helper", "titles")
-    RegDelete("taste", "history")
-    RegDelete("taste", "scores")
-    RegDelete("mylist", "items")
     DeleteFile(SearchCachePath())
     RegDelete("search", "saved")
 end sub
+
+' The account last signed in on this TV: { server, username, pass } (pass is
+' PasswordStamp's, not the password), or invalid.
+function LastLogin() as Dynamic
+    raw = RegRead("account", "last")
+    last = invalid
+    if raw <> invalid then last = ParseJson(raw)
+    if not IsAA(last) or FieldStr(last, "username") = "" then return invalid
+    return last
+end function
+
+' A sign-in (or a login a build carries): the same account at a new address keeps
+' everything, and Continue Watching follows from the old address's sync space at the
+' next sync (sync/previous, SyncTask); another account clears what this TV learnt about
+' the last one (watch history, ratings, My List).
+sub NoteLogin(creds as Object)
+    now = { server: NormalizeServer(FieldStr(creds, "server")), username: FieldStr(creds, "username"), pass: PasswordStamp(FieldStr(creds, "password")) }
+    last = LastLogin()
+    if last <> invalid then
+        change = LoginChange(last, now)
+        if change = "moved" then
+            NoteMovedFrom(FieldStr(last, "server"), now)
+        else if change = "other" then
+            RegDelete("taste", "history")
+            RegDelete("taste", "scores")
+            RegDelete("mylist", "items")
+            RegDelete("sync", "previous")
+        end if
+    end if
+    RegWrite("account", "last", FormatJson(now))
+end sub
+
+' The account moved from `server` to now's address: its old sync space is fetched once
+' at the next sync and folded into the new one.
+sub NoteMovedFrom(server as String, now as Object)
+    old = SyncSpace({ server: server, username: now.username })
+    if server <> "" and old <> SyncSpace(now) then RegWrite("sync", "previous", old)
+end sub
+
+' A short fingerprint of a password, to tell the same account from another without
+' keeping the password itself after a sign-out.
+function PasswordStamp(text as String) as String
+    if text = "" then return ""
+    bytes = CreateObject("roByteArray")
+    bytes.FromAsciiString(text)
+    digest = CreateObject("roEVPDigest")
+    digest.Setup("sha256")
+    return LCase(Left(digest.Process(bytes), 16))
+end function
 
 ' Player preferences, e.g. { audio: "hin", subtitles: "eng" } (language codes, or "off").
 function LoadPrefs() as Object

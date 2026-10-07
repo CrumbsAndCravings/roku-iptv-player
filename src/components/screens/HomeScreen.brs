@@ -69,6 +69,9 @@ sub init()
     m.menuActions = []
     m.rateChoices = []
     m.nextDialog = ""
+    m.serverTask = invalid
+    m.serverTyped = ""
+    m.serverError = ""
     m.picksTimer = m.top.FindNode("picksTimer")
     m.picksTimer.ObserveField("fire", "askPicks")
     ' 0.5.9 and 0.5.10 had a guard that switched these rows off after a launch that
@@ -1031,7 +1034,7 @@ sub showAccountMenu()
     if not m.global.soundsOn then sounds = "Turn click sounds on"
     intro = "Turn the intro off"
     if FieldStr(LoadPrefs(), "intro") = "off" then intro = "Turn the intro on"
-    dialog.buttons = ["Keep watching", "Online subtitles", sounds, intro, "Sign out"]
+    dialog.buttons = ["Keep watching", "Online subtitles", sounds, intro, "Change server address", "Sign out"]
     dialog.ObserveField("buttonSelected", "onAccountButton")
     dialog.ObserveField("wasClosed", "onDialogClosed")
     m.top.GetScene().dialog = dialog
@@ -1041,6 +1044,8 @@ sub onAccountButton()
     dialog = m.top.GetScene().dialog
     if dialog = invalid then return
     choice = dialog.buttonSelected
+    ' The address keyboard opens as this menu closes (onDialogClosed).
+    if choice = 4 then m.nextDialog = "server"
     dialog.close = true
     if choice = 1 then m.top.action = { name: "openSubtitleSetup" }
     if choice = 2 then
@@ -1061,7 +1066,101 @@ sub onAccountButton()
             SavePref("intro", "off")
         end if
     end if
-    if choice = 4 then m.top.action = { name: "signOut" }
+    if choice = 5 then m.top.action = { name: "signOut" }
+end sub
+
+' --- A new server address --------------------------------------------------------------
+'
+' Providers move to new addresses now and then. Changing it here, rather than signing
+' out, keeps everything: the new address is checked with a sign-in first, then the same
+' account carries on there, Continue Watching following from the old address (NoteLogin
+' in Registry.brs, MainScene's signedIn).
+
+sub showServerKeyboard(text as String)
+    dialog = CreateObject("roSGNode", "StandardKeyboardDialog")
+    dialog.title = "Server address"
+    dialog.message = ["Your provider's new address, like http://example.com:8080. Your account, Continue Watching, My List and ratings stay."]
+    dialog.text = text
+    dialog.buttons = ["Check and save", "Cancel"]
+    dialog.textEditBox.maxTextLength = 256
+    dialog.ObserveField("buttonSelected", "onServerButton")
+    dialog.ObserveField("wasClosed", "onDialogClosed")
+    m.top.GetScene().dialog = dialog
+end sub
+
+sub onServerButton()
+    dialog = m.top.GetScene().dialog
+    if dialog = invalid then return
+    choice = dialog.buttonSelected
+    typed = dialog.text
+    server = NormalizeServer(typed)
+    creds = m.global.creds
+    if choice = 0 and server <> "" and LCase(server) <> LCase(FieldStr(creds, "server")) then
+        m.serverTyped = typed
+        m.nextDialog = "checking"
+        m.serverTask = CreateObject("roSGNode", "XtreamTask")
+        m.serverTask.request = { mode: "auth", creds: { server: server, username: FieldStr(creds, "username"), password: FieldStr(creds, "password") } }
+        m.serverTask.ObserveField("result", "onServerChecked")
+        m.serverTask.control = "RUN"
+    end if
+    dialog.close = true
+end sub
+
+sub showServerChecking()
+    dialog = CreateObject("roSGNode", "StandardMessageDialog")
+    dialog.title = "Server address"
+    dialog.message = ["Checking the new address…"]
+    dialog.buttons = ["Cancel"]
+    dialog.ObserveField("buttonSelected", "onServerCancel")
+    dialog.ObserveField("wasClosed", "onDialogClosed")
+    m.top.GetScene().dialog = dialog
+end sub
+
+sub onServerCancel()
+    if m.serverTask <> invalid then
+        m.serverTask.UnobserveField("result")
+        m.serverTask = invalid
+    end if
+    dialog = m.top.GetScene().dialog
+    if dialog <> invalid then dialog.close = true
+end sub
+
+sub onServerChecked(event as Object)
+    result = event.GetData()
+    if m.serverTask = invalid then return
+    m.serverTask.UnobserveField("result")
+    m.serverTask = invalid
+    dialog = m.top.GetScene().dialog
+    if IsAA(result) and result.ok = true then
+        ' A "Checking" box still to open (the check was quick) doesn't.
+        m.nextDialog = ""
+        if dialog <> invalid then dialog.close = true
+        creds = result.request.creds
+        SaveCreds(creds)
+        ' Home starts again at the new address, keeping everything.
+        m.top.action = { name: "signedIn", creds: creds }
+        return
+    end if
+    m.serverError = "That address didn't work. " + FieldStr(result, "error")
+    m.nextDialog = "serverFailed"
+    if dialog <> invalid then dialog.close = true
+end sub
+
+sub showServerFailed()
+    dialog = CreateObject("roSGNode", "StandardMessageDialog")
+    dialog.title = "Server address"
+    dialog.message = [m.serverError, "Nothing has changed: ARAN+ still uses " + FieldStr(m.global.creds, "server") + "."]
+    dialog.buttons = ["Try again", "Cancel"]
+    dialog.ObserveField("buttonSelected", "onServerFailedButton")
+    dialog.ObserveField("wasClosed", "onDialogClosed")
+    m.top.GetScene().dialog = dialog
+end sub
+
+sub onServerFailedButton()
+    dialog = m.top.GetScene().dialog
+    if dialog = invalid then return
+    if dialog.buttonSelected = 0 then m.nextDialog = "serverAgain"
+    dialog.close = true
 end sub
 
 ' A menu that opens another (Rate it, Account) opens it once it has closed.
@@ -1073,6 +1172,18 @@ sub onDialogClosed()
         return
     else if following = "account" then
         showAccountMenu()
+        return
+    else if following = "server" then
+        showServerKeyboard(FieldStr(m.global.creds, "server"))
+        return
+    else if following = "serverAgain" then
+        showServerKeyboard(m.serverTyped)
+        return
+    else if following = "checking" then
+        showServerChecking()
+        return
+    else if following = "serverFailed" then
+        showServerFailed()
         return
     end if
     restoreFocus()

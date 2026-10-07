@@ -534,6 +534,16 @@ function SaveSearchIndex(index as Object, path as String, owner as String, saved
     return WriteAsciiFile(path, lines.Join(Chr(10)))
 end function
 
+' Whether a saved library belongs to this account: the same username ("<server>
+' <username>"), wherever the server is now, since a provider that moves to a new address
+' keeps its titles and their ids. The next daily refresh brings anything new.
+function SameOwner(saved as String, owner as String) as Boolean
+    if saved = owner then return true
+    a = saved.Split(" ")
+    b = owner.Split(" ")
+    return a.Count() = 2 and b.Count() = 2 and a[1] <> "" and a[1] = b[1]
+end function
+
 ' The saved index for `owner` (with savedAt set), or invalid.
 function LoadSearchIndex(path as String, owner as String) as Dynamic
     text = ReadAsciiFile(path)
@@ -541,7 +551,7 @@ function LoadSearchIndex(path as String, owner as String) as Dynamic
     lines = text.Split(Chr(10))
     header = lines[0].Split(Chr(9))
     ' Format 3 is the same without years; its titles show none until the next refresh.
-    if header.Count() < 5 or (header[0] <> searchFileFormat() and header[0] <> "aranplus-search-3") or header[1] <> owner then return invalid
+    if header.Count() < 5 or (header[0] <> searchFileFormat() and header[0] <> "aranplus-search-3") or not SameOwner(header[1], owner) then return invalid
     count = header[3].ToInt()
     catCount = header[4].ToInt()
     if count <= 0 or lines.Count() <> 1 + count * 2 + catCount then return invalid
