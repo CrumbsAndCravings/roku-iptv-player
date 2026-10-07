@@ -20,35 +20,41 @@
       <Poster width="1280" height="140" uri="pkg:/images/fade_top.png" />
       <Poster translation="[0, 430]" width="1280" height="290" uri="pkg:/images/fade_bottom.png" />
 
-      <Group id="backButton" translation="[48, 30]">
-        <Poster id="backBg" width="120" height="44" uri="pkg:/images/pill.9.png" />
-        <Label id="backLabel" width="120" height="44" horizAlign="center" vertAlign="center" text="‹  Back" />
+      <!-- Back and the title slide in from the left; everything below the picture is
+           drawn up from under the screen (showControls). -->
+      <Group id="controlsTop" translation="[-180, 0]">
+        <Group id="backButton" translation="[48, 30]">
+          <Poster id="backBg" width="120" height="44" uri="pkg:/images/pill.9.png" />
+          <Label id="backLabel" width="120" height="44" horizAlign="center" vertAlign="center" text="‹  Back" />
+        </Group>
+        <Label id="titleLabel" translation="[188, 30]" width="1044" height="44" vertAlign="center" color="0xF7F3FFFF" />
       </Group>
-      <Label id="titleLabel" translation="[188, 30]" width="1044" height="44" vertAlign="center" color="0xF7F3FFFF" />
 
-      <Group id="playButton" translation="[48, 558]">
-        <Poster id="playBg" width="56" height="56" uri="pkg:/images/circle.png" />
-        <Poster id="playIcon" translation="[16, 16]" width="24" height="24" uri="pkg:/images/icon_pause.png" scaleRotateCenter="[12, 12]" />
-      </Group>
-      <Label id="elapsed" translation="[120, 574]" width="96" horizAlign="right" color="0xF7F3FFFF" />
-      <Rectangle id="barTrack" translation="[228, 584]" width="896" height="5" color="0xC9B8FF40" />
-      <Rectangle id="barFill" translation="[228, 584]" width="0" height="5" color="0xC9B8FFFF" />
-      <Rectangle id="barPreview" translation="[228, 584]" width="0" height="5" color="0xFF9ECFCC" visible="false" />
-      <Poster id="knob" width="18" height="18" uri="pkg:/images/circle.png" blendColor="0xF7F3FFFF" />
-      <!-- While choosing a jump through the helper: a picture of that moment above the
-           time. Pictures load into Posters of their own under thumbPics. -->
-      <Group id="thumb" visible="false" opacity="0">
-        <Poster width="264" height="152" uri="pkg:/images/card.9.png" blendColor="0x151028FF" />
-        <Group id="thumbPics" translation="[4, 4]" />
-        <Poster width="264" height="152" uri="pkg:/images/ring.9.png" blendColor="0xC9B8FFFF" />
-      </Group>
-      <Group id="bubble" visible="false">
-        <Poster id="bubbleBg" width="104" height="36" uri="pkg:/images/pill.9.png" blendColor="0xC9B8FFFF" />
-        <Label id="bubbleLabel" width="104" height="36" horizAlign="center" vertAlign="center" color="0x151028FF" />
-      </Group>
-      <Label id="remaining" translation="[1136, 574]" width="100" color="0xC3B8E6FF" />
+      <Group id="controlsBottom" translation="[0, 180]">
+        <Group id="playButton" translation="[48, 558]">
+          <Poster id="playBg" width="56" height="56" uri="pkg:/images/circle.png" />
+          <Poster id="playIcon" translation="[16, 16]" width="24" height="24" uri="pkg:/images/icon_pause.png" scaleRotateCenter="[12, 12]" />
+        </Group>
+        <Label id="elapsed" translation="[120, 574]" width="96" horizAlign="right" color="0xF7F3FFFF" />
+        <Rectangle id="barTrack" translation="[228, 584]" width="896" height="5" color="0xC9B8FF40" />
+        <Rectangle id="barFill" translation="[228, 584]" width="0" height="5" color="0xC9B8FFFF" />
+        <Rectangle id="barPreview" translation="[228, 584]" width="0" height="5" color="0xFF9ECFCC" visible="false" />
+        <Poster id="knob" width="18" height="18" uri="pkg:/images/circle.png" blendColor="0xF7F3FFFF" />
+        <!-- While choosing a jump through the helper: a picture of that moment above the
+             time. Pictures load into Posters of their own under thumbPics. -->
+        <Group id="thumb" visible="false" opacity="0">
+          <Poster width="264" height="152" uri="pkg:/images/card.9.png" blendColor="0x151028FF" />
+          <Group id="thumbPics" translation="[4, 4]" />
+          <Poster width="264" height="152" uri="pkg:/images/ring.9.png" blendColor="0xC9B8FFFF" />
+        </Group>
+        <Group id="bubble" visible="false">
+          <Poster id="bubbleBg" width="104" height="36" uri="pkg:/images/pill.9.png" blendColor="0xC9B8FFFF" />
+          <Label id="bubbleLabel" width="104" height="36" horizAlign="center" vertAlign="center" color="0x151028FF" />
+        </Group>
+        <Label id="remaining" translation="[1136, 574]" width="100" color="0xC3B8E6FF" />
 
-      <Group id="buttonRow" translation="[48, 636]" />
+        <Group id="buttonRow" translation="[48, 636]" />
+      </Group>
     </Group>
 
     <Group id="upNext" translation="[800, 500]" visible="false">
@@ -97,13 +103,17 @@
     <Timer id="commitTimer" duration="0.8" repeat="false" />
     <Timer id="autoSubTimer" duration="2.5" repeat="false" />
     <Timer id="toastTimer" duration="9" repeat="false" />
-    <!-- The controls fade in rising a little, and fade away (showControls, hideControls). -->
-    <Animation id="controlsIn" duration="0.28" easeFunction="outExpo">
+    <!-- The controls come in as they're dragged on and go back the same way, fading as
+         they go (showControls, hideControls; the values are set there). -->
+    <Animation id="controlsIn" duration="0.42" easeFunction="outCubic">
       <FloatFieldInterpolator id="controlsInFade" key="[0.0, 1.0]" keyValue="[0.0, 1.0]" fieldToInterp="controls.opacity" />
-      <Vector2DFieldInterpolator key="[0.0, 1.0]" keyValue="[[0, 10], [0, 0]]" fieldToInterp="controls.translation" />
+      <Vector2DFieldInterpolator id="controlsInTop" key="[0.0, 1.0]" keyValue="[[-180, 0], [0, 0]]" fieldToInterp="controlsTop.translation" />
+      <Vector2DFieldInterpolator id="controlsInBottom" key="[0.0, 1.0]" keyValue="[[0, 180], [0, 0]]" fieldToInterp="controlsBottom.translation" />
     </Animation>
-    <Animation id="controlsOut" duration="0.3" easeFunction="outQuad">
+    <Animation id="controlsOut" duration="0.32" easeFunction="inCubic">
       <FloatFieldInterpolator id="controlsOutFade" key="[0.0, 1.0]" keyValue="[1.0, 0.0]" fieldToInterp="controls.opacity" />
+      <Vector2DFieldInterpolator id="controlsOutTop" key="[0.0, 1.0]" keyValue="[[0, 0], [-180, 0]]" fieldToInterp="controlsTop.translation" />
+      <Vector2DFieldInterpolator id="controlsOutBottom" key="[0.0, 1.0]" keyValue="[[0, 0], [0, 180]]" fieldToInterp="controlsBottom.translation" />
     </Animation>
     <!-- Lets the provider notice a closed connection before the next one opens. -->
     <Timer id="pauseTimer" duration="1.2" repeat="false" />

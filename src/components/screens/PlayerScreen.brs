@@ -19,10 +19,16 @@ sub init()
     m.controls = m.top.FindNode("controls")
     ' Whether the controls are up (they may still be fading away when not).
     m.controlsOn = false
+    m.controlsTop = m.top.FindNode("controlsTop")
+    m.controlsBottom = m.top.FindNode("controlsBottom")
     m.controlsIn = m.top.FindNode("controlsIn")
     m.controlsInFade = m.top.FindNode("controlsInFade")
+    m.controlsInTop = m.top.FindNode("controlsInTop")
+    m.controlsInBottom = m.top.FindNode("controlsInBottom")
     m.controlsOut = m.top.FindNode("controlsOut")
     m.controlsOutFade = m.top.FindNode("controlsOutFade")
+    m.controlsOutTop = m.top.FindNode("controlsOutTop")
+    m.controlsOutBottom = m.top.FindNode("controlsOutBottom")
     m.controlsOut.ObserveField("state", "onControlsGone")
     m.backBg = m.top.FindNode("backBg")
     m.backLabel = m.top.FindNode("backLabel")
@@ -967,14 +973,35 @@ sub buildButtons()
     m.buttonIndex = 0
 end sub
 
+' Where the controls wait while they're away: Back and the title off to the left, the
+' bar and the buttons under the screen.
+function controlsAwayTop() as Object
+    return [-180, 0]
+end function
+
+function controlsAwayBottom() as Object
+    return [0, 180]
+end function
+
+' The controls are dragged on: Back and the title slide in from the left as the bar and
+' the buttons come up from under the screen. When they were still leaving, they come
+' back from where they got to.
 sub showControls(row as String)
     if not m.controlsOn then
         m.controlsOn = true
         m.controlsOut.control = "stop"
         fadeFrom = 0.0
-        if m.controls.visible then fadeFrom = m.controls.opacity
+        topFrom = controlsAwayTop()
+        bottomFrom = controlsAwayBottom()
+        if m.controls.visible then
+            fadeFrom = m.controls.opacity
+            topFrom = m.controlsTop.translation
+            bottomFrom = m.controlsBottom.translation
+        end if
         m.controls.visible = true
         m.controlsInFade.keyValue = [fadeFrom, 1.0]
+        m.controlsInTop.keyValue = [topFrom, [0, 0]]
+        m.controlsInBottom.keyValue = [bottomFrom, [0, 0]]
         m.controlsIn.control = "start"
     end if
     m.row = row
@@ -982,12 +1009,15 @@ sub showControls(row as String)
     restartHideTimer()
 end sub
 
+' They go back the way they came, fading as they go.
 sub hideControls()
     m.hideTimer.control = "stop"
     if not m.controlsOn then return
     m.controlsOn = false
     m.controlsIn.control = "stop"
     m.controlsOutFade.keyValue = [m.controls.opacity, 0.0]
+    m.controlsOutTop.keyValue = [m.controlsTop.translation, controlsAwayTop()]
+    m.controlsOutBottom.keyValue = [m.controlsBottom.translation, controlsAwayBottom()]
     m.controlsOut.control = "start"
 end sub
 
