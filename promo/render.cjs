@@ -48,17 +48,19 @@ async function openPage(browser) {
 async function soundtrack(sound) {
   const wav = path.join(os.tmpdir(), "aranplus-soundtrack.wav");
   const m4a = path.join(os.tmpdir(), "aranplus-soundtrack.m4a"), mp3 = path.join(__dirname, "soundtrack.mp3");
-  // The voiceover comes from voiceover.py as FLAC; decode it to 48 kHz mono floats.
-  let vo = null;
-  const flac = path.join(__dirname, "voiceover.flac");
-  if (fs.existsSync(flac)) {
-    const raw = path.join(os.tmpdir(), "aranplus-vo.f32");
+  // Voice clips from voiceover.py (promo/voice/<id>.flac), decoded to 48 kHz mono floats.
+  const voices = {};
+  for (const id of new Set(sound.cues.filter(c => c.type === "vo").map(c => c.id))) {
+    const flac = path.join(__dirname, "voice", id + ".flac");
+    if (!fs.existsSync(flac)) continue;
+    const raw = path.join(os.tmpdir(), `aranplus-vo-${id}.f32`);
     await run(["-i", flac, "-f", "f32le", "-ac", "1", "-ar", "48000", raw], { quiet: true });
     const b = fs.readFileSync(raw);
-    vo = new Float32Array(b.buffer, b.byteOffset, b.length / 4);
+    voices[id] = new Float32Array(b.buffer.slice(b.byteOffset, b.byteOffset + b.length));
   }
-  const info = makeSoundtrack(sound, wav, vo);
-  console.log(`soundtrack: ${info.bpm.toFixed(1)} bpm, breakdown in bar ${info.bars.breakdown}`);
+  const info = makeSoundtrack(sound, wav, voices);
+  console.log(`soundtrack: ${info.bpm.toFixed(1)} bpm, ${Object.keys(voices).length} voice clips`);
+  info.warnings.forEach(w => console.warn("warning: " + w));
   // Two-pass loudness normalisation to -14 LUFS, -1.5 dBTP.
   const target = "I=-14:TP=-1.5:LRA=11";
   const log = await run(["-i", wav, "-af", `loudnorm=${target}:print_format=json`, "-f", "null", "-"], { quiet: true });
@@ -110,7 +112,7 @@ async function soundtrack(sound) {
     const from = w * per, to = Math.min(frames, from + per);
     const seg = path.join(tmp, `seg${w}.mp4`);
     await run(["-f", "image2pipe", "-framerate", String(fps), "-c:v", "mjpeg", "-i", "-",
-      "-c:v", "libx264", "-preset", "slow", "-crf", "18", "-pix_fmt", "yuv420p", "-r", String(fps), seg], {
+      "-c:v", "libx264", "-preset", "slow", "-crf", "22", "-tune", "film", "-pix_fmt", "yuv420p", "-r", String(fps), seg], {
       quiet: true,
       input: async stdin => {
         for (let f = from; f < to; f++) {

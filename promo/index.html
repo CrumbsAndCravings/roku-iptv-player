@@ -1,10 +1,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>ARAN+ Promo</title>
-<meta name="description" content="A 38 second vertical promo for ARAN+, the cinematic IPTV player for Roku.">
+<meta name="description" content="A 56 second vertical promo for ARAN+, the cinematic IPTV player for Roku: a warm story with before and after comparisons.">
 <style>
 /* Vertical 1080x1920 stage. Every colour, font and asset comes from the ARAN+ app:
-   the plum night, lavender focus, bubblegum progress and butter sparkles. */
+   the plum night, lavender focus, bubblegum progress and butter sparkles. The grey
+   "Before" world stands for a plain IPTV player, drawn for the promo. */
 @font-face { font-family: "Fredoka"; src: url("../src/fonts/Fredoka-SemiBold.ttf") format("truetype"); font-weight: 600; }
 @font-face { font-family: "Fredoka"; src: url("../src/fonts/Fredoka-Medium.ttf") format("truetype"); font-weight: 500; }
 @font-face { font-family: "Nunito"; src: url("../src/fonts/Nunito-ExtraBold.ttf") format("truetype"); font-weight: 800; }
@@ -27,8 +28,12 @@
   --ink-4: #8579B0;
   --plot: #DDD4F7;
   --key: #D8CEF5;
+  --grey-bg: #1b1b1d;     /* the plain "before" player */
+  --grey-panel: #2a2a2e;
+  --grey-ink: #bdbdc4;
   --display: "Fredoka", "Nunito", system-ui, sans-serif;
   --body: "Nunito", "Fredoka", system-ui, sans-serif;
+  --plain: Arial, "Liberation Sans", Helvetica, sans-serif;
   color-scheme: dark;
 }
 html, body { height: 100%; }
@@ -62,12 +67,12 @@ svg.spark { position: absolute; overflow: visible; }
 #neutralBg { background: radial-gradient(ellipse at 50% 40%, #232327 0%, #121214 70%); }
 #sglowA { left: -620px; top: -560px; width: 1560px; height: 1560px; background: var(--lavender-glow); }
 #sglowB { left: 240px; top: 1040px; width: 1440px; height: 1440px; background: var(--pink); }
-#tvCam { transform-origin: 0 0; will-change: transform; }
+.cam { transform-origin: 0 0; will-change: transform; }
 .bezel { position: absolute; left: -20px; top: -20px; width: 1320px; height: 760px; border-radius: 24px; background: linear-gradient(180deg, #1c1631 0%, #0b0817 100%); box-shadow: 0 50px 140px rgba(0,0,0,.65), inset 0 0 0 1.5px rgba(201,184,255,.16), inset 0 2px 0 rgba(255,255,255,.06); }
 .stand { position: absolute; left: 520px; top: 742px; width: 240px; height: 28px; border-radius: 0 0 14px 14px; background: linear-gradient(180deg, #120d22, #07050e); }
 .stand::after { content: ""; position: absolute; left: -110px; top: 26px; width: 460px; height: 8px; border-radius: 6px; background: #0a0714; }
-#screen { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; overflow: hidden; border-radius: 4px; background: var(--plum); }
-#gloss { background: linear-gradient(115deg, rgba(255,255,255,.07) 0%, rgba(255,255,255,0) 38%); pointer-events: none; }
+.screen { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; overflow: hidden; border-radius: 4px; background: var(--plum); }
+.gloss { background: linear-gradient(115deg, rgba(255,255,255,.07) 0%, rgba(255,255,255,0) 38%); pointer-events: none; }
 .scr { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; overflow: hidden; }
 .fill { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
 
@@ -93,17 +98,56 @@ svg.spark { position: absolute; overflow: visible; }
 #brandCap .wmWrap { position: relative; display: inline-block; font-size: 176px; }
 #brandCap p { margin: 34px 0 0; font: 800 42px/1.2 var(--body); color: var(--ink-2); letter-spacing: .01em; }
 
-/* --- dull "before" screen --- */
-#dull { background: #1b1b1d; font-family: Arial, "Liberation Sans", Helvetica, sans-serif; color: #96969c; }
-#dull .top { position: absolute; left: 0; top: 0; width: 1280px; height: 64px; background: #252528; display: flex; align-items: center; gap: 46px; padding-left: 36px; font-size: 21px; letter-spacing: .06em; box-sizing: border-box; }
-#dull .top b { color: #c9c9ce; font-weight: 700; }
-#dull .side { position: absolute; left: 0; top: 64px; width: 420px; height: 656px; background: #202023; border-right: 1px solid #2d2d31; }
-#dull .row { height: 54px; display: flex; align-items: center; padding-left: 30px; font-size: 22px; border-bottom: 1px solid #29292c; white-space: nowrap; }
-#dull .row.sel { background: #3a404e; color: #e3e3e6; }
-#dull .list { position: absolute; left: 420px; top: 64px; width: 860px; height: 656px; overflow: hidden; }
-#dull .item { height: 64px; display: flex; align-items: center; gap: 22px; padding-left: 30px; font-size: 22px; border-bottom: 1px solid #262629; white-space: nowrap; }
-#dull .item .ph { width: 44px; height: 44px; background: #2c2c30; display: grid; place-items: center; font-size: 12px; color: #55555b; }
-#dull .item .bar { height: 14px; background: #2e2e32; border-radius: 2px; }
+/* The viewer's lines: a plain speech bubble with a small avatar. */
+.bubble { position: absolute; left: 72px; display: flex; align-items: flex-end; gap: 22px; }
+.bubble .av { width: 84px; height: 84px; border-radius: 50%; background: #3a3a42; position: relative; overflow: hidden; flex: none; }
+.bubble .av::before { content: ""; position: absolute; left: 27px; top: 14px; width: 30px; height: 30px; border-radius: 50%; background: #8d8b98; }
+.bubble .av::after { content: ""; position: absolute; left: 14px; top: 50px; width: 56px; height: 50px; border-radius: 28px 28px 0 0; background: #8d8b98; }
+.bubble .tx { position: relative; padding: 26px 34px; border-radius: 26px 26px 26px 6px; background: #2c2c33; font: 800 40px/1.2 var(--body); color: #ECEAF2; max-width: 760px; }
+
+/* Before / ARAN+ labels and the slider handle. */
+.lbl { position: absolute; top: 718px; height: 54px; padding: 0 24px; border-radius: 6px; display: flex; align-items: center; font: 800 26px/1 var(--body); letter-spacing: .14em; text-transform: uppercase; }
+#lblBefore { left: 72px; background: var(--grey-panel); color: var(--grey-ink); }
+#lblAran { right: 72px; background: var(--lavender); color: var(--plum); letter-spacing: .06em; font: 600 30px/1 var(--display); text-transform: none; }
+.handle { position: absolute; top: 0; width: 0; height: 720px; }
+.handle .ln { position: absolute; left: -2px; top: 0; width: 4px; height: 720px; background: var(--ink); box-shadow: 0 0 18px rgba(201,184,255,.9); }
+.handle .kn { position: absolute; left: -34px; top: 326px; width: 68px; height: 68px; border-radius: 50%; background: var(--lavender); box-shadow: 0 6px 24px rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; gap: 8px; font: 600 34px/1 var(--display); color: var(--plum); }
+
+/* Room labels for the two TVs. */
+.room { position: absolute; left: 188px; font: 800 26px/1 var(--body); letter-spacing: .16em; text-transform: uppercase; color: var(--ink-3); display: flex; align-items: center; gap: 14px; }
+.room i { width: 12px; height: 12px; border-radius: 50%; background: var(--pink); display: inline-block; }
+#syncDot { width: 28px; height: 28px; margin: -14px 0 0 -14px; border-radius: 50%; background: var(--pink); box-shadow: 0 0 24px 8px rgba(255,158,207,.55); }
+
+/* Messy provider names becoming ARAN+ category cards. */
+.nrow { position: absolute; left: 72px; width: 936px; height: 128px; }
+.nraw { position: absolute; left: 0; top: 4px; width: 400px; height: 120px; box-sizing: border-box; padding: 0 26px; border-radius: 4px; background: #232326; border: 1px solid #34343a; display: flex; align-items: center; font: 400 32px/1 var(--plain); color: #a6a6ac; white-space: nowrap; }
+.narrow { position: absolute; left: 420px; top: 44px; width: 64px; height: 40px; }
+.ntile { position: absolute; left: 504px; top: 0; width: 432px; height: 128px; transform-origin: 0 50%; }
+.ntile .base { position: absolute; inset: 0; border-radius: 6px; background: var(--pill); overflow: hidden; }
+.ntile .accent { position: absolute; left: 0; top: 0; width: 7px; height: 128px; background: var(--pink); }
+.ntile .nm { position: absolute; left: 34px; top: 20px; font: 500 40px/1.15 var(--display); color: var(--ink); white-space: nowrap; }
+.ntile .cp { position: absolute; left: 34px; top: 80px; font: 800 26px/1.1 var(--body); color: var(--ink-2); }
+#callout { left: 72px; top: 1440px; width: 936px; box-sizing: border-box; padding: 30px 40px 34px 50px; border-radius: 9px; background: rgba(48,39,90,.9); border-left: 9px solid var(--butter); }
+#callout .ey { font: 800 22px/1 var(--body); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); }
+#callout .q { margin-top: 14px; font: 800 34px/1.32 var(--body); color: var(--butter); }
+.ntile .ring { position: absolute; left: -6px; top: -6px; right: -6px; bottom: -6px; border: 4px solid var(--lavender); border-radius: 9px; opacity: 0; }
+
+/* --- the plain "before" screens --- */
+.dull { background: var(--grey-bg); font-family: var(--plain); color: #96969c; }
+.dull .top { position: absolute; left: 0; top: 0; width: 1280px; height: 64px; background: #252528; display: flex; align-items: center; gap: 46px; padding-left: 36px; font-size: 21px; letter-spacing: .06em; box-sizing: border-box; }
+.dull .top b { color: #c9c9ce; font-weight: 700; }
+.dull .side { position: absolute; left: 0; top: 64px; width: 420px; height: 656px; background: #202023; border-right: 1px solid #2d2d31; }
+.dull .row { height: 54px; display: flex; align-items: center; padding-left: 30px; font-size: 22px; border-bottom: 1px solid #29292c; white-space: nowrap; }
+.dull .row.sel { background: #3a404e; color: #e3e3e6; }
+.dull .list { position: absolute; left: 420px; top: 64px; width: 860px; height: 656px; overflow: hidden; }
+.dull .item { height: 64px; display: flex; align-items: center; gap: 22px; padding-left: 30px; font-size: 22px; border-bottom: 1px solid #262629; white-space: nowrap; }
+.dull .item .ph { width: 44px; height: 44px; background: #2c2c30; display: grid; place-items: center; font-size: 12px; color: #55555b; }
+.dull .item .bar { height: 14px; background: #2e2e32; border-radius: 2px; }
+.dullErr { background: #0c0c0d; font-family: var(--plain); }
+.dullErr .dlg { position: absolute; left: 330px; top: 230px; width: 620px; height: 260px; background: #2a2a2d; border: 1px solid #3a3a3f; box-sizing: border-box; padding: 36px 40px; }
+.dullErr .dlg b { display: block; font-size: 30px; color: #e0e0e3; }
+.dullErr .dlg p { margin: 18px 0 0; font-size: 22px; line-height: 1.35; color: #a0a0a6; }
+.dullErr .dlg span { position: absolute; right: 40px; bottom: 30px; width: 120px; height: 44px; background: #3a404e; color: #e3e3e6; display: flex; align-items: center; justify-content: center; font-size: 20px; }
 
 /* --- ARAN+ screens (logical 1280x720, positions from the app's XML) --- */
 .logo { position: absolute; left: 50px; top: 25px; font-size: 30px; }
@@ -157,9 +201,24 @@ svg.spark { position: absolute; overflow: visible; }
 .upnext .hn { position: absolute; left: 28px; top: 114px; font: 600 17px/1.2 var(--body); color: var(--ink-2); white-space: pre; }
 .upnext .sp { position: absolute; left: 396px; top: 18px; width: 18px; height: 18px; background: var(--butter); }
 
-/* --- feature list and outro --- */
-#feats { left: 0; top: 0; width: 1080px; height: 1920px; }
-.fpill { position: absolute; left: 72px; height: 104px; padding: 0 46px; box-sizing: border-box; display: flex; align-items: center; border-radius: 9px; background: rgba(48,39,90,.85); font: 500 46px/1 var(--display); color: var(--key); white-space: nowrap; transform-origin: 0 50%; }
+/* Details page (DetailsScreen.xml). */
+.det .t { position: absolute; left: 48px; top: 72px; width: 640px; font: 600 42px/1.12 var(--display); color: var(--ink); }
+.det .m { position: absolute; left: 48px; top: 130px; font: 800 18px/1.3 var(--body); color: var(--ink-2); white-space: pre; }
+.det .pl { position: absolute; left: 48px; top: 168px; width: 580px; font: 600 17px/1.42 var(--body); color: var(--plot); }
+.det .btn { position: absolute; left: 48px; top: 400px; height: 44px; padding: 0 30px; border-radius: 4px; background: var(--lavender); color: var(--plum); display: flex; align-items: center; font: 500 20px/1 var(--display); transform: scale(1.06); transform-origin: 50% 50%; }
+.det .cmp { position: absolute; left: 48px; top: 462px; width: 1184px; font: 800 17px/1.3 var(--body); color: var(--butter); }
+
+/* Player: Audio & subtitles panel and captions on the video. */
+.tracks { background: rgba(13,9,32,.85); }
+.tracks .tt { position: absolute; left: 120px; top: 80px; font: 600 34px/1.2 var(--display); color: var(--ink); }
+.tracks .hd { position: absolute; top: 160px; font: 800 15px/1.2 var(--body); letter-spacing: .12em; color: var(--pink); }
+.opt { position: absolute; width: 440px; height: 44px; border-radius: 4px; }
+.opt .dot { position: absolute; left: 20px; top: 18px; width: 8px; height: 8px; background: var(--pink); }
+.opt .lb { position: absolute; left: 44px; top: 0; height: 44px; display: flex; align-items: center; font: 800 20px/1 var(--body); color: var(--ink-3); white-space: nowrap; }
+.subline { position: absolute; left: 0; top: 596px; width: 1280px; text-align: center; }
+.subline span { display: inline-block; padding: 6px 16px; background: rgba(0,0,0,.75); font: 700 30px/1.25 var(--plain); color: #fff; }
+
+/* --- outro --- */
 #outro { left: 0; top: 0; width: 1080px; height: 1920px; text-align: center; }
 #outro .wmWrap { position: relative; display: inline-block; font-size: 210px; }
 #outro .tag { font: 600 66px/1.1 var(--display); color: var(--ink); }
@@ -182,21 +241,33 @@ svg.spark { position: absolute; overflow: visible; }
       <div id="sglowA" class="abs tint glow"></div>
       <div id="sglowB" class="abs tint glow"></div>
 
-      <div id="tvCam" class="abs">
-        <div class="bezel" id="bezel"></div>
-        <div class="stand" id="stand"></div>
-        <div id="screen">
-          <div id="dull" class="scr"></div>
+      <div id="tvB" class="abs cam">
+        <div class="bezel"></div>
+        <div class="stand"></div>
+        <div class="screen">
+          <div class="abs tint glow" style="left:-300px;top:-330px;width:820px;height:820px;background:var(--lavender-glow);opacity:.16"></div>
+          <div class="abs tint glow" style="left:880px;top:470px;width:640px;height:640px;background:var(--pink);opacity:.10"></div>
+          <div id="homeB" class="scr"></div>
+          <div class="abs fill gloss"></div>
+        </div>
+      </div>
+
+      <div id="tvA" class="abs cam">
+        <div class="bezel" id="bezelA"></div>
+        <div class="stand" id="standA"></div>
+        <div class="screen">
+          <div id="dull" class="scr dull"></div>
+          <div id="dullErr" class="scr dullErr"><div class="dlg"><b>Playback error</b><p>This video format is not supported.</p><span>OK</span></div></div>
           <div id="aran" class="scr">
             <div id="iglowA" class="abs tint glow" style="left:-300px;top:-330px;width:820px;height:820px;background:var(--lavender-glow)"></div>
             <div id="iglowB" class="abs tint glow" style="left:880px;top:470px;width:640px;height:640px;background:var(--pink)"></div>
             <div id="home" class="scr"></div>
-            <div id="cats" class="scr"></div>
-            <div id="search" class="scr"></div>
+            <div id="details" class="scr det"></div>
             <div id="player" class="scr"></div>
           </div>
+          <div id="handle" class="handle"><div class="ln"></div><div class="kn">‹ ›</div></div>
           <div id="flash" class="abs fill"></div>
-          <div id="gloss" class="abs fill"></div>
+          <div id="glossA" class="abs fill gloss"></div>
         </div>
       </div>
 
@@ -205,25 +276,32 @@ svg.spark { position: absolute; overflow: visible; }
       <div id="scrimFoot" class="abs"></div>
       <div id="burst" class="abs"></div>
 
+      <div id="lblBefore" class="lbl">Before</div>
+      <div id="lblAran" class="lbl">ARAN+</div>
+      <div id="roomA" class="room" style="top:628px"><i></i>Living room</div>
+      <div id="roomB" class="room" style="top:1138px"><i></i>Bedroom</div>
+      <div id="syncDot" class="abs"></div>
+      <div id="names" class="abs" style="width:1080px;height:1920px"></div>
+
       <div id="hookCap" class="abs"></div>
       <div id="brandCap" class="abs">
         <div class="wmWrap" id="brandMark"></div>
         <p id="brandTag">A cinematic IPTV player for Roku</p>
       </div>
       <div id="caps"></div>
-      <div id="feats" class="abs"></div>
+      <div id="bubbles"></div>
       <div id="outro" class="abs"></div>
 
       <div id="vignette" class="abs"></div>
       <div id="grain" class="abs"></div>
-      <div id="fine" class="abs">Titles and artwork shown are illustrative.</div>
+      <div id="fine" class="abs">Titles, artwork and the “Before” screens are illustrative.</div>
     </div>
   </div>
   <audio id="music" preload="none" loop></audio>
   <div id="bar">
     <button id="playBtn" type="button">Pause</button>
     <button id="soundBtn" type="button" aria-pressed="false">Sound off</button>
-    <input id="scrub" type="range" min="0" max="38" step="0.01" value="0" aria-label="Position in the promo">
+    <input id="scrub" type="range" min="0" max="56.5" step="0.01" value="0" aria-label="Position in the promo">
     <span id="clock">0:00</span>
   </div>
 </main>
@@ -231,7 +309,7 @@ svg.spark { position: absolute; overflow: visible; }
 <script>
 (() => {
 "use strict";
-const DUR = 38;
+const DUR = 56.5;
 const $ = (s, r = document) => r.querySelector(s);
 const html = (el, s) => { el.insertAdjacentHTML("beforeend", s); return el.lastElementChild; };
 const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
@@ -384,22 +462,6 @@ const KINDS = ["peaks", "city", "sea", "profile", "planet", "forest", "road", "s
 const PALS = ["dusk", "teal", "ember", "arctic", "gold", "jade", "violet", "rose"];
 const auto = n => ({ kind: KINDS[(n * 5 + 3) % 8], pal: PALS[(n * 3 + 1) % 8], seed: 1000 + n * 37 });
 
-/* ------------------------------------------------------------------ content
-   Row names, captions and buttons use the app's own words. */
-const CW = [
-  { art: { kind: "planet", pal: "violet", seed: 11 }, p: .42, title: "Alterity", meta: "2026   ·   1h 52m   ·   Sci-Fi, Drama   ·   * to remove", plot: "A signal from the far side of the moon pulls an engineer into a world that mirrors her own." },
-  { art: { kind: "city", pal: "arctic", seed: 23 }, p: .64, cap: "S1:E4", title: "Northline", meta: "Resume  S1:E4   ·   * to remove", plot: "A night-shift crew on the last train north keeps meeting passengers who never boarded." },
-  { art: { kind: "sea", pal: "dusk", seed: 37 }, p: .2, title: "Paper Moons", meta: "2024   ·   1h 38m   ·   Drama   ·   * to remove", plot: "Two old friends drive the coast one last summer, chasing a film they never finished." },
-  { art: { kind: "profile", pal: "ember", seed: 41 }, p: .78, cap: "S2:E7" },
-  { art: { kind: "forest", pal: "jade", seed: 53 }, p: .5 },
-  { art: { kind: "road", pal: "rose", seed: 67 }, p: .3, cap: "S1:E2" },
-  { art: { kind: "peaks", pal: "gold", seed: 71 }, p: .66 },
-  { art: { kind: "streaks", pal: "teal", seed: 83 }, p: .24 },
-  { art: { kind: "profile", pal: "arctic", seed: 97 }, p: .55, cap: "S3:E1" },
-];
-const ROW1 = [0, 1, 2, 3, 4, 5, 6, 7, 8].map(i => ({ art: auto(i + 10) }));
-const ROW2 = [0, 1, 2, 3, 4, 5, 6, 7, 8].map(i => ({ art: auto(i + 30) }));
-
 /* ------------------------------------------------------------------ build DOM */
 function posterItem(parent, x, item, opts = {}) {
   const el = html(parent, `<div class="pi" style="left:${x}px"><div class="card"><div class="ring"></div><div class="base"></div></div></div>`);
@@ -421,7 +483,52 @@ function header(scr, withSparkle = true) {
 }
 function imgEl(parent, src, x, y, w, h, extra = "") { return html(parent, `<img alt="" src="../src/images/${src}" style="position:absolute;left:${x}px;top:${y}px;width:${w}px;height:${h}px;${extra}">`); }
 
-// Dull "before" screen: the raw provider names ARAN+ tidies up.
+/* ------------------------------------------------------------------ content
+   Row names, captions, buttons and messages use the app's own words. */
+const CW = [
+  { art: { kind: "planet", pal: "violet", seed: 11 }, p: .5, title: "Alterity", meta: "2026   ·   1h 52m   ·   Sci-Fi, Drama   ·   * to remove", plot: "A signal from the far side of the moon pulls an engineer into a world that mirrors her own." },
+  { art: { kind: "city", pal: "arctic", seed: 23 }, p: .64, cap: "S1:E4", title: "Northline", meta: "Resume  S1:E4   ·   * to remove", plot: "A night-shift crew on the last train north keeps meeting passengers who never boarded." },
+  { art: { kind: "sea", pal: "dusk", seed: 37 }, p: .2, title: "Paper Moons", meta: "2024   ·   1h 38m   ·   Drama   ·   * to remove", plot: "Two old friends drive the coast one last summer, chasing a film they never finished." },
+  { art: { kind: "profile", pal: "ember", seed: 41 }, p: .78, cap: "S2:E7" },
+  { art: { kind: "forest", pal: "jade", seed: 53 }, p: .5 },
+  { art: { kind: "road", pal: "rose", seed: 67 }, p: .3, cap: "S1:E2" },
+  { art: { kind: "peaks", pal: "gold", seed: 71 }, p: .66 },
+  { art: { kind: "streaks", pal: "teal", seed: 83 }, p: .24 },
+  { art: { kind: "profile", pal: "arctic", seed: 97 }, p: .55, cap: "S3:E1" },
+];
+const ROW1 = [0, 1, 2, 3, 4, 5, 6, 7, 8].map(i => ({ art: auto(i + 10) }));
+const ROW2 = [0, 1, 2, 3, 4, 5, 6, 7, 8].map(i => ({ art: auto(i + 30) }));
+const TABS = ["Home", "Movies", "Series", "Categories", "Search"];
+
+/* ------------------------------------------------------------------ build DOM */
+const setSvgSize = (el, w, h) => { const s = el.firstElementChild; s.setAttribute("width", w); s.setAttribute("height", h); return el; };
+
+// Home (HomeScreen.xml): hero banner, tab bar and poster rows. Built for both TVs.
+function makeHome(scr) {
+  html(scr, `<div class="fill" style="background:var(--plum)"></div>`);
+  const backdrops = html(scr, `<div style="position:absolute;left:340px;top:0;width:940px;height:529px;overflow:hidden;isolation:isolate"></div>`);
+  const bdEls = CW.slice(0, 3).map(c => setSvgSize(html(backdrops, `<div class="fill" style="opacity:0">${art(c.art, 320, 180)}</div>`), 940, 529));
+  imgEl(scr, "fade_left.png", 340, 0, 440, 540);
+  imgEl(scr, "fade_bottom.png", 320, 280, 960, 260);
+  html(scr, `<div style="position:absolute;left:0;top:528px;width:1280px;height:192px;background:var(--plum)"></div>`);
+  imgEl(scr, "fade_top.png", 0, 0, 1280, 140);
+  header(scr);
+  const tabHL = html(scr, `<div class="tabHL"></div>`);
+  const tabsEl = html(scr, `<div class="tabs"></div>`);
+  const tabEls = TABS.map(n => html(tabsEl, `<div class="tab">${n}</div>`));
+  const hero = html(scr, `<div class="hero"><div class="t"></div><div class="m"></div><div class="pl"></div></div>`);
+  const rowsClip = html(scr, `<div class="rowsClip"></div>`);
+  const rowlist = html(rowsClip, `<div class="rowlist"></div>`);
+  const rows = [["Continue Watching", CW], ["New Releases  ·  Movies", ROW1], ["New Releases  ·  Series", ROW2]].map(([label, items], ri) => {
+    const row = html(rowlist, `<div class="rowL" style="top:${ri * 226}px"><div class="lab">${label}</div></div>`);
+    return items.map((it, i) => posterItem(row, i * 130, it));
+  });
+  return { backdrops, bdEls, tabHL, tabEls, hero, rowlist, rows };
+}
+const homeA = makeHome($("#home"));
+const homeB = makeHome($("#homeB"));
+
+// The plain "before" list: the raw provider names ARAN+ tidies up.
 const dull = $("#dull");
 html(dull, `<div class="top"><b>VOD</b><span>LIVE</span><span>SERIES</span><span>SETTINGS</span><span style="margin-left:auto;margin-right:36px;color:#6e6e74">ALL &gt; MOVIES</span></div>`);
 const side = html(dull, `<div class="side"></div>`);
@@ -432,75 +539,28 @@ const dullList = html(html(dull, `<div class="list"></div>`), `<div style="posit
   html(dullList, `<div class="item"><div class="ph">N/A</div>${n || `<div class="bar" style="width:${w}px"></div>`}</div>`);
 });
 
-// Home: hero banner, tab bar and poster rows.
-const home = $("#home");
-html(home, `<div class="fill" style="background:var(--plum)"></div>`);
-const backdrops = html(home, `<div style="position:absolute;left:340px;top:0;width:940px;height:529px;overflow:hidden;isolation:isolate"></div>`);
-const bdEls = CW.slice(0, 3).map(c => html(backdrops, `<div class="fill" style="opacity:0">${art(c.art, 320, 180)}</div>`));
-bdEls.forEach(el => { const s = el.firstElementChild; s.setAttribute("width", "940"); s.setAttribute("height", "529"); });
-imgEl(home, "fade_left.png", 340, 0, 440, 540);
-imgEl(home, "fade_bottom.png", 320, 280, 960, 260);
-html(home, `<div style="position:absolute;left:0;top:528px;width:1280px;height:192px;background:var(--plum)"></div>`);
-imgEl(home, "fade_top.png", 0, 0, 1280, 140);
-header(home);
-const tabHL = html(home, `<div class="tabHL"></div>`);
-const tabsEl = html(home, `<div class="tabs"></div>`);
-const tabEls = ["Home", "Movies", "Series", "Categories", "Search"].map(n => html(tabsEl, `<div class="tab">${n}</div>`));
-const hero = html(home, `<div class="hero"><div class="t"></div><div class="m"></div><div class="pl"></div></div>`);
-const rowsClip = html(home, `<div class="rowsClip"></div>`);
-const rowlist = html(rowsClip, `<div class="rowlist"></div>`);
-const homeRows = [["Continue Watching", CW], ["New Releases  ·  Movies", ROW1], ["New Releases  ·  Series", ROW2]].map(([label, items], ri) => {
-  const row = html(rowlist, `<div class="rowL" style="top:${ri * 226}px"><div class="lab">${label}</div></div>`);
-  return items.map((it, i) => posterItem(row, i * 130, it));
-});
+// Details (DetailsScreen.xml), with the helper line it shows when this TV can't decode a file.
+const det = $("#details");
+html(det, `<div class="fill" style="background:var(--plum)"></div>`);
+setSvgSize(html(det, `<div style="position:absolute;left:320px;top:0;width:960px;height:540px;overflow:hidden">${art({ kind: "sea", pal: "dusk", seed: 37 }, 320, 180)}</div>`), 960, 540);
+imgEl(det, "fade_left.png", 320, 0, 440, 540);
+imgEl(det, "fade_bottom.png", 320, 280, 960, 260);
+html(det, `<div style="position:absolute;left:0;top:538px;width:1280px;height:182px;background:var(--plum)"></div>`);
+html(det, `<div class="t">Paper Moons</div>`);
+html(det, `<div class="m">2024   ·   1h 38m   ·   Drama</div>`);
+html(det, `<div class="pl">Two old friends drive the coast one last summer, chasing a film they never finished.</div>`);
+html(det, `<div class="btn">Play</div>`);
+html(det, `<div class="cmp">This TV can't play this file itself, so the helper on your computer converts it while you watch.</div>`);
+const cmpRing = html(det, `<div style="position:absolute;left:36px;top:452px;width:1000px;height:40px;box-sizing:border-box;border:3px solid var(--lavender);border-radius:6px;opacity:0"></div>`);
+$("#vignette").insertAdjacentHTML("beforebegin", `<div id="callout" class="abs"><div class="ey">On the Details page</div><div class="q">“This TV can't play this file itself, so the helper on your computer converts it while you watch.”</div></div>`);
+const callout = $("#callout");
 
-// Categories tab.
-const cats = $("#cats");
-header(cats);
-html(cats, `<div class="heading">Categories</div>`);
-const CAT_ROWS = [
-  ["New releases", [["New Releases", "Movies"], ["New Releases", "Series"], ["Trending", "Movies"], ["Box Office", "Movies"], ["Just Added", "Series"], ["Trending", "Series"]]],
-  ["English movies", [["Action", "Movies"], ["Comedy", "Movies"], ["Drama", "Movies"], ["Sci-Fi", "Movies"], ["Thriller", "Movies"], ["Family", "Movies"]]],
-  ["Hindi movies", [["Bollywood", "Movies"], ["Hindi Action", "Movies"], ["Hindi Comedy", "Movies"], ["Hindi Drama", "Movies"], ["Hindi Thriller", "Movies"], ["Hindi Romance", "Movies"]]],
-  ["Punjabi", [["Punjabi", "Movies"], ["Punjabi Comedy", "Movies"], ["Punjabi", "Series"], ["Punjabi Drama", "Movies"], ["Punjabi Romance", "Movies"], ["Punjabi Action", "Movies"]]],
-];
-const catTiles = CAT_ROWS.map(([label, tiles], ri) => {
-  const y = 104 + ri * 140;
-  html(cats, `<div style="position:absolute;left:48px;top:${y}px;font:500 21px/1.2 var(--display);color:#EEE8FF">${label}</div>`);
-  return tiles.map(([nm, cp], i) => {
-    const el = html(cats, `<div class="ct" style="left:${48 + i * 220}px;top:${y + 34}px"><div class="card"><div class="ring"></div><div class="base"><div class="accent"></div></div><div class="nm">${nm}</div><div class="cp">${cp}</div></div></div>`);
-    return { card: el.firstElementChild, ring: el.querySelector(".ring"), base: el.querySelector(".base") };
-  });
-});
-
-// Search tab: keyboard, symbols, results.
-const search = $("#search");
-imgEl(search, "fade_top.png", 0, 0, 1280, 140);
-header(search);
-html(search, `<div class="heading" style="top:26px">Search</div>`);
-const kb = html(search, `<div class="kb"><div class="box"></div><div class="pad"></div></div>`);
-const kbBox = kb.firstElementChild, kbPad = kb.children[1];
-const kFocus = html(kbPad, `<div class="kfocus"></div>`);
-const KEYS = ["abcdef", "ghijkl", "mnopqr", "stuvwx", "yz1234", "567890"];
-const keyPos = {};
-KEYS.forEach((row, r) => [...row].forEach((ch, c) => { const x = 10 + c * 69, y = 12 + r * 54; keyPos[ch] = [x, y]; html(kbPad, `<div class="key" style="left:${x}px;top:${y}px">${ch}</div>`); }));
-[["space", 10, 133], ["⌫", 148, 133], ["clear", 286, 133]].forEach(([l, x, w]) => html(kbPad, `<div class="key" style="left:${x}px;top:${12 + 6 * 54}px;width:${w}px;font-size:${l === "⌫" ? 24 : 19}px">${l}</div>`));
-["&", "'", "-", ":", ".", ",", "!", "?", "(", ")", "+", "#", "@", "/"].forEach((s, i) => html(search, `<div class="sym" style="left:${36 + (i % 7) * 59}px;top:${560 + Math.floor(i / 7) * 48}px">${s}</div>`));
-const results = html(search, `<div class="results"></div>`);
-const resRows = [
-  ["Categories", [["Comedy", "Movies"], ["Comedy", "Series"], ["Hindi Comedy", "Movies"], ["Punjabi Comedy", "Movies"], ["Romantic Comedy", "Movies"], ["Stand-Up Comedy", "Series"]].map(([name, cap]) => ({ name, cap }))],
-  ["Movies", [50, 51, 52, 53, 54, 55].map(n => ({ art: auto(n) }))],
-  ["Series", [60, 61, 62, 63, 64, 65].map(n => ({ art: auto(n) }))],
-].map(([label, items], ri) => {
-  const row = html(results, `<div class="rowL" style="top:${ri * 244}px;width:752px"><div class="lab">${label}</div></div>`);
-  return { row, items: items.map((it, i) => posterItem(row, i * 130, it)) };
-});
-
-// Player: the video, our own controls and the Up next card.
+// Player: two videos, our own controls, the Up next card, the Audio & subtitles panel.
 const player = $("#player");
 html(player, `<div class="fill" style="background:#000"></div>`);
-const video = html(player, `<div class="fill" style="transform-origin:62% 50%">${art({ kind: "city", pal: "arctic", seed: 24, sunX: .8, sunY: .5, lit: .42 }, 320, 180)}</div>`);
-video.firstElementChild.setAttribute("width", "1280"); video.firstElementChild.setAttribute("height", "720");
+const vidA = setSvgSize(html(player, `<div class="fill" style="transform-origin:50% 45%">${art({ kind: "peaks", pal: "gold", seed: 77 }, 320, 180)}</div>`), 1280, 720);
+const vidB = setSvgSize(html(player, `<div class="fill" style="transform-origin:62% 50%">${art({ kind: "city", pal: "arctic", seed: 24, sunX: .8, sunY: .5, lit: .42 }, 320, 180)}</div>`), 1280, 720);
+const subline = html(player, `<div class="subline"><span></span></div>`);
 const controls = html(player, `<div class="fill"></div>`);
 imgEl(controls, "fade_top.png", 0, 0, 1280, 140);
 imgEl(controls, "fade_bottom.png", 0, 430, 1280, 290);
@@ -516,43 +576,58 @@ let bx = 48;
 ["Audio & subtitles", "Episodes", "Next episode", "Restart"].forEach(l => { const b = html(controls, `<div class="pl-btn" style="left:${bx}px;top:636px">${l.replace("&", "&amp;")}</div>`); bx += b.offsetWidth + 14; });
 const upnext = html(player, `<div class="upnext"><div class="sp tint spark-img"></div><div class="ey">UP NEXT</div><div class="tt">S1:E5  Episode 5</div><div class="hn"></div></div>`);
 const upHint = upnext.querySelector(".hn");
+const tracks = html(player, `<div class="fill tracks"><div class="tt">Audio &amp; subtitles</div><div class="hd" style="left:120px">AUDIO</div><div class="hd" style="left:640px">SUBTITLES</div></div>`);
+const option = (x, y, label) => { const el = html(tracks, `<div class="opt" style="left:${x}px;top:${y}px"><div class="dot"></div><div class="lb">${label}</div></div>`); return { el, dot: el.children[0], lb: el.children[1] }; };
+const audioOpts = ["English · AAC", "Hindi · AAC"].map((l, i) => option(120, 196 + i * 50, l));
+const subOpts = ["Off", "English · saved for this title", "Find English subtitles online"].map((l, i) => option(640, 196 + i * 50, l));
+
+// Messy provider names, and the tidy names ARAN+ shows (Categories.brs, SplitTitle).
+const namesEl = $("#names");
+const NAMES = [["EN | ACTION ★", "Action", "Movies"], ["|IN| ACTION", "Hindi Action", "Movies"], ["IN ✪ PUNJABI", "Punjabi", "Movies"], ["EN ★ Alterity - 2026", "Alterity", "2026"]];
+const nameRows = NAMES.map(([raw, nm, cp], i) => {
+  const el = html(namesEl, `<div class="nrow" style="top:${770 + i * 168}px"><div class="nraw">${raw}</div><svg class="narrow" viewBox="0 0 64 40"><path d="M3 20 H56 M42 6 L57 20 L42 34" fill="none" stroke="#C9B8FF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="100" stroke-dashoffset="100"/></svg><div class="ntile"><div class="base"><div class="accent"></div></div><div class="nm">${nm}</div><div class="cp">${cp}</div><div class="ring"></div></div></div>`);
+  return { el, raw: el.children[0], arrow: el.querySelector("path"), tile: el.children[2], ring: el.querySelector(".ring") };
+});
 
 // Stage captions.
 const capsEl = $("#caps");
 const CAPS = [
-  { a: 6.1, b: 10.55, eb: "Home", h: "Posters, not lists.", p: "A big backdrop for whatever you land on." },
-  { a: 10.75, b: 14.55, eb: "Continue Watching", h: "Right where you left off.", p: "Series roll on to the next episode." },
-  { a: 14.75, b: 18.95, eb: "Categories", h: "Every category, tidied.", p: "New releases first, then your languages." },
-  { a: 19.15, b: 23.55, eb: "Search", h: "Results as you type.", p: "Movies, series and categories." },
-  { a: 23.75, b: 27.95, eb: "Player", h: "Up next, on its own.", p: "A countdown rolls you into the next episode." },
-].map(c => ({ ...c, el: html(capsEl, `<div class="cap"><div class="eb"><i class="tint spark-img"></i>${c.eb}</div><h2>${c.h}</h2><p>${c.p}</p></div>`) }));
+  { a: 5.0, b: 6.1, h: "We hear you." },
+  { a: 9.7, b: 15.2, eb: "Home", h: "Posters, not lists.", p: "A big backdrop for whatever you land on." },
+  { a: 15.55, b: 21.25, eb: "Categories", h: "Messy names, tidied.", p: "Sorted by your languages, new releases first." },
+  { a: 21.5, b: 25.3, eb: "Continue Watching", h: "Fell asleep halfway?", p: "Pick up right where you left off." },
+  { a: 25.45, b: 29.7, eb: "Sync", h: "It follows you.", p: "With sync set up, pick up on another TV." },
+  { a: 29.95, b: 36.9, eb: "The helper", h: "Even files that wouldn't play.", p: "Converted by the helper on a computer at home." },
+  { a: 37.1, b: 44.0, eb: "Subtitles", h: "So everyone can follow.", p: "Found online once. With sync, saved for every device." },
+  { a: 44.3, b: 49.0, eb: "Player", h: "Up next, on its own.", p: "A countdown rolls you into the next episode." },
+].map(c => ({ ...c, el: html(capsEl, `<div class="cap">${c.eb ? `<div class="eb"><i class="tint spark-img"></i>${c.eb}</div>` : ""}<h2${c.eb ? "" : ' style="margin-top:0"'}>${c.h}</h2>${c.p ? `<p>${c.p}</p>` : ""}</div>`) }));
+
+// The viewer's lines, as speech bubbles.
+const BUBBLES = [
+  { a: 2.95, b: 4.95, top: 1450, text: "Honestly? I just want to watch something." },
+  { a: 47.6, b: 49.1, top: 1545, text: "Okay. One more episode." },
+].map(b => ({ ...b, el: html($("#bubbles"), `<div class="bubble" style="top:${b.top}px"><div class="av"></div><div class="tx">${b.text}</div></div>`) }));
 
 // Hook and brand captions.
 const hookCap = $("#hookCap");
 const hookWords = "Bored from the UI of your IPTV player?".split(" ").map((w, i) => html(hookCap, `<span${i === 0 ? ' class="bored"' : ""}>${w}</span>`));
-const brandMark = $("#brandMark");
-brandMark.innerHTML = wordmark()
-  + sparkSVG("var(--butter)", "left:-.5em;top:.06em;width:.44em;height:.44em")
+const sparks3 = () => sparkSVG("var(--butter)", "left:-.5em;top:.06em;width:.44em;height:.44em")
   + sparkSVG("#fff", "left:calc(100% + .1em);top:-.04em;width:.3em;height:.3em")
   + sparkSVG("var(--lavender-light)", "left:66%;top:calc(100% - .02em);width:.24em;height:.24em");
+const brandMark = $("#brandMark");
+brandMark.innerHTML = wordmark() + sparks3();
 const brandSparks = [...brandMark.querySelectorAll("svg")];
 const burst = $("#burst");
 burst.innerHTML = sparkSVG("var(--lavender-light)", "left:-110px;top:-110px;width:220px;height:220px");
 
-// Feature list.
-const feats = $("#feats");
-const featCap = html(feats, `<div class="cap"><div class="eb"><i class="tint spark-img"></i>Plus</div><h2>The little things.</h2></div>`);
-const FEATS = ["Resume or play from start", "Audio & subtitles", "English subtitles online", "Seasons & episodes", "Search inside a category", "Flags files that won't play"];
-const featEls = FEATS.map((f, i) => html(feats, `<div class="fpill" style="top:${560 + i * 128}px">${f.replace("&", "&amp;")}</div>`));
-
 // Outro.
 const outro = $("#outro");
-const oMark = html(outro, `<div style="position:absolute;left:0;top:590px;width:1080px"><div class="wmWrap">${wordmark()}${sparkSVG("var(--butter)", "left:-.5em;top:.06em;width:.44em;height:.44em")}${sparkSVG("#fff", "left:calc(100% + .1em);top:-.04em;width:.3em;height:.3em")}${sparkSVG("var(--lavender-light)", "left:66%;top:calc(100% - .02em);width:.24em;height:.24em")}</div></div>`);
+const oMark = html(outro, `<div style="position:absolute;left:0;top:590px;width:1080px"><div class="wmWrap">${wordmark()}${sparks3()}</div></div>`);
 const oSparks = [...oMark.querySelectorAll("svg")];
-const oTag = html(outro, `<div class="tag" style="position:absolute;left:0;top:900px;width:1080px">IPTV, made for Roku.</div>`);
+const oTag = html(outro, `<div class="tag" style="position:absolute;left:0;top:900px;width:1080px">Made with care, for Roku.</div>`);
 const oTabs = html(outro, `<div class="otabs" style="top:1030px"></div>`);
 const oHL = html(oTabs, `<div class="otabHL"></div>`);
-const oTabEls = ["Home", "Movies", "Series", "Categories", "Search"].map(n => html(oTabs, `<div class="otab">${n}</div>`));
+const oTabEls = TABS.map(n => html(oTabs, `<div class="otab">${n}</div>`));
 const oCard = html(outro, `<div class="ocard"><div class="acc"></div><div class="sp tint spark-img"></div><div class="h">Just a player.</div><div class="b">ARAN+ doesn't sell IPTV or playlists.<br>Sign in with your own provider's login.</div></div>`);
 
 // Film grain, made once.
@@ -565,28 +640,42 @@ const oCard = html(outro, `<div class="ocard"><div class="acc"></div><div class=
 })();
 
 /* ------------------------------------------------------------------ timeline */
-// Camera: which point of the TV screen (cx, cy) sits at stage x 540, y sy, and at what scale.
+// Camera on the main TV: which point of its screen (cx, cy) sits at stage x 540, y sy, at scale s.
 const CAM = [
   { t: 0, s: .78, cx: 640, cy: 360, sy: 1090 },
-  { t: 6, s: .79, cx: 640, cy: 360, sy: 1090 },
-  { t: 10.5, s: .81, cx: 640, cy: 360, sy: 1090 },
-  { t: 11.35, s: 1.86, cx: 308, cy: 548, sy: 1152 },
-  { t: 13.0, s: 1.86, cx: 314, cy: 548, sy: 1152 },
-  { t: 14.0, s: 1.86, cx: 320, cy: 548, sy: 1152 },
-  { t: 14.75, s: 1.35, cx: 430, cy: 46, sy: 960 },
-  { t: 15.75, s: 1.35, cx: 432, cy: 46, sy: 960 },
-  { t: 16.45, s: 1.4, cx: 410, cy: 384, sy: 1272 },
-  { t: 18.9, s: 1.4, cx: 430, cy: 384, sy: 1272 },
-  { t: 19.55, s: 1.55, cx: 248, cy: 340, sy: 1258 },
-  { t: 21.75, s: 1.55, cx: 252, cy: 340, sy: 1258 },
-  { t: 22.5, s: 1.45, cx: 820, cy: 340, sy: 1234 },
-  { t: 23.55, s: 1.45, cx: 836, cy: 340, sy: 1234 },
-  { t: 24.2, s: .78, cx: 640, cy: 360, sy: 1090 },
-  { t: 25.9, s: .8, cx: 640, cy: 360, sy: 1090 },
-  { t: 26.85, s: 1.55, cx: 990, cy: 578, sy: 1300 },
-  { t: 28.4, s: 1.62, cx: 990, cy: 578, sy: 1300 },
+  { t: 9.6, s: .78, cx: 640, cy: 360, sy: 1090 },
+  { t: 15.0, s: .8, cx: 640, cy: 360, sy: 1090 },
+  { t: 15.5, s: .7, cx: 640, cy: 360, sy: 1040 },
+  { t: 21.2, s: .78, cx: 640, cy: 360, sy: 1090 },
+  { t: 21.9, s: .78, cx: 640, cy: 360, sy: 1090 },
+  { t: 22.7, s: 1.86, cx: 308, cy: 548, sy: 1152 },
+  { t: 25.1, s: 1.86, cx: 316, cy: 548, sy: 1152 },
+  { t: 25.95, s: .55, cx: 640, cy: 360, sy: 880 },
+  { t: 29.55, s: .55, cx: 640, cy: 360, sy: 880 },
+  { t: 30.3, s: .78, cx: 640, cy: 360, sy: 1090 },
+  { t: 36.85, s: .8, cx: 640, cy: 360, sy: 1090 },
+  { t: 37.35, s: .78, cx: 640, cy: 360, sy: 1090 },
+  { t: 37.8, s: .78, cx: 640, cy: 360, sy: 1090 },
+  { t: 38.5, s: 1.5, cx: 860, cy: 250, sy: 1150 },
+  { t: 40.1, s: 1.5, cx: 864, cy: 250, sy: 1150 },
+  { t: 40.75, s: 1.3, cx: 640, cy: 540, sy: 1240 },
+  { t: 44.05, s: 1.33, cx: 640, cy: 540, sy: 1240 },
+  { t: 44.6, s: .78, cx: 640, cy: 360, sy: 1090 },
+  { t: 45.7, s: .8, cx: 640, cy: 360, sy: 1090 },
+  { t: 46.5, s: 1.55, cx: 990, cy: 578, sy: 1250 },
+  { t: 49.2, s: 1.6, cx: 990, cy: 578, sy: 1250 },
 ];
-// Focus changes: [time, index]. Each item eases in or out over 0.2 s, like RowList.
+const linear = x => x;
+const steps = (keys, t) => keyed(keys.map(([kt, v]) => ({ t: kt, v })), t, "v", linear);
+const TVA_ON = [[0, 1], [15.1, 1], [15.5, 0], [21.2, 0], [21.55, 1], [49.0, 1], [49.45, 0]];
+const BEZEL = [[0, 1], [21.95, 1], [22.5, 0], [25.3, 0], [25.85, 1], [99, 1]];
+const TVB_ON = [[25.6, 0], [26.15, 1], [29.45, 1], [29.85, 0]];
+const TVB = { s: .55, cx: 640, cy: 360, sy: 1390 };
+// Before/after: left of X (logical px) shows the plain player, right of it ARAN+.
+const SLIDE = [{ t: 0, x: 1280 }, { t: 6.0, x: 1280 }, { t: 7.1, x: 0 }, { t: 10.0, x: 0 }, { t: 10.9, x: 640 }, { t: 12.4, x: 640 }, { t: 13.3, x: 0 }, { t: 29.85, x: 0 }, { t: 29.9, x: 1280 }, { t: 31.9, x: 1280 }, { t: 33.0, x: 0 }];
+const COMPARE = [[5.45, 7.45], [9.8, 13.6], [29.95, 33.3]];
+
+// Focus changes: [time, key]. Each item eases in or out over 0.2 s, like RowList.
 const focusAmt = (events, t, key) => {
   let cur = -1;
   for (let i = 0; i < events.length; i++) if (t >= events[i][0]) cur = i;
@@ -598,245 +687,271 @@ const focusAmt = (events, t, key) => {
   if (was) return 1 - E.outCubic(k);
   return 0;
 };
-const current = (events, t) => { let c = null; for (const e of events) if (t >= e[0]) c = e; return c; };
+const current = (events, t) => { let c = events[0]; for (const e of events) if (t >= e[0]) c = e; return c; };
 
-const HOME_FOCUS = [[0, "0:0"], [7.1, "0:1"], [8.75, "0:2"], [12.0, "0:3"], [13.25, "1:3"], [14.55, "nav"]];
-const HERO_EVENTS = [[-1, 0], [7.1, 1], [8.75, 2]];
-const TAB_EVENTS = [[0, 0, false], [14.55, 0, true], [14.95, 1, true], [15.2, 2, true], [15.45, 3, true]];
-const CAT_FOCUS = [[16.0, "0:0"], [16.7, "0:1"], [17.4, "1:1"], [18.1, "2:1"], [18.8, "3:1"]];
-const TYPED = [[19.85, "c"], [20.2, "o"], [20.55, "m"], [20.9, "e"], [21.25, "d"], [21.6, "y"]];
-const RES_FOCUS = [[22.75, "0:0"], [23.2, "0:1"]];
-const FEAT_FOCUS = [[29.1, 0], [29.5, 1], [29.9, 2], [30.3, 3], [30.7, 4], [31.1, 5]];
-const OUTRO_TABS = [[33.0, 1], [33.3, 2], [33.6, 3], [33.9, 4]];
+const HOME_FOCUS = [[0, "0:0"], [13.7, "0:1"], [14.6, "0:2"], [21.0, "0:0"]];
+const HERO_A = [[-1, 0], [13.7, 1], [14.6, 2], [21.0, 0]];
+const HERO_B = [[-1, 1], [27.65, 0]];
+const SUB_CURSOR = [[37.4, 0], [38.2, 1]];
+const SUB_PICK = 39.3;
+const SUBLINES = [[40.7, 42.3, "Grandma, you have to see this part."], [42.5, 44.1, "I'm watching, I'm watching."]];
+const OUTRO_TABS = [[50.7, 1], [51.0, 2], [51.3, 3], [51.6, 4]];
+const SYNC = { leave: 26.75, land: 27.5 };
 
-// Sound cues, read by render.cjs to time the soundtrack to these same moments.
-const SOUND = { duration: DUR, sections: { bloom: 3.15, drums: 6.0, breakdown: 26.0, final: 31.75 }, cues: [] };
-const cue = (t, type) => SOUND.cues.push({ t, type });
-cue(0, "hook"); cue(1.5, "droop"); cue(2.15, "riser"); cue(3.15, "bloom");
-[3.5, 3.64, 3.78, 32.1, 32.24, 32.38].forEach(t => cue(t, "sparkle"));
-[HOME_FOCUS.slice(1), TAB_EVENTS.slice(2), CAT_FOCUS.slice(1), RES_FOCUS, FEAT_FOCUS, OUTRO_TABS].forEach(list => list.forEach(e => cue(e[0], "tick")));
-TYPED.forEach(e => cue(e[0], "key"));
-cue(15.75, "select");
-[10.55, 14.1, 15.8, 18.95, 21.85, 23.6, 26.1, 27.9, 31.4].forEach(t => cue(t, "whoosh"));
-cue(26.0, "chime"); cue(27.0, "count"); cue(31.75, "hit"); cue(33.6, "card");
+// Sound and voice cues, read by render.cjs to build the soundtrack on these same moments.
+const SOUND = {
+  duration: DUR,
+  sections: { warm: 5.0, bloom: 6.15, drums: 9.6, final: 49.2, bars: 15, quiet: [5], lift: 6, soft: [10, 11, 12], breakdown: [13], build: [14] },
+  cues: [],
+};
+const cue = (t, type, extra) => SOUND.cues.push({ t, type, ...extra });
+cue(0, "hook"); cue(1.55, "droop"); cue(5.35, "riser"); cue(6.15, "bloom");
+[6.5, 6.64, 6.78, 49.7, 49.84, 49.98].forEach(t => cue(t, "sparkle"));
+[6.0, 10.0, 12.4, 31.9].forEach(t => cue(t, "slide"));
+[HOME_FOCUS.slice(1, 3), SUB_CURSOR.slice(1), OUTRO_TABS].forEach(list => list.forEach(e => cue(e[0], "tick")));
+nameRows.forEach((_, i) => cue(16.85 + i * .55, "pop"));
+cue(SUB_PICK, "select");
+cue(SYNC.leave, "glide"); cue(SYNC.land, "land");
+[15.1, 21.25, 22.0, 25.2, 29.6, 36.9, 37.85, 40.15, 44.1, 45.8, 48.95].forEach(t => cue(t, "whoosh"));
+cue(33.3, "card");
+cue(45.75, "chime"); cue(46.75, "count"); cue(47.75, "count"); cue(49.2, "hit"); cue(52.25, "card");
+[[0.1, "bored"], [2.95, "tired"], [5.05, "hear"], [6.15, "meet"], [9.75, "posters"], [15.6, "names"], [21.55, "asleep"], [25.55, "follows"],
+ [30.0, "helper"], [37.15, "subs"], [44.4, "upnext"], [47.65, "onemore"], [49.5, "care"], [52.6, "player"]].forEach(([t, id]) => cue(t, "vo", { id }));
 SOUND.cues.sort((a, b) => a.t - b.t);
 window.__sound = SOUND;
 
-const tabGeom = () => tabEls.map(el => [el.offsetLeft + 232, el.offsetWidth]);
-let TABG = null, OTABG = null;
 const fmt = s => { s = Math.max(0, Math.floor(s)); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); };
+let TABG = null, OTABG = null;
+const camMap = (c, x, y) => [540 + (x - c.cx) * c.s, c.sy + (y - c.cy) * c.s];
 
 function render(t) {
   t = clamp(t, 0, DUR);
-  if (!TABG) TABG = tabGeom();
+  if (!TABG) TABG = homeA.tabEls.map(el => [el.offsetLeft + 232, el.offsetWidth]);
   if (!OTABG) OTABG = oTabEls.map(el => [el.offsetLeft, el.offsetWidth]);
 
-  // Stage: a grey "before" world that blooms into the plum night.
-  const bloom = E.inOutCubic(seg(t, 2.75, 3.7));
+  // Stage: a grey "before" world that warms into the plum night.
+  const bloom = E.inOutCubic(seg(t, 5.9, 7.0));
   setStyle($("#neutralBg"), { opacity: 1 - bloom });
   const drift = Math.sin(t * .35);
   setStyle($("#sglowA"), { opacity: lerp(.05, .24, bloom), transform: `translate(${drift * 30}px, ${Math.cos(t * .3) * 24}px)` });
   setStyle($("#sglowB"), { opacity: lerp(.03, .17, bloom), transform: `translate(${-drift * 26}px, ${Math.sin(t * .27) * 30}px)` });
 
-  // Camera and TV.
-  const s = keyed(CAM, t, "s"), cx = keyed(CAM, t, "cx"), cy = keyed(CAM, t, "cy"), sy = keyed(CAM, t, "sy");
-  const tvIn = E.outCubic(seg(t, -.4, .5)), tvOut = E.inCubic(seg(t, 28.0, 28.55));
-  setStyle($("#tvCam"), { transform: `translate(${540 - cx * s}px, ${sy - cy * s + (1 - tvIn) * 60 + tvOut * 40}px) scale(${s})`, opacity: tvIn * (1 - tvOut) });
-  const bez = 1 - E.inOutCubic(seg(t, 10.65, 11.25)) + E.inOutCubic(seg(t, 23.6, 24.15));
-  setStyle($("#bezel"), { opacity: bez });
-  setStyle($("#stand"), { opacity: bez });
-  setStyle($("#gloss"), { opacity: bez });
+  // Main TV.
+  const c = { s: keyed(CAM, t, "s"), cx: keyed(CAM, t, "cx"), cy: keyed(CAM, t, "cy"), sy: keyed(CAM, t, "sy") };
+  const onA = steps(TVA_ON, t);
+  setStyle($("#tvA"), { transform: `translate(${540 - c.cx * c.s}px, ${c.sy - c.cy * c.s + (1 - onA) * 40}px) scale(${c.s})`, opacity: onA, visibility: onA > 0 ? "visible" : "hidden" });
+  const bez = steps(BEZEL, t);
+  ["#bezelA", "#standA", "#glossA"].forEach(id => setStyle($(id), { opacity: bez }));
+  setStyle($("#bezelA"), { filter: `saturate(${bloom})` });
   setStyle($("#iglowA"), { opacity: .16 * bez });
   setStyle($("#iglowB"), { opacity: .10 * bez });
-  setStyle($("#bezel"), { filter: `saturate(${lerp(0, 1, bloom)})` });
+
+  // Second TV, for sync.
+  const onB = steps(TVB_ON, t);
+  setStyle($("#tvB"), { transform: `translate(${540 - TVB.cx * TVB.s}px, ${TVB.sy - TVB.cy * TVB.s + (1 - onB) * 40}px) scale(${TVB.s})`, opacity: onB, visibility: onB > 0 ? "visible" : "hidden" });
+  const rooms = win(t, 26.0, 29.5);
+  setStyle($("#roomA"), { opacity: rooms }); setStyle($("#roomB"), { opacity: rooms });
 
   // Scrims keep captions clear when the camera is close.
-  setStyle($("#scrimTop"), { opacity: clamp((820 - (sy - cy * s)) / 80) });
-  setStyle($("#scrimFoot"), { opacity: .9 * (1 - bez) });
-  const bottom = sy + (720 - cy) * s;
-  setStyle($("#scrimBot"), { top: (bottom - 130) + "px", background: `linear-gradient(180deg, rgba(21,16,40,0) 0, var(--plum) 130px, var(--plum) 100%)`, opacity: 1 - bez });
+  setStyle($("#scrimTop"), { opacity: clamp((700 - (c.sy - c.cy * c.s)) / 80) * onA });
+  setStyle($("#scrimFoot"), { opacity: .9 * (1 - bez) * onA });
+  const bottom = c.sy + (720 - c.cy) * c.s;
+  setStyle($("#scrimBot"), { top: (bottom - 130) + "px", background: `linear-gradient(180deg, rgba(21,16,40,0) 0, var(--plum) 130px, var(--plum) 100%)`, opacity: (1 - bez) * onA });
 
-  // Before/after swap inside the TV.
-  const wipe = E.inOutCubic(seg(t, 2.85, 3.55));
-  setStyle($("#aran"), { clipPath: wipe >= 1 ? "none" : `circle(${wipe * 760}px at 50% 50%)` });
-  setStyle($("#dull"), { visibility: wipe >= 1 ? "hidden" : "visible", filter: `brightness(${1 - seg(t, 2.4, 2.9) * .35})` });
-  setStyle(dullList, { transform: `translateY(${-Math.max(0, t) * 18}px)` });
-  const fl = Math.sin(Math.PI * seg(t, 2.8, 3.6));
-  setStyle($("#flash"), { background: `radial-gradient(circle at 50% 50%, rgba(226,216,255,${.55 * fl}) 0, rgba(201,184,255,${.25 * fl}) 30%, rgba(201,184,255,0) 60%)` });
-  const bk = seg(t, 2.7, 3.55);
-  setStyle(burst, { left: "540px", top: (sy) + "px", opacity: Math.sin(Math.PI * bk), transform: `scale(${E.outCubic(bk) * 1.5}) rotate(${bk * 90}deg)` });
+  // Before/after slider.
+  const X = keyed(SLIDE, t, "x");
+  setStyle($("#aran"), { clipPath: X <= .5 ? "none" : `inset(0 0 0 ${X}px)` });
+  setStyle($("#dull"), { visibility: t < 15.6 && X > .5 ? "visible" : "hidden" });
+  setStyle($("#dullErr"), { visibility: t > 29.8 && t < 33.2 && X > .5 ? "visible" : "hidden" });
+  setStyle(dullList, { transform: `translateY(${-Math.min(t, 15) * 18}px)` });
+  const cmp = Math.max(...COMPARE.map(([a, b]) => win(t, a, b, .25, .3)));
+  setStyle($("#handle"), { left: X + "px", opacity: cmp, visibility: cmp > 0 ? "visible" : "hidden" });
+  setStyle($("#lblBefore"), { opacity: cmp, transform: `translateY(${(1 - cmp) * 14}px)` });
+  setStyle($("#lblAran"), { opacity: cmp, transform: `translateY(${(1 - cmp) * 14}px)` });
+  const fl = Math.sin(Math.PI * seg(t, 6.6, 7.4));
+  setStyle($("#flash"), { background: `radial-gradient(circle at 20% 50%, rgba(226,216,255,${.4 * fl}) 0, rgba(201,184,255,${.18 * fl}) 30%, rgba(201,184,255,0) 60%)` });
+  const bk = seg(t, 6.75, 7.55);
+  const [bxs, bys] = camMap(c, 640, 360);
+  setStyle(burst, { left: bxs + "px", top: bys + "px", opacity: Math.sin(Math.PI * bk), transform: `scale(${E.outCubic(bk) * 1.5}) rotate(${bk * 90}deg)` });
 
   // Hook question.
   hookWords.forEach((w, i) => {
-    const a = E.outCubic(seg(t, -.25 + i * .12, .2 + i * .12));
-    const out = E.inCubic(seg(t, 2.6, 2.95));
+    const a = E.outCubic(seg(t, -.25 + i * .12, .2 + i * .12)), out = E.inCubic(seg(t, 4.65, 5.0));
     let tr = `translateY(${(1 - a) * 34 - out * 30}px)`;
-    if (i === 0) tr += ` rotate(${E.outBack(seg(t, 1.5, 2.1)) * 7}deg)`;
+    if (i === 0) tr += ` rotate(${E.outBack(seg(t, 1.55, 2.15)) * 7}deg)`;
     setStyle(w, { opacity: a * (1 - out), transform: tr });
   });
 
   // Brand reveal.
-  const bIn = seg(t, 3.15, 3.8), bOut = E.inCubic(seg(t, 5.65, 6.0));
+  const bIn = seg(t, 6.2, 6.85), bOut = E.inCubic(seg(t, 9.3, 9.65));
   setStyle(brandMark, { opacity: E.outCubic(bIn) * (1 - bOut), transform: `scale(${lerp(.72, 1, E.outBack(bIn)) - bOut * .05}) translateY(${-bOut * 30}px)` });
   brandSparks.forEach((sp, i) => {
-    const k = seg(t, 3.5 + i * .14, 3.95 + i * .14);
-    const tw = 1 + Math.sin(t * 3 + i * 2) * .08;
-    setStyle(sp, { transform: `scale(${E.outBack(k) * tw}) rotate(${(1 - k) * -60}deg)`, opacity: k > 0 ? 1 : 0 });
+    const k = seg(t, 6.5 + i * .14, 6.95 + i * .14);
+    setStyle(sp, { transform: `scale(${E.outBack(k) * (1 + Math.sin(t * 3 + i * 2) * .08)}) rotate(${(1 - k) * -60}deg)`, opacity: k > 0 ? 1 : 0 });
   });
-  const tagIn = E.outCubic(seg(t, 3.7, 4.15));
+  const tagIn = E.outCubic(seg(t, 6.75, 7.2));
   setStyle($("#brandTag"), { opacity: tagIn * (1 - bOut), transform: `translateY(${(1 - tagIn) * 24 - bOut * 30}px)` });
 
-  // Scene captions.
-  CAPS.forEach(c => {
-    const kids = c.el.children;
+  // Scene captions and the viewer's bubbles.
+  CAPS.forEach(cp => {
+    const kids = cp.el.children;
     let any = false;
     for (let i = 0; i < kids.length; i++) {
-      const a = E.outCubic(seg(t, c.a + i * .08, c.a + i * .08 + .45)), o = E.inCubic(seg(t, c.b - .3, c.b));
+      const a = E.outCubic(seg(t, cp.a + i * .08, cp.a + i * .08 + .45)), o = E.inCubic(seg(t, cp.b - .3, cp.b));
       if (a * (1 - o) > 0) any = true;
       setStyle(kids[i], { opacity: a * (1 - o), transform: `translateY(${(1 - a) * 34 - o * 26}px)` });
     }
-    setStyle(c.el, { visibility: any ? "visible" : "hidden" });
+    setStyle(cp.el, { visibility: any ? "visible" : "hidden" });
+  });
+  BUBBLES.forEach(b => {
+    const a = E.outBack(seg(t, b.a, b.a + .4)), o = E.inCubic(seg(t, b.b - .3, b.b)), op = clamp(seg(t, b.a, b.a + .25)) * (1 - o);
+    setStyle(b.el, { opacity: op, visibility: op > 0 ? "visible" : "hidden", transform: `translateY(${(1 - Math.min(a, 1)) * 30}px) scale(${lerp(.9, 1, a)})`, transformOrigin: "0 100%" });
   });
 
   // Which app screen is on: each fades and floats in, like the app.
-  const scr = (el, a, b) => { const i = E.outCubic(seg(t, a, a + .32)), o = seg(t, b, b + .2); setStyle(el, { opacity: i * (1 - o), transform: `translateY(${(1 - i) * 14}px)`, visibility: i * (1 - o) > 0 ? "visible" : "hidden" }); };
-  scr(home, -1, 15.75);
-  scr($("#cats"), 15.8, 19.05);
-  scr(search, 19.1, 23.75);
-  scr(player, 23.8, 99);
+  const scr = (el, a, b) => { const i = a < 0 ? 1 : E.outCubic(seg(t, a, a + .32)), o = seg(t, b, b + .2); setStyle(el, { opacity: i * (1 - o), transform: `translateY(${(1 - i) * 14}px)`, visibility: i * (1 - o) > 0 ? "visible" : "hidden" }); };
+  scr($("#home"), -1, 29.9);
+  scr(det, 29.95, 37.0);
+  scr(player, 37.05, 99);
 
-  renderHome(t);
-  renderCats(t);
-  renderSearch(t);
+  renderHomeA(t);
+  renderHomeB(t, c);
+  renderNames(t);
+  renderCallout(t);
   renderPlayer(t);
-  renderFeats(t);
   renderOutro(t);
 
   setStyle($("#grain"), { backgroundPosition: `${Math.floor(t * 24) * 53 % 240}px ${Math.floor(t * 24) * 97 % 240}px` });
-  setStyle($("#fine"), { opacity: .85 * E.outCubic(seg(t, 3.6, 4.2)) * (1 - E.inOutCubic(seg(t, 37.45, 38))) });
+  setStyle($("#fine"), { opacity: .85 * E.outCubic(seg(t, .2, .8)) * (1 - E.inOutCubic(seg(t, DUR - .55, DUR))) });
 }
 
-function renderHome(t) {
-  if (t > 15.9) return;
-  // Hero for the focused Continue Watching title: floats up as it changes.
-  const he = current(HERO_EVENTS, t), idx = he[1], c = CW[idx];
-  setText(hero.children[0], c.title); setText(hero.children[1], c.meta); setText(hero.children[2], c.plot);
-  const hk = E.outCubic(seg(t, he[0], he[0] + .35));
-  setStyle(hero, { opacity: hk, transform: `translateY(${(1 - hk) * 14}px)` });
-  bdEls.forEach((el, i) => {
-    const onAt = HERO_EVENTS.find(e => e[1] === i)[0];
-    const next = HERO_EVENTS.find(e => e[0] > onAt);
-    const fin = i === 0 ? 1 : E.outQuad(seg(t, onAt + .25, onAt + .75));
-    const gone = next && t > next[0] + .8 ? 0 : 1;
-    const kb = 1.04 + .04 * seg(t, onAt, onAt + 6);
-    setStyle(el, { opacity: fin * gone, zIndex: i, transform: `scale(${kb})` });
+// Hero banner for the focused Continue Watching title: floats up and its backdrop fades in.
+function renderHero(h, events, t) {
+  const he = current(events, t), hi = events.indexOf(he), prev = hi > 0 ? events[hi - 1][1] : -1, item = CW[he[1]];
+  setText(h.hero.children[0], item.title); setText(h.hero.children[1], item.meta); setText(h.hero.children[2], item.plot);
+  const hk = hi === 0 ? 1 : E.outCubic(seg(t, he[0], he[0] + .35));
+  setStyle(h.hero, { opacity: hk, transform: `translateY(${(1 - hk) * 14}px)` });
+  h.bdEls.forEach((el, i) => {
+    let op = 0, z = 0;
+    if (i === he[1]) { op = hi === 0 ? 1 : E.outQuad(seg(t, he[0] + .25, he[0] + .75)); z = 2; }
+    else if (i === prev) { op = 1; z = 1; }
+    setStyle(el, { opacity: op, zIndex: z, transform: `scale(${1.04 + .04 * seg(t, he[0], he[0] + 6)})` });
   });
-  // Feathered backdrop edges only show once the TV frame is gone.
-  const bez = 1 - E.inOutCubic(seg(t, 10.65, 11.25));
-  const f = (1 - bez) * 120;
-  setStyle(backdrops, { webkitMaskImage: f > 0 ? `linear-gradient(to left, transparent 0, #000 ${f}px), linear-gradient(to bottom, transparent 0, #000 ${f}px)` : "none", webkitMaskComposite: "source-in", maskComposite: "intersect" });
+}
+function restTabs(h) {
+  const [x, w] = TABG[0];
+  setStyle(h.tabHL, { left: x + "px", width: w + "px" });
+  h.tabEls.forEach((el, i) => setStyle(el, { color: i === 0 ? "var(--ink)" : "var(--ink-3)" }));
+}
 
-  // Tab bar.
-  const te = current(TAB_EVENTS, t), prev = TAB_EVENTS[Math.max(0, TAB_EVENTS.indexOf(te) - 1)];
-  const k = E.outCubic(seg(t, te[0], te[0] + .22));
-  const [x0, w0] = TABG[prev[1]], [x1, w1] = TABG[te[1]];
-  setStyle(tabHL, { left: lerp(x0, x1, k) + "px", width: lerp(w0, w1, k) + "px", background: te[2] ? "var(--lavender)" : "var(--pill)", transform: te[2] ? "scale(1.06)" : "none" });
-  const lit = k < .5 ? prev[1] : te[1];
-  tabEls.forEach((el, i) => setStyle(el, { color: te[2] && i === lit ? "var(--plum)" : i === 0 ? "var(--ink)" : "var(--ink-3)" }));
-
-  // Rows: Down moves the next row to the top.
-  const down = E.outCubic(seg(t, 13.25, 13.55));
-  setStyle(rowlist, { transform: `translateY(${-226 * down}px)` });
-  homeRows.forEach((row, ri) => row.forEach((p, i) => {
+function renderHomeA(t) {
+  if (t > 30.2) return;
+  renderHero(homeA, HERO_A, t);
+  restTabs(homeA);
+  // Feathered backdrop edges only while the TV frame is gone.
+  const f = (1 - steps(BEZEL, t)) * 120;
+  setStyle(homeA.backdrops, { webkitMaskImage: f > 0 ? `linear-gradient(to left, transparent 0, #000 ${f}px), linear-gradient(to bottom, transparent 0, #000 ${f}px)` : "none", webkitMaskComposite: "source-in", maskComposite: "intersect" });
+  homeA.rows.forEach((row, ri) => row.forEach((p, i) => {
     const a = focusAmt(HOME_FOCUS, t, ri + ":" + i);
     setStyle(p.card, { transform: `scale(${1 + .06 * a})` });
     setStyle(p.ring, { opacity: a });
-    if (p.fill && ri === 0) setStyle(p.fill, { width: (p.p * 120 * (t < 10.6 ? 1 : E.outCubic(seg(t, 11.0 + i * .06, 11.7 + i * .06)))) + "px" });
   }));
 }
 
-function renderCats(t) {
-  if (t < 15.6 || t > 19.4) return;
-  catTiles.forEach((row, ri) => row.forEach((tile, i) => {
-    const a = focusAmt(CAT_FOCUS, t, ri + ":" + i);
-    setStyle(tile.card, { transform: `scale(${1 + .05 * a})` });
-    setStyle(tile.ring, { opacity: a });
-    setStyle(tile.base, { background: a > .5 ? "var(--pill-on)" : "var(--pill)" });
+// The second TV: before sync its Continue Watching row has no Alterity; then it arrives.
+function renderHomeB(t, c) {
+  if (t < 25.4 || t > 30) { setStyle($("#syncDot"), { opacity: 0 }); return; }
+  renderHero(homeB, HERO_B, t);
+  restTabs(homeB);
+  const shift = E.outCubic(seg(t, SYNC.land, SYNC.land + .35)), pop = seg(t, SYNC.land, SYNC.land + .4);
+  const focusIdx = t < SYNC.land + .15 ? 1 : 0;
+  homeB.rows.forEach((row, ri) => row.forEach((p, i) => {
+    const on = ri === 0 && i === focusIdx ? 1 : 0;
+    if (ri === 0 && i === 0) setStyle(p.el, { opacity: clamp(pop * 3), transform: `scale(${E.outBack(pop)})` });
+    else if (ri === 0) setStyle(p.el, { transform: `translateX(${-130 * (1 - shift)}px)` });
+    setStyle(p.card, { transform: `scale(${1 + .06 * on})` });
+    setStyle(p.ring, { opacity: on });
   }));
+  // Your place travels from one TV to the other.
+  const k = E.inOutCubic(seg(t, SYNC.leave, SYNC.land));
+  const [x0, y0] = camMap(c, 108, 530), [x1, y1] = camMap(TVB, 108, 530);
+  const cx = 860, cyy = (y0 + y1) / 2;
+  const x = (1 - k) * (1 - k) * x0 + 2 * (1 - k) * k * cx + k * k * x1, y = (1 - k) * (1 - k) * y0 + 2 * (1 - k) * k * cyy + k * k * y1;
+  const vis = t >= SYNC.leave && t <= SYNC.land + .25 ? Math.min(1, seg(t, SYNC.leave, SYNC.leave + .15)) * (1 - seg(t, SYNC.land, SYNC.land + .25)) : 0;
+  setStyle($("#syncDot"), { left: x + "px", top: y + "px", opacity: vis, transform: `scale(${1 + .4 * Math.sin(Math.PI * k)})` });
 }
 
-function renderSearch(t) {
-  if (t < 18.9 || t > 24.2) return;
-  let q = "", last = null;
-  for (const e of TYPED) if (t >= e[0]) { q += e[1]; last = e; }
-  const caret = Math.floor(t * 2.2) % 2 === 0 && t < 22.75 ? '<span class="caret"></span>' : "";
-  const box = (q ? q : '<span class="hint">Movies and series</span>') + caret;
-  if (kbBox.innerHTML !== box) kbBox.innerHTML = box;
-  // The key highlight glides to each letter just before it is pressed.
-  let from = "a", to = "a", mt = 0;
-  for (let i = 0; i < TYPED.length; i++) if (t >= TYPED[i][0] - .2) { from = i ? TYPED[i - 1][1] : "a"; to = TYPED[i][1]; mt = TYPED[i][0] - .2; }
-  const mk = E.outCubic(seg(t, mt, mt + .14));
-  const [fx, fy] = keyPos[from], [tx, ty] = keyPos[to];
-  const press = last && t - last[0] < .14 ? .9 : 1;
-  const kbFocused = t < 22.75;
-  setStyle(kFocus, { left: lerp(fx, tx, mk) + "px", top: lerp(fy, ty, mk) + "px", transform: `scale(${press})`, background: kbFocused ? "var(--lavender)" : "var(--pill-on)" });
-  kbPad.querySelectorAll(".key").forEach(k => setStyle(k, { color: kbFocused && k.textContent === to && mk > .5 ? "var(--plum)" : "var(--key)" }));
-  // Results fill in after the debounce.
-  resRows.forEach((r, ri) => {
-    const a = E.outCubic(seg(t, 20.9 + ri * .1, 21.25 + ri * .1));
-    setStyle(r.row, { opacity: a, transform: `translateY(${(1 - a) * 16}px)` });
-    r.items.forEach((p, i) => { const f = focusAmt(RES_FOCUS, t, ri + ":" + i); setStyle(p.card, { transform: `scale(${1 + .06 * f})` }); setStyle(p.ring, { opacity: f }); });
+function renderNames(t) {
+  const on = t > 15.5 && t < 21.5;
+  setStyle(namesEl, { visibility: on ? "visible" : "hidden" });
+  if (!on) return;
+  const out = E.inCubic(seg(t, 21.0, 21.35));
+  nameRows.forEach((r, i) => {
+    const a = E.outCubic(seg(t, 15.75 + i * .12, 16.2 + i * .12));
+    const tk = seg(t, 16.85 + i * .55, 17.3 + i * .55);
+    setStyle(r.raw, { opacity: a * lerp(1, .6, tk), transform: `translateX(${(1 - a) * -40}px)` });
+    r.arrow.setAttribute("stroke-dashoffset", String(100 * (1 - E.outCubic(seg(t, 16.65 + i * .55, 16.95 + i * .55)))));
+    setStyle(r.tile, { opacity: E.outCubic(tk), transform: `scale(${lerp(.85, 1, E.outBack(tk))})` });
+    setStyle(r.ring, { opacity: Math.sin(Math.PI * seg(t, 16.95 + i * .55, 17.7 + i * .55)) });
+    setStyle(r.el, { opacity: 1 - out, transform: `translateY(${-out * 24}px)` });
   });
+}
+
+function renderCallout(t) {
+  const a = win(t, 33.3, 36.9, .45, .3);
+  setStyle(callout, { opacity: a, visibility: a > 0 ? "visible" : "hidden", transform: `translateY(${(1 - Math.min(1, a * 1.2)) * 30}px)` });
+  setStyle(cmpRing, { opacity: a * (.65 + .35 * Math.sin(t * 5)) });
 }
 
 function renderPlayer(t) {
-  if (t < 23.6) return;
-  const kb = 1 + .08 * seg(t, 23.6, 28.6);
-  setStyle(video, { transform: `scale(${kb}) translateX(${-seg(t, 23.6, 28.6) * 16}px)` });
-  const cIn = E.outCubic(seg(t, 24.1, 24.4)), cOut = seg(t, 25.75, 26.05);
-  setStyle(controls, { opacity: cIn * (1 - cOut) });
-  const dur = 2532, pos = 2290 + (t - 23.8);
+  if (t < 36.9) return;
+  // The movie with subtitles, then the series with Up next.
+  const bIn = E.outCubic(seg(t, 44.2, 44.5));
+  setStyle(vidA, { opacity: 1 - bIn, transform: `scale(${1 + .06 * seg(t, 37, 44.5)})` });
+  setStyle(vidB, { opacity: bIn, transform: `scale(${1 + .08 * seg(t, 44.2, 49.5)}) translateX(${-seg(t, 44.2, 49.5) * 16}px)` });
+  // Audio & subtitles: move to "English · saved for this title" and pick it.
+  setStyle(tracks, { opacity: win(t, 37.3, 40.3, .3, .3) });
+  const cur = current(SUB_CURSOR, t)[1], active = t >= SUB_PICK ? 1 : 0;
+  subOpts.forEach((o, i) => {
+    const focused = i === cur;
+    setStyle(o.el, { background: focused ? "var(--lavender)" : "transparent" });
+    setStyle(o.lb, { color: focused ? "var(--plum)" : i === active ? "var(--ink)" : "var(--ink-3)" });
+    setStyle(o.dot, { visibility: i === active ? "visible" : "hidden", background: focused ? "var(--plum)" : "var(--pink)" });
+  });
+  audioOpts.forEach((o, i) => { setStyle(o.lb, { color: i === 0 ? "var(--ink)" : "var(--ink-3)" }); setStyle(o.dot, { visibility: i === 0 ? "visible" : "hidden" }); });
+  const line = SUBLINES.find(([a, b]) => t >= a && t < b);
+  setText(subline.firstElementChild, line ? line[2] : "");
+  setStyle(subline, { opacity: line ? 1 : 0 });
+  // Controls, then the Up next countdown.
+  setStyle(controls, { opacity: E.outCubic(seg(t, 44.5, 44.8)) * (1 - seg(t, 45.45, 45.75)) });
+  const dur = 2532, pos = 2290 + (t - 44.3);
   setText(elapsedEl, fmt(pos)); setText(remainEl, "-" + fmt(dur - pos));
   const w = 896 * pos / dur;
   setStyle(barFill, { width: w + "px" }); setStyle(knob, { left: (228 + w - 9) + "px" });
-  const u = E.outCubic(seg(t, 25.95, 26.35));
+  const u = E.outCubic(seg(t, 45.75, 46.15));
   setStyle(upnext, { opacity: u, transform: `translateX(${(1 - u) * 28}px)` });
-  const left = Math.max(1, 8 - Math.floor(Math.max(0, t - 26.0)));
-  setText(upHint, `Starts in ${left}   ·   OK to play now`);
-}
-
-function renderFeats(t) {
-  const on = t > 28.1 && t < 32;
-  setStyle(feats, { visibility: on ? "visible" : "hidden" });
-  if (!on) return;
-  const out = E.inCubic(seg(t, 31.45, 31.8));
-  [...featCap.children].forEach((k, i) => { const a = E.outCubic(seg(t, 28.25 + i * .08, 28.7 + i * .08)); setStyle(k, { opacity: a * (1 - out), transform: `translateY(${(1 - a) * 34 - out * 26}px)` }); });
-  featEls.forEach((el, i) => {
-    const a = E.outCubic(seg(t, 28.5 + i * .09, 28.95 + i * .09));
-    const f = focusAmt(FEAT_FOCUS, t, i);
-    setStyle(el, { opacity: a * (1 - out), transform: `translateX(${(1 - a) * -60}px) scale(${1 + .06 * f})`, background: f > .5 ? "var(--lavender)" : "rgba(48,39,90,.85)", color: f > .5 ? "var(--plum)" : "var(--key)" });
-  });
+  setText(upHint, `Starts in ${Math.max(1, 8 - Math.floor(Math.max(0, t - 45.75)))}   ·   OK to play now`);
 }
 
 function renderOutro(t) {
-  const on = t > 31.6;
+  const on = t > 49.15;
   setStyle(outro, { visibility: on ? "visible" : "hidden" });
   if (!on) return;
-  const m = seg(t, 31.75, 32.4);
+  const m = seg(t, 49.35, 50.0);
   setStyle(oMark.firstElementChild, { opacity: E.outCubic(m), transform: `scale(${lerp(.7, 1, E.outBack(m))})` });
-  oSparks.forEach((sp, i) => { const k = seg(t, 32.1 + i * .14, 32.55 + i * .14); setStyle(sp, { transform: `scale(${E.outBack(k) * (1 + Math.sin(t * 3 + i * 2) * .08)}) rotate(${(1 - k) * -60}deg)`, opacity: k > 0 ? 1 : 0 }); });
-  const a1 = E.outCubic(seg(t, 32.35, 32.8)), a2 = E.outCubic(seg(t, 32.6, 33.05)), a3 = E.outCubic(seg(t, 33.6, 34.15));
-  setStyle(outro, { opacity: 1 - E.inOutCubic(seg(t, 37.45, 38)) });
+  oSparks.forEach((sp, i) => { const k = seg(t, 49.7 + i * .14, 50.15 + i * .14); setStyle(sp, { transform: `scale(${E.outBack(k) * (1 + Math.sin(t * 3 + i * 2) * .08)}) rotate(${(1 - k) * -60}deg)`, opacity: k > 0 ? 1 : 0 }); });
+  const a1 = E.outCubic(seg(t, 49.95, 50.4)), a2 = E.outCubic(seg(t, 50.2, 50.65)), a3 = E.outCubic(seg(t, 52.25, 52.8));
+  setStyle(outro, { opacity: 1 - E.inOutCubic(seg(t, DUR - .55, DUR)) });
   setStyle(oTag, { opacity: a1, transform: `translateY(${(1 - a1) * 26}px)` });
   setStyle(oTabs, { opacity: a2, transform: `translateY(${(1 - a2) * 26}px)`, left: ((1080 - oTabs.offsetWidth) / 2) + "px" });
   setStyle(oCard, { opacity: a3, transform: `translateY(${(1 - a3) * 34}px)` });
-  const steps = [[32.6, 0]].concat(OUTRO_TABS);
-  let cur = 0, prev = 0, st = 0;
-  steps.forEach((e, i) => { if (t >= e[0]) { cur = e[1]; prev = i ? steps[i - 1][1] : 0; st = e[0]; } });
+  const stepsT = [[50.2, 0]].concat(OUTRO_TABS);
+  let curT = 0, prevT = 0, st = 0;
+  stepsT.forEach((e, i) => { if (t >= e[0]) { curT = e[1]; prevT = i ? stepsT[i - 1][1] : 0; st = e[0]; } });
   const k = E.outCubic(seg(t, st, st + .22));
-  const [x0, w0] = OTABG[prev], [x1, w1] = OTABG[cur];
+  const [x0, w0] = OTABG[prevT], [x1, w1] = OTABG[curT];
   setStyle(oHL, { left: lerp(x0, x1, k) + "px", width: lerp(w0, w1, k) + "px" });
-  const lit = k < .5 ? prev : cur;
+  const lit = k < .5 ? prevT : curT;
   oTabEls.forEach((el, i) => setStyle(el, { color: i === lit ? "var(--plum)" : "var(--ink-3)" }));
 }
 
@@ -888,13 +1003,13 @@ Promise.all([document.fonts.ready, ...preload]).then(async () => {
   fit(); TABG = null; OTABG = null;
   if (isRender) {
     // Show every scene once so masks and fonts are decoded before frames are captured.
-    for (const w of [1, 4.5, 8, 12, 15, 17, 21, 23, 26, 27.5, 30, 34, 36]) { render(w); await nextFrame(); }
+    for (const w of [1, 7, 11, 17, 23, 27, 31, 35, 39, 42, 46, 50, 53]) { render(w); await nextFrame(); }
     render(0); await nextFrame();
     window.__ready = true;
     return;
   }
   window.__ready = true;
-  if (reduce) { setPlaying(false); show(4.6); }
+  if (reduce) { setPlaying(false); show(7.6); }
   else { setPlaying(true); show(0); }
   requestAnimationFrame(loop);
 });

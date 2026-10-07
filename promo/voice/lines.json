@@ -1,0 +1,72 @@
+{
+  "bored": {
+    "voice": "af_heart",
+    "text": "Bored from the UI of your IPTV player?",
+    "seconds": 2.627
+  },
+  "tired": {
+    "voice": "am_puck",
+    "text": "Honestly? I just want to watch something.",
+    "seconds": 1.925
+  },
+  "hear": {
+    "voice": "af_heart",
+    "text": "We hear you.",
+    "seconds": 0.793
+  },
+  "meet": {
+    "voice": "af_heart",
+    "text": "Meet Aran Plus. A cinematic player for your Roku.",
+    "seconds": 3.106
+  },
+  "posters": {
+    "voice": "af_heart",
+    "text": "Your library becomes posters, not lists, with a big backdrop for whatever you land on.",
+    "seconds": 5.211
+  },
+  "names": {
+    "voice": "af_heart",
+    "text": "Messy provider names are tidied into ones you can read, and sorted by your languages.",
+    "seconds": 5.108
+  },
+  "asleep": {
+    "voice": "af_heart",
+    "text": "Fell asleep halfway through? Continue Watching keeps your place.",
+    "seconds": 3.518
+  },
+  "follows": {
+    "voice": "af_heart",
+    "text": "And with sync set up, it follows you to another TV.",
+    "seconds": 2.946
+  },
+  "helper": {
+    "voice": "af_heart",
+    "text": "Some files won't play on a Roku in any app. The helper on your computer at home converts them while you watch.",
+    "seconds": 6.022
+  },
+  "subs": {
+    "voice": "af_heart",
+    "text": "And subtitles, so everyone can follow along. Found online once, and with sync, saved for every screen.",
+    "seconds": 6.284
+  },
+  "upnext": {
+    "voice": "af_heart",
+    "text": "When an episode ends, the next one counts down on its own.",
+    "seconds": 3.105
+  },
+  "onemore": {
+    "voice": "am_puck",
+    "text": "Okay. One more episode.",
+    "seconds": 1.328
+  },
+  "care": {
+    "voice": "af_heart",
+    "text": "Aran Plus. Made with care, for Roku.",
+    "seconds": 2.396
+  },
+  "player": {
+    "voice": "af_heart",
+    "text": "Just a player. It doesn't sell IPTV or playlists.",
+    "seconds": 3.258
+  }
+}
