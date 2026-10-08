@@ -14,6 +14,9 @@
   <children>
     <Rectangle width="1280" height="720" color="0x000000FF" />
     <Video id="video" width="1280" height="720" enableUI="false" />
+    <!-- After a long pause the stream is let go (releaseConnection): the title's picture
+         stands in for the paused frame. -->
+    <Poster id="restPicture" width="1280" height="720" loadDisplayMode="scaleToZoom" opacity="0.55" visible="false" />
     <BusySpinner id="spinner" translation="[608, 328]" spinInterval="1" visible="false" />
 
     <Group id="controls" visible="false">
@@ -102,6 +105,12 @@
     <Timer id="holdTimer" duration="0.25" repeat="true" />
     <Timer id="commitTimer" duration="0.8" repeat="false" />
     <Timer id="autoSubTimer" duration="2.5" repeat="false" />
+    <!-- How long the saved-subtitle lookup may hold up the stream (startItem). -->
+    <Timer id="savedWait" duration="3" repeat="false" />
+    <!-- Paused this long, the stream lets go of the provider's connection. -->
+    <Timer id="releaseTimer" duration="180" repeat="false" />
+    <!-- The wait before asking again after the provider's server failed. -->
+    <Timer id="retryTimer" duration="5" repeat="false" />
     <Timer id="toastTimer" duration="9" repeat="false" />
     <!-- The controls come in as they're dragged on and go back the same way, fading as
          they go (showControls, hideControls; the values are set there). -->

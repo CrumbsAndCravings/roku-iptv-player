@@ -6,7 +6,6 @@ sub work()
     req = m.top.request
     mode = FieldStr(req, "mode")
     m.account = req.account
-    m.videoAgent = FieldStr(req, "userAgent")
     m.accountChanged = false
     if mode = "login" then
         result = osCheck()
@@ -116,11 +115,10 @@ function osCheck() as Object
 end function
 
 function osFind(req as Object) as Object
-    ' The helper on a computer at home fingerprints the files it plays (req.hash); a
-    ' second connection to the provider during its playback would be one too many.
+    ' The file's fingerprint comes from the helper on a computer at home, which reads it
+    ' before its stream (req.hash). Played straight from the provider, there's none: the
+    ' provider allows one connection, and the video is using it.
     hash = FieldStr(req, "hash")
-    videoUrl = FieldStr(req, "videoUrl")
-    if hash = "" and videoUrl <> "" and FieldStr(req, "via") <> "helper" then hash = fileHash(videoUrl)
 
     params = { languages: "en" }
     if hash <> "" then params.moviehash = hash
@@ -175,46 +173,4 @@ function osDownload(req as Object) as Object
     link = FieldStr(res.data, "link")
     if link = "" then return { ok: false, error: "OpenSubtitles didn't send a subtitle file." }
     return { ok: true, link: link, remaining: ToInt(Field(res.data, "remaining")) }
-end function
-
-' --- File fingerprint ----------------------------------------------------------------
-
-' Reads the first and last 64 KB of the video with range requests. Best effort: any
-' server that doesn't support ranges just means no fingerprint.
-function fileHash(url as String) as String
-    head = rangeBytes(url, "bytes=0-65535", "tmp:/oshash-head.bin")
-    if head = invalid then return ""
-    total = head.total
-    if total < 131072 then return ""
-    tailStart = total - 65536
-    tailEnd = total - 1
-    tail = rangeBytes(url, "bytes=" + tailStart.ToStr() + "-" + tailEnd.ToStr(), "tmp:/oshash-tail.bin")
-    if tail = invalid then return ""
-    return OsHashHex(head.bytes, tail.bytes, total)
-end function
-
-function rangeBytes(url as String, range as String, path as String) as Dynamic
-    http = CreateObject("roUrlTransfer")
-    port = CreateObject("roMessagePort")
-    http.SetMessagePort(port)
-    http.SetUrl(url)
-    http.SetCertificatesFile("common:/certs/ca-bundle.crt")
-    http.InitClientCertificates()
-    if m.videoAgent <> "" then http.AddHeader("User-Agent", m.videoAgent)
-    http.AddHeader("Range", range)
-    DeleteFile(path)
-    if not http.AsyncGetToFile(path) then return invalid
-    ' A server that ignores Range would send the whole film, so give up quickly.
-    msg = Wait(8000, port)
-    if type(msg) <> "roUrlEvent" then
-        http.AsyncCancel()
-        DeleteFile(path)
-        return invalid
-    end if
-    total = ParseContentRangeTotal(FieldStr(msg.GetResponseHeaders(), "content-range"))
-    bytes = CreateObject("roByteArray")
-    ok = msg.GetResponseCode() = 206 and total > 0 and bytes.ReadFile(path)
-    DeleteFile(path)
-    if not ok or bytes.Count() <> 65536 then return invalid
-    return { bytes: bytes, total: total }
 end function

@@ -283,7 +283,7 @@ end function
 
 ' How ARAN+ introduces itself when a provider turns away requests that say "Roku".
 function AppUserAgent() as String
-    return "ARANplus/0.5.14"
+    return "ARANplus/0.5.15"
 end function
 
 ' A plain desktop web browser, for providers whose servers only answer browsers (a

@@ -134,6 +134,10 @@ New since 0.4.1. **Why:** one provider stopped answering for a while after about
 | API timeout | 45 s per request | `tasks/Http.brs` |
 | Indexed categories | only the languages you watch (about 75 of 312 lists on the provider in use) | `SearchTask.brs` |
 | Series | one request for the whole list (about 5 MB, 3 s for 7,000 series) | `SearchTask.brs` |
+| Online subtitles while a video plays straight from the provider | no reads of the file for a fingerprint (since 0.5.15); the search goes by TMDB id or name | `SubtitleTask.brs` `osFind` |
+| A direct stream paused 3 minutes | lets go of its connection; play opens it again at the same spot (since 0.5.15) | `PlayerScreen.brs` `releaseConnection` |
+| The provider's server failing (a 5xx) | asked again once, 5 s later, then at most once a minute of playing (since 0.5.15) | `PlayerScreen.brs` `retryLater` |
+| A stream opened again for new subtitles | 1.2 s after it closed (since 0.5.15) | `PlayerScreen.brs` `reloadWithSubtitle` |
 
 ## 4. Organizing the library
 All new since 0.4.1. Code: `common/Categories.brs`, tested in `tests/utils_test.brs` with the real category names of the provider in use.
@@ -364,6 +368,8 @@ Additions since then:
   - The Audio & subtitles panel notes "Audio now: AAC."
   - **Samsung:** AVPlay decodes most formats, but DTS varies by model year. Port the format labels and the swap when `getTotalTrackInfo` shows an undecodable track.
 - **AVI:** Roku can't play AVI, so without the helper those titles are marked "Won't play" with "OK to try anyway". They're about 0.3% of the provider's library. With the helper on a computer at home (§15) they play, converted to H.264, and so do HEVC files on a Roku without HEVC, which is most of the library on the user's Roku TV.
+- **Long pauses** (new in 0.5.15): a paused stream holds the provider's one connection, idle, and the provider may drop it, so that resuming stalls or is turned away. After 3 minutes paused (`releaseTimer`), a direct stream saves where it is, its subtitles and its sound track, and stops (`releaseConnection`); the title's backdrop stands in for the paused frame (`restPicture`). Play opens the stream again there with the same subtitles and sound (`resumeReleased`); jumps while it's let go move the spot. Helper streams are left alone, since their connection is the helper's, which keeps converting while you're paused.
+- **The provider's server failing** (new in 0.5.15): an error with an HTTP 5xx in Roku's words, or FFmpeg's "Server returned 5XX" from the helper (`ProviderServerTrouble` in `common/Playback.brs`), is often over in a moment. The player asks once more 5 s later (`retryLater`: the stream, or the helper's description or start), and asks again only after a minute of playing. If it still fails, the error screen starts with plain words (`ServerTroubleText`): "Your provider's server had a problem sending this video. That's on their side, not your internet or this TV. Wait a minute and try again."
 - Code: `screens/PlayerScreen.brs`, `common/Compat.brs`, `common/Tracks.brs`, `tasks/XtreamParse.brs` (`CodecFields`, `IsPictureCodec`).
 
 ## 8. Online subtitles
@@ -425,8 +431,10 @@ Unchanged since 0.4.1 apart from where the account is kept; see `samsung-plan.md
 - **API:** `GET /v1/subtitles?space&k` (`&text=0` leaves the file out), `POST` with `{ fileId, name, delayMs, text }` to save, or `{ fileId, delayMs }` for a nudge; `GET /v1/subtitles/file?space&k&t=<token>&delay=<ms>` serves the file, moved by `delay`, with its own token instead of the key, because Roku's player fetches subtitles by address and can't send headers.
 - **When the Roku shows them by itself:** where the subtitle preference is "online" (after built-in English ones) or not chosen yet (""); never over "off" or a built-in language. The column lists them first as "English · saved for this title", even without an OpenSubtitles account.
 - **The Roku's way:** `lookUpSaved()` asks the service as each video starts; `autoSubtitles()` waits for the answer if it's still out. Saved subtitles play from the service's address (`SavedSubtitleUrl`), and nudges change `delay` there, so on the Roku they no longer use a download either. A fresh download (not one moved by OpenSubtitles) is fetched once more by `SyncTask` and saved (`shareSubtitle`).
+- **No second opening** (new in 0.5.15): Roku only reads subtitle files when a stream loads, so showing new ones opens the stream again. A direct stream now waits for the lookup (3 s at most, `savedWait`) and saved ones go into it from the start, not showing (`onSavedLooked` sets `m.extraSubtitle`); `autoSubtitles()` or a choice in the column then just shows them (`reloadWithSubtitle` sees `m.attachedSubtitle`). The column and the subtitle preference never take them for the file's own (`builtInSubtitles`).
+- **When saving fails** (new in 0.5.15): a note says why straight after the download, and the Audio & subtitles panel keeps it (`SubtitleSaveText`). A sync service from before saved subtitles answers 404, and both the lookup and the save then say "Subtitles can't be saved for next time, because your sync service is an older version" with where to update it (`OldSyncText`). Until 0.5.15 this failed silently, so a Worker that was never updated meant a download every time.
 - **Code:** `sync/worker.js` (`subtitles`, `subtitleFile`, `moveCues`), `tasks/SyncTask.*` (modes `subtitle-get`, `subtitle-save`, `subtitle-delay`), `common/Subtitles.brs` (`SavedCandidate`, `SplitSavedCandidates`, `SavedSubtitleUrl`, tested), `screens/PlayerScreen.brs` (`lookUpSaved`, `showSaved`, `shareSubtitle`, `nudgeSaved`).
-- **Setup:** the Worker needs updating once (`sync/README.md`, "Update it"); until then the service answers 404 to these requests and every device behaves as before.
+- **Setup:** the Worker needs updating once (`sync/README.md`, "Update it"); until then the service answers 404 to these requests, every device behaves as before, and the Roku says so (above).
 
 ## 10. Look and feel
 - **Palette:**
@@ -618,7 +626,7 @@ Three requests, in order, through `HelperTask` (each answer is dropped if the ti
 ### 15.7 Subtitles
 - Built-in subtitle tracks don't come through to the Roku. (The helper can write them out as WebVTT, `subs=1`, but those files grow as FFmpeg goes, and Roku reads a side-loaded file once, when the stream loads.)
 - **Online subtitles** do. A whole film's playlist runs on the film's clock, so OpenSubtitles' file plays as it is, from any point. A growing playlist that starts partway has its own clock, so it gets none (`onlineTrackName` is "").
-- **The fingerprint:** for helper titles the subtitle search uses the helper's (`/v1/hash`) and reads nothing from the provider itself (`via: "helper"` in the `SubtitleTask` request).
+- **The fingerprint:** for helper titles the subtitle search uses the helper's (`/v1/hash`) and reads nothing from the provider itself (`via: "helper"` in the `SubtitleTask` request). Played straight from the provider there's none since 0.5.15: reading the file's start and end took the provider's one connection away from the video.
 
 ### 15.8 Code
 - `common/Helper.brs`: addresses, `HelperRoute`, the choices, `HelperAudioOptions`, `ParseHelperInfo`, `ParseHelperStart`, `HelperPreviewUrl`, `ParseHelperHash`, `HelperFailure`, `HelperPlanLine`, the remembered titles (tested in `tests/utils_test.brs` and `tests/parse_test.brs`).

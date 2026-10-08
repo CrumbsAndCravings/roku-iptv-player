@@ -79,6 +79,14 @@ sub Main()
     checkInt("roku http code", HttpCodeIn("There was an error in the HTTP response. (code -1): reader pick stream error:HTTP error:Transfer error: HTTP response code said error response code:(403):403:extra"), 403)
     checkInt("roku http 404", HttpCodeIn("HTTP 404 not found"), 404)
     checkInt("roku no http code", HttpCodeIn("buffer:loop:demux error 2024"), 0)
+    check("server error from roku", ToStr(ProviderServerTrouble("There was an error in the HTTP response. (code -1): HTTP response code said error response code:(503):503")), "true")
+    check("server error from ffmpeg", ToStr(ProviderServerTrouble("Your computer says: couldn't read series. Error opening input: Server returned 5XX Server Error reply")), "true")
+    check("refusal is not a server error", ToStr(ProviderServerTrouble("HTTP 403 forbidden")), "false")
+    check("no code is not a server error", ToStr(ProviderServerTrouble("buffer:loop:demux error 2024")), "false")
+    check("helper 500 counts", ToStr(ProviderServerTrouble("The helper on your computer answered HTTP 500.")), "true")
+    check("old sync service", SubtitleSaveText(404, "The sync service answered HTTP 404. Not found."), OldSyncText())
+    check("save failed words", SubtitleSaveText(0, "The sync service took too long to answer."), "These subtitles couldn't be saved for next time. The sync service took too long to answer.")
+    check("save failed quietly", SubtitleSaveText(400, ""), "These subtitles couldn't be saved for next time.")
     check("cloudflare by ray", IsCloudflare({ "CF-RAY": "8abc" }).ToStr(), "true")
     check("not cloudflare", IsCloudflare({ server: "nginx" }).ToStr(), "false")
     check("http detail nginx 404", HttpDetail(404, { server: "openresty" }, "<html><head><title>404 Not Found</title></head><body><center><h1>404 Not Found</h1></center><hr><center>nginx</center></body></html>"), "HTTP 404 from openresty: " + q + "404 Not Found nginx" + q)
@@ -283,20 +291,6 @@ sub Main()
     checkInt("bar unknown", Int(BarFraction(10.0, 0.0) * 100), 0)
     checkInt("bar over", Int(BarFraction(4000.0, 3600.0) * 100), 100)
 
-    ' OpenSubtitles file fingerprint, checked against a Python reference (tools: struct '<Q' sums)
-    head = [165, 77, 202, 24, 37, 48, 187, 29, 109, 19, 44, 222, 214, 35, 123, 46, 217, 30, 63, 114, 31, 203, 25, 113, 23, 68, 148, 214, 73, 60, 157, 92, 52, 96, 190, 49, 32, 30, 105, 254, 218, 160, 238, 232, 185, 153, 127, 92, 124, 41, 153, 253, 175, 229, 147, 37, 60, 214, 84, 175, 77, 250, 215, 20]
-    tail = [39, 160, 174, 179, 254, 233, 35, 47, 138, 242, 33, 31, 158, 228, 145, 197, 177, 11, 236, 181, 86, 59, 252, 30, 111, 147, 66, 126, 203, 200, 254, 41, 85, 229, 205, 142, 70, 220, 142, 212, 183, 194, 118, 77, 42, 90, 77, 118, 119, 6, 248, 93, 134, 144, 2, 74, 214, 189, 163, 64, 27, 233, 200, 203]
-    check("hash small file", OsHashHex(head, tail, 131072&), "4d9a760e894662f2")
-    check("hash 5GB file", OsHashHex(head, tail, 5368709120&), "4d9a760fc94462f2")
-    check("hash huge size", OsHashHex(head, tail, 6148914691236517205&), "a2efcb63de99b847")
-    ff = []
-    for i = 1 to 64
-        ff.Push(255)
-    end for
-    check("hash wraps at 64 bits", OsHashHex(ff, ff, 12884901895&), "00000002fffffff7")
-    check("content-range total", ParseContentRangeTotal("bytes 0-65535/5368709120").ToStr(), "5368709120")
-    check("content-range unknown", ParseContentRangeTotal("bytes 0-65535/*").ToStr(), "-1")
-    check("content-range missing", ParseContentRangeTotal("").ToStr(), "-1")
 
     ' Title cleanup for text searches
     cleaned = CleanTitleForSearch("EN - The Batman (2022)")
