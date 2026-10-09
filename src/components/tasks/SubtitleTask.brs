@@ -159,10 +159,10 @@ function osFind(req as Object) as Object
     return { ok: true, candidates: candidates, hashUsed: hash <> "" }
 end function
 
+' A download: OpenSubtitles' link, and the file itself, read into cues for the player
+' to draw (ParseCues) and kept as text for saving on the sync service.
 function osDownload(req as Object) as Object
     body = { file_id: ToInt(req.fileId) }
-    shift = req.shift
-    if shift <> invalid and shift <> 0 then body.timeshift = shift
     res = osRequest("POST", "/download", body)
     ' Tokens expire; sign in again once and retry.
     if (res.code = 401 or res.code = 403) and FieldStr(m.account, "username") <> "" then
@@ -172,5 +172,27 @@ function osDownload(req as Object) as Object
     if not res.ok then return { ok: false, error: osError(res) }
     link = FieldStr(res.data, "link")
     if link = "" then return { ok: false, error: "OpenSubtitles didn't send a subtitle file." }
-    return { ok: true, link: link, remaining: ToInt(Field(res.data, "remaining")) }
+    text = fetchSubtitleText(link)
+    if text.Trim() = "" then return { ok: false, error: "The subtitle file from OpenSubtitles didn't arrive." }
+    cues = ParseCues(text)
+    if cues.Count() = 0 then return { ok: false, error: "The subtitle file from OpenSubtitles had nothing this app can read." }
+    return { ok: true, link: link, remaining: ToInt(Field(res.data, "remaining")), cues: cues, text: text }
+end function
+
+' The file behind a download link, or "" when it doesn't arrive.
+function fetchSubtitleText(url as String) as String
+    http = CreateObject("roUrlTransfer")
+    port = CreateObject("roMessagePort")
+    http.SetMessagePort(port)
+    http.SetUrl(url)
+    http.SetCertificatesFile("common:/certs/ca-bundle.crt")
+    http.InitClientCertificates()
+    if not http.AsyncGetToString() then return ""
+    msg = Wait(20000, port)
+    if type(msg) <> "roUrlEvent" then
+        http.AsyncCancel()
+        return ""
+    end if
+    if msg.GetResponseCode() <> 200 then return ""
+    return msg.GetString()
 end function

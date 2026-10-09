@@ -78,36 +78,41 @@ function subtitlePath(req as Object) as String
     return "/v1/subtitles?space=" + FieldStr(req, "space") + "&k=" + FieldStr(req, "title").EncodeUriComponent()
 end function
 
-' The subtitles saved for this title by any device, without the file itself:
-' -> { ok, title, found, fileId, name, delayMs, file }, or { ok: false, code, error }
-' (404 from a sync service older than saved subtitles).
+' The subtitles saved for this title by any device, read into cues for the player to
+' draw: -> { ok, title, found, fileId, name, delayMs, cues }, or { ok: false, code,
+' error } (404 from a sync service older than saved subtitles).
 function subtitleGet(req as Object) as Object
-    res = syncRequest(req, subtitlePath(req) + "&text=0", invalid)
+    res = syncRequest(req, subtitlePath(req), invalid)
     result = { ok: false, title: FieldStr(req, "title"), found: false, code: res.code, error: res.error }
     if res.code <> 200 then return result
     data = ParseJson(res.text)
     if not IsAA(data) then return result
     result.ok = true
-    if ToStr(Field(data, "found")) = "true" and FieldStr(data, "file") <> "" then
-        result.found = true
-        result.fileId = FieldStr(data, "fileId")
-        result.name = FieldStr(data, "name")
-        result.delayMs = ToInt(Field(data, "delayMs"))
-        result.file = FieldStr(data, "file")
+    if ToStr(Field(data, "found")) = "true" then
+        cues = ParseCues(ToStr(Field(data, "text")))
+        if cues.Count() > 0 then
+            result.found = true
+            result.fileId = FieldStr(data, "fileId")
+            result.name = FieldStr(data, "name")
+            result.delayMs = ToInt(Field(data, "delayMs"))
+            result.cues = cues
+        end if
     end if
     return result
 end function
 
-' A download from OpenSubtitles (its link), saved for this title for every device.
-' -> { ok, title, fileId, name, file }, or { ok: false, code, error }
+' A download from OpenSubtitles (its text, or its link), saved for this title for every
+' device, with its timing. -> { ok, title, fileId, name, delayMs, file }, or
+' { ok: false, code, error }
 function subtitleSave(req as Object) as Object
-    result = { ok: false, title: FieldStr(req, "title"), fileId: FieldStr(req, "fileId"), name: FieldStr(req, "name"), code: 0, error: "" }
-    text = fetchText(FieldStr(req, "link"))
+    result = { ok: false, title: FieldStr(req, "title"), fileId: FieldStr(req, "fileId"), name: FieldStr(req, "name"), delayMs: ToInt(req.delayMs), code: 0, error: "" }
+    text = ToStr(req.text)
+    if text.Trim() = "" then text = fetchText(FieldStr(req, "link"))
     if text.Trim() = "" then
         result.error = "The file from OpenSubtitles didn't arrive."
         return result
     end if
-    res = subtitlePost(req, { fileId: result.fileId, name: result.name, delayMs: 0, text: text })
+    res = subtitlePost(req, { fileId: result.fileId, name: result.name, delayMs: result.delayMs, text: text })
     if res.ok then
         result.ok = true
         result.file = res.file

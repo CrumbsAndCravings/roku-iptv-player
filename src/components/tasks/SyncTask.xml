@@ -4,11 +4,13 @@
   - none: a Continue Watching round, sending this Roku's list and removals and getting
     back the merged list from every device.
     { url, key, space, entries, removed } -> { ok, state | error }
-  - "subtitle-get": the subtitles saved for a title ("m:<id>" or "e:<id>") by any device.
-    { url, key, space, title } -> { ok, title, found, fileId, name, delayMs, file }
-  - "subtitle-save": fetches a download from OpenSubtitles and saves it for the title.
-    { url, key, space, title, fileId, name, link } -> { ok, title, fileId, name, file }
-  - "subtitle-delay": saves a nudge of the title's saved subtitles.
+  - "subtitle-get": the subtitles saved for a title ("m:<id>" or "e:<id>") by any device,
+    read into cues for the player to draw.
+    { url, key, space, title } -> { ok, title, found, fileId, name, delayMs, cues }
+  - "subtitle-save": saves a download from OpenSubtitles (its text, else fetched from its
+    link) for the title, with its timing.
+    { url, key, space, title, fileId, name, text | link, delayMs } -> { ok, title, fileId, name, delayMs, file }
+  - "subtitle-delay": saves a change of the timing of the title's saved subtitles.
     { url, key, space, title, fileId, delayMs } -> { ok, title, file }
 -->
 <component name="SyncTask" extends="Task">
@@ -17,5 +19,6 @@
     <field id="result" type="assocarray" />
   </interface>
   <script type="text/brightscript" uri="pkg:/components/common/Utils.brs" />
+  <script type="text/brightscript" uri="pkg:/components/common/Subtitles.brs" />
   <script type="text/brightscript" uri="pkg:/components/tasks/SyncTask.brs" />
 </component>

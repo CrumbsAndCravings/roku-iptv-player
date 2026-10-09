@@ -111,8 +111,20 @@ sub init()
     m.pauseTimer = m.top.FindNode("pauseTimer")
     m.pauseTimer.ObserveField("fire", "onPauseDone")
     m.afterPause = ""
-    m.savedWait = m.top.FindNode("savedWait")
-    m.savedWait.ObserveField("fire", "onSavedWait")
+    m.ownSubs = m.top.FindNode("ownSubs")
+    m.subLabels = buildSubLabels()
+    m.cueTimer = m.top.FindNode("cueTimer")
+    m.cueTimer.ObserveField("fire", "drawSubtitles")
+    m.timingBox = m.top.FindNode("timingBox")
+    m.timingLabel = m.top.FindNode("timingLabel")
+    m.timingLabel.font = MakeFont("Nunito-ExtraBold", 26)
+    m.timingHint = m.top.FindNode("timingHint")
+    m.timingHint.font = MakeFont("Nunito-SemiBold", 18)
+    m.timingTimer = m.top.FindNode("timingTimer")
+    m.timingTimer.ObserveField("fire", "closeTiming")
+    m.clockMark = CreateObject("roTimespan")
+    m.clockPos = 0.0
+    m.clockRunning = false
     m.restPicture = m.top.FindNode("restPicture")
     m.releaseTimer = m.top.FindNode("releaseTimer")
     m.releaseTimer.ObserveField("fire", "releaseConnection")
@@ -121,8 +133,6 @@ sub init()
     m.retryWhat = ""
     m.serverRetried = false
     m.retryFrom = 0
-    m.streamLoaded = false
-    m.attachedSubtitle = ""
     m.pendingAudio = ""
     resetRelease()
 
@@ -223,8 +233,6 @@ sub startItem(startAt as Integer)
     m.errors = []
     m.serverRetried = false
     m.retryTimer.control = "stop"
-    m.streamLoaded = false
-    m.attachedSubtitle = ""
     m.pendingAudio = ""
     resetRelease()
     resetProbe()
@@ -269,28 +277,7 @@ sub startItem(startAt as Integer)
         pauseThen("direct")
         return
     end if
-    if m.savedLooking then
-        ' Subtitles saved for this title go into the stream from the start, so showing
-        ' them doesn't open it again (onSavedLooked). The sync service answers in a
-        ' moment; the stream waits 3 s at most.
-        m.waitingSaved = true
-        m.spinner.visible = true
-        m.spinner.control = "start"
-        m.savedWait.control = "start"
-        return
-    end if
     loadStream()
-end sub
-
-' The saved-subtitle lookup has answered, or took too long: the stream starts.
-sub startAfterSaved()
-    m.waitingSaved = false
-    m.savedWait.control = "stop"
-    if not m.closing then loadStream()
-end sub
-
-sub onSavedWait()
-    if m.waitingSaved then startAfterSaved()
 end sub
 
 ' Resuming backs up a few seconds, so the scene picks up where it left off.
@@ -338,9 +325,11 @@ sub loadStream()
         if fmt <> "" then content.streamFormat = fmt
     end if
     ' Back up a few seconds so the scene picks up where it left off.
-    if m.startAt > 10 then content.playStart = m.startAt - 5
-    attachOnlineSubtitle(content, false)
-    m.streamLoaded = true
+    startPoint = 0
+    if m.startAt > 10 then startPoint = m.startAt - 5
+    if startPoint > 0 then content.playStart = startPoint
+    ' The drawn subtitles' clock starts where the stream does.
+    setClock(startPoint)
 
     m.lastSaved = m.startAt
     m.video.visible = true
@@ -355,6 +344,7 @@ end sub
 
 sub onPosition()
     if m.closing or not m.started then return
+    setClock(positionSecs())
     position = Int(positionSecs())
     m.lastPos = position
     if m.pendingSeek >= 0 and Abs(position - m.pendingSeek) < 15 then m.pendingSeek = -1
@@ -468,6 +458,12 @@ sub onState()
     ' Paused for long, a direct stream lets go of the provider (releaseConnection).
     m.releaseTimer.control = "stop"
     if state = "paused" then m.releaseTimer.control = "start"
+    ' The drawn subtitles' clock runs only while the video does.
+    if state = "playing" then
+        startClock()
+    else
+        stopClock()
+    end if
     m.spinner.visible = (state = "buffering")
     if state = "buffering" then
         m.spinner.control = "start"
@@ -929,7 +925,6 @@ end sub
 ' Plays the stream the helper started (m.helperStarted).
 sub openHelper()
     started = m.helperStarted
-    showing = onlineSubtitleShowing()
     m.helperSession = started.session
     m.helperVod = started.vod
     m.helperUsed = true
@@ -946,8 +941,7 @@ sub openHelper()
     content.title = m.titleLabel.text
     content.streamFormat = "hls"
     if started.vod and at > 0 then content.playStart = at
-    attachOnlineSubtitle(content, showing)
-    m.streamLoaded = true
+    setClock(at)
     ' The new stream numbers its tracks afresh.
     m.audioPrefDone = false
     m.subPrefDone = false
@@ -1159,6 +1153,7 @@ sub showControls(row as String)
     m.row = row
     renderControls()
     restartHideTimer()
+    placeSubs(true)
 end sub
 
 ' They go back the way they came, fading as they go.
@@ -1171,6 +1166,7 @@ sub hideControls()
     m.controlsOutTop.keyValue = [m.controlsTop.translation, controlsAwayTop()]
     m.controlsOutBottom.keyValue = [m.controlsBottom.translation, controlsAwayBottom()]
     m.controlsOut.control = "start"
+    placeSubs(false)
 end sub
 
 sub onControlsGone()
@@ -1393,6 +1389,7 @@ end sub
 ' growing one has converted; anything else starts the helper's stream again there.
 sub seekTo(target as Float)
     m.lastSaved = Int(target)
+    setClock(target)
     ' Let go after a long pause: play opens the stream at the new spot.
     if m.released then
         m.releasedAt = Int(target)
@@ -1542,6 +1539,7 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
 
     if m.panel = "tracks" then return onTrackKey(key)
     if m.panel = "episodes" then return onEpisodeKey(key)
+    if m.panel = "timing" then return onTimingKey(key)
 
     if m.errorBox.visible then
         if key = "OK" then
@@ -1675,7 +1673,8 @@ sub close()
     if m.probeTask <> invalid then m.probeTask.UnobserveField("result")
     if m.helperTask <> invalid then m.helperTask.UnobserveField("result")
     m.pauseTimer.control = "stop"
-    m.savedWait.control = "stop"
+    m.cueTimer.control = "stop"
+    m.timingTimer.control = "stop"
     m.releaseTimer.control = "stop"
     m.retryTimer.control = "stop"
     cancelSeek()
@@ -1691,21 +1690,19 @@ end sub
 
 ' --- Online subtitles (OpenSubtitles) -------------------------------------------
 '
-' The Subtitles column ends with online choices. Picking one downloads it and reloads
-' the stream at the same spot, since Roku only reads subtitle files when a stream
-' starts. Choosing one also sets the "online" preference, so later videos without
-' built-in English subtitles fetch the best match by themselves.
+' The Subtitles column ends with online choices. They're drawn by this screen
+' (drawSubtitles) rather than by Roku, which only reads a subtitle file when a stream
+' opens: so they come on, and move in time, at once, without opening the stream again.
+' Choosing one also sets the "online" preference, so later videos without built-in
+' English subtitles fetch the best match by themselves.
 
 sub resetOnline()
-    m.online = { state: "idle", candidates: [], message: "", link: "", fileId: "", shift: 0.0, auto: false, remaining: -1 }
-    m.extraSubtitle = ""
+    m.online = { state: "idle", candidates: [], message: "", fileId: "", auto: false, remaining: -1 }
     m.pendingSubtitle = ""
     m.autoChecked = false
     m.autoWaiting = false
     m.saved = invalid
     m.savedLooking = false
-    m.waitingSaved = false
-    if m.savedWait <> invalid then m.savedWait.control = "stop"
     ' Why subtitles can't be saved for next time, when they can't.
     m.subsProblem = ""
     if m.savedTask <> invalid then m.savedTask.UnobserveField("result")
@@ -1713,6 +1710,14 @@ sub resetOnline()
     if m.autoSubTimer <> invalid then m.autoSubTimer.control = "stop"
     if m.osTask <> invalid then m.osTask.UnobserveField("result")
     m.osTask = invalid
+    ' The drawn subtitles: their cues ({ s, e, t }, ParseCues), how much later than the
+    ' file says they show (ms), and whether they're on.
+    m.cues = []
+    m.subDelay = 0
+    m.ownOn = false
+    m.cueText = ""
+    if m.cueTimer <> invalid then m.cueTimer.control = "stop"
+    if m.ownSubs <> invalid then m.ownSubs.visible = false
 end sub
 
 function currentStreamUrl() as String
@@ -1747,12 +1752,12 @@ end function
 ' built-in English ones (for "online"), else the ones saved for this title on the sync
 ' service, else (for "online") the best match from OpenSubtitles.
 sub autoSubtitles()
-    if m.closing or m.failed or m.online.link <> "" then return
+    if m.closing or m.failed or ownLoaded() then return
     pref = FieldStr(LoadPrefs(), "subtitles")
     if pref <> "online" and pref <> "" then return
     if pref = "online" then
         ' Built-in English subtitles beat a download.
-        options = builtInSubtitles()
+        options = SubtitleOptions(m.video.availableSubtitleTracks)
         index = OptionIndex(options, "language", "eng")
         if index < 0 then index = OptionIndex(options, "language", "en")
         if index > 0 then
@@ -1767,7 +1772,7 @@ sub autoSubtitles()
         return
     end if
     if m.saved <> invalid then
-        showSaved(m.saved.delayMs)
+        showSaved()
         return
     end if
     if pref = "online" and LoadOsAccount() <> invalid then startOnlineSearch(true)
@@ -1806,16 +1811,16 @@ sub onOnlineFound(event as Object)
     else
         m.online.state = "results"
         m.online.candidates = result.candidates
-        if m.online.auto then startOnlineDownload(result.candidates[0].fileId, 0.0)
+        if m.online.auto then startOnlineDownload(result.candidates[0].fileId)
     end if
     refreshTracksPanel()
 end sub
 
-sub startOnlineDownload(fileId as String, shift as Float)
+sub startOnlineDownload(fileId as String)
     account = LoadOsAccount()
     if account = invalid or fileId = "" then return
     m.online.state = "downloading"
-    runOsTask({ mode: "download", account: account, fileId: fileId, shift: shift }, "onOnlineDownloaded")
+    runOsTask({ mode: "download", account: account, fileId: fileId }, "onOnlineDownloaded")
     refreshTracksPanel()
 end sub
 
@@ -1829,61 +1834,167 @@ sub onOnlineDownloaded(event as Object)
         return
     end if
     m.online.state = "results"
-    m.online.link = result.link
-    m.online.fileId = FieldStr(result.request, "fileId")
-    m.online.shift = result.request.shift
     m.online.remaining = ToInt(result.remaining)
     SavePref("subtitles", "online")
-    reloadWithSubtitle(result.link)
-    ' A fresh download (not one moved by OpenSubtitles) is saved for every device.
-    if m.online.shift = 0 then shareSubtitle(m.online.fileId, result.link)
+    showOwn(result.cues, FieldStr(result.request, "fileId"), 0)
+    ' Saved for every device, from the file the task already read.
+    shareSubtitle(m.online.fileId, ToStr(result.text))
     refreshTracksPanel()
 end sub
 
-' Roku reads subtitle files when a stream loads, so reload at the same spot.
-sub reloadWithSubtitle(link as String)
-    m.extraSubtitle = link
-    ' Let go after a long pause: they come with the stream when play opens it again.
-    if m.released then
-        m.releaseSubtitle = link
-        return
-    end if
-    ' Already in the stream (saved ones, put in before it started): they just show.
-    if link <> "" and link = m.attachedSubtitle then
-        if m.started then
-            m.video.subtitleTrack = link
-            m.video.globalCaptionMode = "On"
-        else
-            m.pendingSubtitle = link
-        end if
-        return
-    end if
-    m.pendingSubtitle = link
-    if m.started then m.startAt = Int(positionSecs())
-    m.started = false
-    m.video.control = "stop"
-    if m.route = "helper" then
-        requestStart(m.startAt)
-    else
-        ' The provider gets a moment to notice the closed connection.
-        pauseThen("direct")
-    end if
+function ownLoaded() as Boolean
+    return m.cues.Count() > 0
+end function
+
+' Drawn subtitles on, from `cues`, `delayMs` later than the file says; Roku's own
+' captions go off.
+sub showOwn(cues as Object, fileId as String, delayMs as Integer)
+    m.cues = cues
+    m.online.fileId = fileId
+    m.subDelay = delayMs
+    m.ownOn = true
+    m.video.globalCaptionMode = "Off"
+    redrawSubtitles()
+    m.cueTimer.control = "start"
 end sub
 
-' The video's own subtitle tracks, without the online ones put in the stream.
-function builtInSubtitles() as Object
-    options = []
-    for each option in SubtitleOptions(m.video.availableSubtitleTracks)
-        if m.extraSubtitle = "" or option.id <> m.extraSubtitle then options.Push(option)
+sub hideOwn()
+    m.ownOn = false
+    m.cueTimer.control = "stop"
+    m.cueText = ""
+    m.ownSubs.visible = false
+end sub
+
+' The words, white with a dark edge: four dark copies just around them and a soft
+' shadow below, since a Label draws no outline of its own. Three lines at most, rising
+' from just above the bottom of the screen.
+function buildSubLabels() as Object
+    labels = []
+    for each place in [[2, 3, "0x00000080"], [-2, 0, "0x000000E6"], [2, 0, "0x000000E6"], [0, -2, "0x000000E6"], [0, 2, "0x000000E6"], [0, 0, "0xFFFFFFFF"]]
+        label = m.ownSubs.CreateChild("Label")
+        label.font = MakeFont("Nunito-ExtraBold", 30)
+        label.width = 1080
+        label.height = 150
+        label.translation = [100 + place[0], 530 + place[1]]
+        label.horizAlign = "center"
+        label.vertAlign = "bottom"
+        label.wrap = true
+        label.maxLines = 3
+        label.color = place[2]
+        labels.Push(label)
     end for
-    return options
+    return labels
 end function
+
+' Every 0.1 s while they're on (cueTimer): the words for where the video is now.
+sub drawSubtitles()
+    text = ""
+    state = m.video.state
+    if m.ownOn and not m.released and (state = "playing" or state = "paused" or state = "buffering") then
+        text = CueTextAt(m.cues, Int(clockNow() * 1000) - m.subDelay)
+    end if
+    if text = m.cueText then return
+    m.cueText = text
+    for each label in m.subLabels
+        label.text = text
+    end for
+    m.ownSubs.visible = text <> ""
+end sub
+
+' Draws them now, even when the words would be the same (on, or moved in time).
+sub redrawSubtitles()
+    m.cueText = Chr(1)
+    drawSubtitles()
+end sub
+
+' Above the bar while the controls are up, near the bottom otherwise.
+sub placeSubs(raised as Boolean)
+    y = 0
+    if raised then y = -150
+    if m.ownSubs.translation[1] <> y then Tween(m.ownSubs, "translation", [m.ownSubs.translation, [0, y]], 0.3, "outCubic", 0)
+end sub
+
+' The film's clock for the drawn subtitles. Roku says where the video is once a second
+' (onPosition); in between, the clock runs on from there while it plays.
+sub setClock(seconds as Float)
+    m.clockPos = seconds
+    m.clockMark.Mark()
+end sub
+
+sub startClock()
+    if m.clockRunning then return
+    m.clockRunning = true
+    m.clockMark.Mark()
+end sub
+
+sub stopClock()
+    if not m.clockRunning then return
+    m.clockPos = clockNow()
+    m.clockRunning = false
+end sub
+
+function clockNow() as Float
+    if not m.clockRunning then return m.clockPos
+    ahead = m.clockMark.TotalMilliseconds() / 1000.0
+    ' No word from Roku for a while (a stall it hasn't reported yet): hold there.
+    if ahead > 2.0 then ahead = 2.0
+    return m.clockPos + ahead
+end function
+
+' --- Subtitle timing ----------------------------------------------------------------
+'
+' Drawn subtitles move at once, so their timing is set while watching: Left and Right
+' move them 0.1 s earlier or later. OK or Back, or 8 s without a key, closes the box and
+' saves the timing for every device when they're the saved ones (saveSubDelay).
+
+sub openTiming()
+    closePanel(false)
+    m.panel = "timing"
+    renderTiming()
+    m.timingBox.visible = true
+    m.timingTimer.control = "stop"
+    m.timingTimer.control = "start"
+end sub
+
+sub renderTiming()
+    m.timingLabel.text = "Subtitles " + DelayLabel(m.subDelay)
+end sub
+
+function onTimingKey(key as String) as Boolean
+    m.timingTimer.control = "stop"
+    m.timingTimer.control = "start"
+    if key = "left" or key = "rewind" then
+        moveSubtitles(-100)
+    else if key = "right" or key = "fastforward" then
+        moveSubtitles(100)
+    else if key = "OK" or key = "back" then
+        closeTiming()
+    else if key = "play" then
+        togglePause()
+    end if
+    return true
+end function
+
+sub moveSubtitles(ms as Integer)
+    m.subDelay = m.subDelay + ms
+    if m.subDelay > 600000 then m.subDelay = 600000
+    if m.subDelay < -600000 then m.subDelay = -600000
+    redrawSubtitles()
+    renderTiming()
+end sub
+
+sub closeTiming()
+    m.timingTimer.control = "stop"
+    if m.panel <> "timing" then return
+    closePanel(false)
+end sub
 
 ' --- Subtitles saved for every device (the sync service, sync/worker.js) -----------
 '
-' A download is saved there for this title, so the next device to play it shows it
-' without one. The Roku plays any device's saved subtitles from the service's address,
-' which also moves them for a nudge, so nudging them costs no download.
+' A download is saved there for this title, with its timing, so the next device to
+' play it shows it without one. The Roku reads any device's saved subtitles from the
+' service and draws them; moving them in time is drawing them elsewhere, so it costs
+' no download.
 
 function syncRequestFor(mode as String) as Dynamic
     config = SyncConfig()
@@ -1906,18 +2017,14 @@ sub onSavedLooked(event as Object)
     m.savedTask = invalid
     m.savedLooking = false
     if IsAA(result) and FieldStr(result, "title") = itemKey() then
-        if ToStr(result.found) = "true" then
-            m.saved = { fileId: FieldStr(result, "fileId"), name: FieldStr(result, "name"), delayMs: ToInt(result.delayMs), file: FieldStr(result, "file") }
+        if ToStr(result.found) = "true" and IsArr(result.cues) then
+            m.saved = { fileId: FieldStr(result, "fileId"), name: FieldStr(result, "name"), delayMs: ToInt(result.delayMs), cues: result.cues }
             m.online.candidates.Unshift(SavedCandidate(m.saved))
-            ' Before the stream starts, they go into it (not showing yet), so showing
-            ' them later (autoSubtitles) doesn't open the stream again.
-            if not m.streamLoaded and m.extraSubtitle = "" then m.extraSubtitle = SavedSubtitleUrl(m.saved.file, m.saved.delayMs)
             refreshTracksPanel()
         else if ToInt(Field(result, "code")) = 404 then
             m.subsProblem = OldSyncText()
         end if
     end if
-    if m.waitingSaved then startAfterSaved()
     ' No answer still lets the device search as before.
     if m.autoWaiting then
         m.autoWaiting = false
@@ -1925,10 +2032,9 @@ sub onSavedLooked(event as Object)
     end if
 end sub
 
-' The saved subtitles, moved `delayMs` by the service.
-sub showSaved(delayMs as Integer)
-    if m.saved = invalid then return
-    m.saved.delayMs = delayMs
+' The saved subtitles, drawn with their saved timing.
+sub showSaved()
+    if m.saved = invalid or not IsArr(m.saved.cues) then return
     ' A search or download still out is overtaken.
     if m.osTask <> invalid then m.osTask.UnobserveField("result")
     m.osTask = invalid
@@ -1936,23 +2042,20 @@ sub showSaved(delayMs as Integer)
         m.online.state = "idle"
         if SplitSavedCandidates(m.online.candidates).found.Count() > 0 then m.online.state = "results"
     end if
-    link = SavedSubtitleUrl(m.saved.file, delayMs)
-    m.online.link = link
-    m.online.fileId = m.saved.fileId
-    m.online.shift = delayMs / 1000
-    reloadWithSubtitle(link)
+    showOwn(m.saved.cues, m.saved.fileId, m.saved.delayMs)
     refreshTracksPanel()
 end sub
 
 function savedShowing() as Boolean
-    return m.saved <> invalid and m.online.link <> "" and m.online.fileId = m.saved.fileId
+    return m.ownOn and m.saved <> invalid and m.online.fileId = m.saved.fileId
 end function
 
-sub shareSubtitle(fileId as String, link as String)
+sub shareSubtitle(fileId as String, text as String)
     request = syncRequestFor("subtitle-save")
     if request = invalid then return
     request.fileId = fileId
-    request.link = link
+    request.text = text
+    request.delayMs = m.subDelay
     request.name = ""
     for each candidate in m.online.candidates
         if candidate.fileId = fileId and ToStr(candidate.saved) <> "true" then request.name = candidate.release
@@ -1975,72 +2078,48 @@ sub onSubtitleShared(event as Object)
         refreshTracksPanel()
         return
     end if
-    m.saved = { fileId: FieldStr(result, "fileId"), name: FieldStr(result, "name"), delayMs: 0, file: FieldStr(result, "file") }
+    cues = invalid
+    if FieldStr(result, "fileId") = m.online.fileId then cues = m.cues
+    m.saved = { fileId: FieldStr(result, "fileId"), name: FieldStr(result, "name"), delayMs: ToInt(result.delayMs), cues: cues }
     ' What was saved before is replaced.
     m.online.candidates = SplitSavedCandidates(m.online.candidates).found
+    ' Timing moved while it was being saved goes along now.
+    saveSubDelay()
     refreshTracksPanel()
 end sub
 
-' A nudge of the saved subtitles: shown through the service, and saved for every device.
-sub nudgeSaved(moveMs as Integer)
-    showSaved(m.saved.delayMs + moveMs)
+' Saves the timing of the subtitles showing for every device, when they're the saved
+' ones. While a download is still being saved, its timing goes with it, and any moved
+' since follows when it's done (onSubtitleShared).
+sub saveSubDelay()
+    if m.saved = invalid or m.saved.fileId <> m.online.fileId or m.saved.delayMs = m.subDelay then return
+    m.saved.delayMs = m.subDelay
     request = syncRequestFor("subtitle-delay")
     if request = invalid then return
     request.fileId = m.saved.fileId
-    request.delayMs = m.saved.delayMs
+    request.delayMs = m.subDelay
     if m.delayTask <> invalid then m.delayTask.UnobserveField("result")
     m.delayTask = CreateObject("roSGNode", "SyncTask")
     m.delayTask.request = request
     m.delayTask.control = "RUN"
 end sub
 
-' The name Roku knows the online subtitles by: OpenSubtitles' file. A growing helper
-' playlist that starts partway has its own clock, which the file's times don't follow,
-' so it gets none ("").
-function onlineTrackName() as String
-    if m.extraSubtitle = "" then return ""
-    if m.route = "helper" and m.offset > 0 then return ""
-    return m.extraSubtitle
-end function
-
-function onlineSubtitleShowing() as Boolean
-    if m.extraSubtitle = "" or ToStr(m.video.globalCaptionMode) <> "On" then return false
-    return ToStr(m.video.subtitleTrack) = onlineTrackName()
-end function
-
-' Online subtitles go with every stream load, since Roku reads them only then.
-' `showing` turns them on again once the new stream plays.
-sub attachOnlineSubtitle(content as Object, showing as Boolean)
-    m.attachedSubtitle = ""
-    name = onlineTrackName()
-    if name = "" then return
-    content.subtitleTracks = [{ Language: "eng", TrackName: name, Description: "Online" }]
-    m.attachedSubtitle = name
-    if showing or m.pendingSubtitle <> "" then m.pendingSubtitle = name
-end sub
-
 sub chooseOnline(id as String)
     if id = "os:search" then
         startOnlineSearch(false)
-    else if id = "os:earlier" and savedShowing() then
-        nudgeSaved(-1000)
-    else if id = "os:later" and savedShowing() then
-        nudgeSaved(1000)
-    else if id = "os:earlier" then
-        startOnlineDownload(m.online.fileId, m.online.shift - 1.0)
-    else if id = "os:later" then
-        startOnlineDownload(m.online.fileId, m.online.shift + 1.0)
+    else if id = "os:timing" then
+        openTiming()
+        return
     else if Left(id, 8) = "os:file:" then
         fileId = Mid(id, 9)
-        if fileId = m.online.fileId and m.online.link <> "" then
-            m.video.subtitleTrack = onlineTrackName()
-            m.video.globalCaptionMode = "On"
+        if fileId = m.online.fileId and ownLoaded() then
+            showOwn(m.cues, fileId, m.subDelay)
             SavePref("subtitles", "online")
-        else if m.saved <> invalid and fileId = m.saved.fileId then
-            showSaved(m.saved.delayMs)
+        else if m.saved <> invalid and fileId = m.saved.fileId and IsArr(m.saved.cues) then
+            showSaved()
             SavePref("subtitles", "online")
         else
-            startOnlineDownload(fileId, 0.0)
+            startOnlineDownload(fileId)
         end if
     end if
     refreshTracksPanel()
@@ -2050,7 +2129,7 @@ end sub
 ' then subtitles saved for this title on the sync service (no OpenSubtitles account
 ' needed), then the online choices for the current state.
 sub buildSubtitleOptions()
-    options = builtInSubtitles()
+    options = SubtitleOptions(m.video.availableSubtitleTracks)
     split = SplitSavedCandidates(m.online.candidates)
     for each candidate in split.saved
         options.Push({ id: "os:file:" + candidate.fileId, label: SubtitleLabel(candidate), language: "eng" })
@@ -2072,10 +2151,7 @@ sub buildSubtitleOptions()
             options.Push({ id: "os:file:" + candidate.fileId, label: SubtitleLabel(candidate), language: "eng" })
         end for
     end if
-    if m.online.link <> "" then
-        options.Push({ id: "os:earlier", label: "Show subtitles 1s earlier", language: "" })
-        options.Push({ id: "os:later", label: "Show subtitles 1s later", language: "" })
-    end if
+    if m.ownOn then options.Push({ id: "os:timing", label: "Subtitle timing: " + DelayLabel(m.subDelay), language: "" })
     m.subOptions = options
 end sub
 
@@ -2084,23 +2160,21 @@ sub updateTracksNote()
     playing = LCase(ToStr(m.video.audioFormat))
     if playing <> "" then notes.Push("Audio now: " + CodecLabel(playing) + ".")
     state = m.online.state
-    if LoadOsAccount() = invalid and m.online.link = "" then
+    if LoadOsAccount() = invalid and not ownLoaded() then
         notes.Push("To search online, connect OpenSubtitles: on the home screen press * and choose Online subtitles.")
     else if state = "searching" then
         notes.Push("Searching OpenSubtitles for English subtitles…")
     else if state = "downloading" then
-        notes.Push("Downloading, then the video picks up where it was.")
+        notes.Push("Downloading the subtitles…")
     else if state = "none" then
         notes.Push("OpenSubtitles has no English subtitles for this title.")
     else if state = "error" then
         notes.Push(m.online.message)
-    else if m.online.link <> "" then
-        shiftText = ""
-        if m.online.shift <> 0 then shiftText = " Timing moved " + Str(m.online.shift).Trim() + "s."
+    else if m.ownOn then
         if savedShowing() then
-            notes.Push("Online subtitles on, saved for all your devices." + shiftText + " If they're out of sync, nudge them earlier or later.")
+            notes.Push("Online subtitles on, saved for all your devices. Out of sync? Choose Subtitle timing and move them 0.1 s at a time while you watch.")
         else
-            notes.Push("Online subtitles on." + shiftText + " If they're out of sync, nudge them earlier or later (each nudge uses a download).")
+            notes.Push("Online subtitles on. Out of sync? Choose Subtitle timing and move them 0.1 s at a time while you watch.")
         end if
     else if SplitSavedCandidates(m.online.candidates).found.Count() > 0 then
         notes.Push("“Matches this file” means timed for your exact video.")
@@ -2125,9 +2199,12 @@ end sub
 ' --- Panels (audio & subtitles, episodes) ---------------------------------------
 
 sub closePanel(backToControls as Boolean)
+    if m.panel = "timing" then saveSubDelay()
     m.panel = ""
     m.tracks.visible = false
     m.episodes.visible = false
+    m.timingBox.visible = false
+    m.timingTimer.control = "stop"
     if backToControls then showControls("buttons")
 end sub
 
@@ -2145,7 +2222,7 @@ sub onTracksChanged()
         end if
     end if
     if not m.subPrefDone then
-        options = builtInSubtitles()
+        options = SubtitleOptions(m.video.availableSubtitleTracks)
         if options.Count() > 1 then
             m.subPrefDone = true
             wanted = FieldStr(prefs, "subtitles")
@@ -2222,10 +2299,9 @@ function activeAudioIndex() as Integer
 end function
 
 function activeSubtitleIndex() as Integer
+    if m.ownOn then return OptionIndex(m.subOptions, "id", "os:file:" + m.online.fileId)
     if ToStr(m.video.globalCaptionMode) <> "On" then return 0
-    current = ToStr(m.video.subtitleTrack)
-    if m.online.link <> "" and current = onlineTrackName() then return OptionIndex(m.subOptions, "id", "os:file:" + m.online.fileId)
-    return OptionIndex(m.subOptions, "id", current)
+    return OptionIndex(m.subOptions, "id", ToStr(m.video.subtitleTrack))
 end function
 
 sub renderTracks()
@@ -2249,6 +2325,8 @@ sub chooseTrack()
             chooseOnline(option.id)
             return
         end if
+        ' The file's own subtitles, or none: the drawn ones go.
+        hideOwn()
         if option.id = "" then
             m.video.globalCaptionMode = "Off"
             SavePref("subtitles", "off")

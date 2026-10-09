@@ -60,6 +60,18 @@
       </Group>
     </Group>
 
+    <!-- Online subtitles, drawn here rather than by Roku (drawSubtitles): white words
+         with a dark edge (their Labels are made in buildSubLabels), above the bar while
+         the controls are up. -->
+    <Group id="ownSubs" visible="false" />
+
+    <!-- Moving the drawn subtitles in time (openTiming): Left and Right, 0.1 s a press. -->
+    <Group id="timingBox" translation="[340, 56]" visible="false">
+      <Poster width="600" height="100" uri="pkg:/images/card.9.png" blendColor="0x151028EE" />
+      <Label id="timingLabel" translation="[0, 16]" width="600" horizAlign="center" color="0xF7F3FFFF" />
+      <Label id="timingHint" translation="[0, 60]" width="600" horizAlign="center" color="0xC3B8E6FF" text="‹  earlier   ·   later  ›   ·   OK when they match" />
+    </Group>
+
     <Group id="upNext" translation="[800, 500]" visible="false">
       <Poster width="432" height="156" uri="pkg:/images/card.9.png" blendColor="0x151028EE" />
       <Poster translation="[396, 18]" uri="pkg:/images/sparkle.png" width="18" height="18" blendColor="0xFFD98AFF" />
@@ -105,8 +117,10 @@
     <Timer id="holdTimer" duration="0.25" repeat="true" />
     <Timer id="commitTimer" duration="0.8" repeat="false" />
     <Timer id="autoSubTimer" duration="2.5" repeat="false" />
-    <!-- How long the saved-subtitle lookup may hold up the stream (startItem). -->
-    <Timer id="savedWait" duration="3" repeat="false" />
+    <!-- Draws the online subtitles' words in time with the video (drawSubtitles). -->
+    <Timer id="cueTimer" duration="0.1" repeat="true" />
+    <!-- Closes the timing box once it's left alone. -->
+    <Timer id="timingTimer" duration="8" repeat="false" />
     <!-- Paused this long, the stream lets go of the provider's connection. -->
     <Timer id="releaseTimer" duration="180" repeat="false" />
     <!-- The wait before asking again after the provider's server failed. -->
