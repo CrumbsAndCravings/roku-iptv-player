@@ -17,6 +17,19 @@ sub init()
     m.keys = m.top.FindNode("keys")
 
     m.controls = m.top.FindNode("controls")
+    ' Whether the controls are up (they may still be fading away when not).
+    m.controlsOn = false
+    m.controlsTop = m.top.FindNode("controlsTop")
+    m.controlsBottom = m.top.FindNode("controlsBottom")
+    m.controlsIn = m.top.FindNode("controlsIn")
+    m.controlsInFade = m.top.FindNode("controlsInFade")
+    m.controlsInTop = m.top.FindNode("controlsInTop")
+    m.controlsInBottom = m.top.FindNode("controlsInBottom")
+    m.controlsOut = m.top.FindNode("controlsOut")
+    m.controlsOutFade = m.top.FindNode("controlsOutFade")
+    m.controlsOutTop = m.top.FindNode("controlsOutTop")
+    m.controlsOutBottom = m.top.FindNode("controlsOutBottom")
+    m.controlsOut.ObserveField("state", "onControlsGone")
     m.backBg = m.top.FindNode("backBg")
     m.backLabel = m.top.FindNode("backLabel")
     m.titleLabel = m.top.FindNode("titleLabel")
@@ -29,6 +42,14 @@ sub init()
     m.knob = m.top.FindNode("knob")
     m.bubble = m.top.FindNode("bubble")
     m.bubbleLabel = m.top.FindNode("bubbleLabel")
+    m.thumb = m.top.FindNode("thumb")
+    m.thumbPics = m.top.FindNode("thumbPics")
+    m.thumbFront = invalid
+    m.thumbLoader = invalid
+    m.thumbShown = ""
+    m.thumbLoading = ""
+    m.thumbLoadAt = 0.0
+    m.thumbMissing = {}
     m.buttonRow = m.top.FindNode("buttonRow")
 
     m.upNext = m.top.FindNode("upNext")
@@ -90,10 +111,26 @@ sub init()
     m.pauseTimer = m.top.FindNode("pauseTimer")
     m.pauseTimer.ObserveField("fire", "onPauseDone")
     m.afterPause = ""
+    m.savedWait = m.top.FindNode("savedWait")
+    m.savedWait.ObserveField("fire", "onSavedWait")
+    m.restPicture = m.top.FindNode("restPicture")
+    m.releaseTimer = m.top.FindNode("releaseTimer")
+    m.releaseTimer.ObserveField("fire", "releaseConnection")
+    m.retryTimer = m.top.FindNode("retryTimer")
+    m.retryTimer.ObserveField("fire", "onRetryTimer")
+    m.retryWhat = ""
+    m.serverRetried = false
+    m.retryFrom = 0
+    m.streamLoaded = false
+    m.attachedSubtitle = ""
+    m.pendingAudio = ""
+    resetRelease()
 
     m.playback = invalid
     m.kind = "movie"
     m.index = 0
+    ' The episode already counted as finished (noteTaste, markFinished).
+    m.tasteEpisode = -1
     m.startAt = 0
     m.lastSaved = 0
     m.closing = false
@@ -184,6 +221,12 @@ sub startItem(startAt as Integer)
     m.started = false
     m.failed = false
     m.errors = []
+    m.serverRetried = false
+    m.retryTimer.control = "stop"
+    m.streamLoaded = false
+    m.attachedSubtitle = ""
+    m.pendingAudio = ""
+    resetRelease()
     resetProbe()
     resetHelper()
     m.introShown = false
@@ -226,7 +269,28 @@ sub startItem(startAt as Integer)
         pauseThen("direct")
         return
     end if
+    if m.savedLooking then
+        ' Subtitles saved for this title go into the stream from the start, so showing
+        ' them doesn't open it again (onSavedLooked). The sync service answers in a
+        ' moment; the stream waits 3 s at most.
+        m.waitingSaved = true
+        m.spinner.visible = true
+        m.spinner.control = "start"
+        m.savedWait.control = "start"
+        return
+    end if
     loadStream()
+end sub
+
+' The saved-subtitle lookup has answered, or took too long: the stream starts.
+sub startAfterSaved()
+    m.waitingSaved = false
+    m.savedWait.control = "stop"
+    if not m.closing then loadStream()
+end sub
+
+sub onSavedWait()
+    if m.waitingSaved then startAfterSaved()
 end sub
 
 ' Resuming backs up a few seconds, so the scene picks up where it left off.
@@ -276,6 +340,7 @@ sub loadStream()
     ' Back up a few seconds so the scene picks up where it left off.
     if m.startAt > 10 then content.playStart = m.startAt - 5
     attachOnlineSubtitle(content, false)
+    m.streamLoaded = true
 
     m.lastSaved = m.startAt
     m.video.visible = true
@@ -295,19 +360,23 @@ sub onPosition()
     if m.pendingSeek >= 0 and Abs(position - m.pendingSeek) < 15 then m.pendingSeek = -1
     ' A minute of playing since the helper's stream last opened again: it's fine.
     if m.helperReopens > 0 and position - m.offset > 60 then m.helperReopens = 0
+    ' A minute of playing since asking again after a server error: another may ask again.
+    if m.serverRetried and position - m.retryFrom > 60 then m.serverRetried = false
     if Abs(position - m.lastSaved) >= 15 then saveProgress()
-    if m.controls.visible then renderBar()
+    if m.controlsOn then renderBar()
 end sub
 
 ' Where the video is, in seconds from the file's start. Through the helper, a growing
 ' playlist starts at m.offset and Roku counts from there (a whole film's is at 0).
 function positionSecs() as Float
+    if m.released then return m.releasedAt
     return m.offset + m.video.position
 end function
 
 ' The file's length. Through the helper, the length the helper read from the file,
 ' since its stream only lists what is converted so far.
 function durationSecs() as Float
+    if m.released then return m.releasedDuration
     if m.route <> "helper" then return m.video.duration
     if m.helperStarted <> invalid and m.helperStarted.duration > 0 then return m.helperStarted.duration
     if m.helperInfo <> invalid and m.helperInfo.duration > 0 then return m.helperInfo.duration
@@ -321,6 +390,7 @@ sub saveProgress()
     duration = Int(durationSecs())
     if position < 10 then return
     m.lastSaved = position
+    noteTaste(position, duration)
     if duration > 0 and position >= duration * 0.95 then
         markFinished()
         return
@@ -360,9 +430,27 @@ function entryFor(index as Integer, position as Integer, duration as Integer) as
     }
 end function
 
+' What you're watching, for the rows picked for you (common/Taste.brs): a movie by how
+' far you are, a series once you're 3 minutes into an episode.
+sub noteTaste(position as Integer, duration as Integer)
+    p = m.playback
+    if m.kind = "movie" then
+        TasteWatched(FieldStr(p.entry, "k"), FieldStr(p.entry, "name"), TasteWeightFor(position, duration))
+    else if position >= 180 then
+        TasteWatched("s:" + p.seriesId, p.seriesName, 1)
+    end if
+end sub
+
 ' Movies drop out of Continue Watching; series move on to the next episode.
 sub markFinished()
     p = m.playback
+    ' Watched to the end: a movie counts most, a series a little more each episode.
+    if m.kind = "movie" then
+        TasteFinished(FieldStr(p.entry, "k"), FieldStr(p.entry, "name"))
+    else if m.tasteEpisode <> m.index then
+        m.tasteEpisode = m.index
+        TasteEpisodeDone("s:" + p.seriesId, p.seriesName)
+    end if
     if m.kind = "movie" then
         ProgressRemove(p.entry.k)
     else if hasNextEpisode() then
@@ -377,6 +465,9 @@ end sub
 sub onState()
     if m.closing then return
     state = m.video.state
+    ' Paused for long, a direct stream lets go of the provider (releaseConnection).
+    m.releaseTimer.control = "stop"
+    if state = "paused" then m.releaseTimer.control = "start"
     m.spinner.visible = (state = "buffering")
     if state = "buffering" then
         m.spinner.control = "start"
@@ -398,6 +489,10 @@ sub onState()
             m.video.globalCaptionMode = "On"
             m.pendingSubtitle = ""
         end if
+        if m.pendingAudio <> "" then
+            m.video.audioTrack = m.pendingAudio
+            m.pendingAudio = ""
+        end if
         if not m.autoChecked then
             m.autoChecked = true
             m.autoSubTimer.control = "start"
@@ -406,12 +501,12 @@ sub onState()
         if not m.introShown then
             m.introShown = true
             showControls("bar")
-        else if m.controls.visible then
+        else if m.controlsOn then
             restartHideTimer()
         end if
     else if state = "paused" then
         saveProgress()
-        if not m.controls.visible then showControls("bar")
+        if not m.controlsOn then showControls("bar")
         m.hideTimer.control = "stop"
     else if state = "error" then
         onPlaybackError()
@@ -443,6 +538,10 @@ sub onPlaybackError()
     end if
     if m.started then m.startAt = Int(positionSecs())
     m.started = false
+    if ProviderServerTrouble(ToStr(m.errors.Peek())) and not m.serverRetried then
+        retryLater("direct")
+        return
+    end if
     ' A refused request won't change with a different format hint, so ask the server
     ' directly, as a Roku and as ARAN+, whether it would send this video.
     if not m.probed and isHttpRefusal() then
@@ -583,6 +682,7 @@ function diagnosis() as String
     item = currentItem()
     if m.route = "helper" then return helperDiagnosis(item)
     lines = []
+    if ProviderServerTrouble(ToStr(m.errors.Peek())) then lines.Push(ServerTroubleText())
     lines.Push("Roku says: " + m.errors.Peek())
     if m.formatRetried then lines.Push("Tried twice: with the format hint from the file name, then without it.")
     if m.agentSwitched then lines.Push("The server accepted another way of asking, so it tried again " + UserAgentName(FieldStr(m.global.creds, "userAgent")) + ".")
@@ -643,6 +743,8 @@ sub resetHelper()
     m.helperProblem = ""
     m.helperSaid = ""
     m.helperReopens = 0
+    m.helperPreviews = invalid
+    forgetThumbs()
     m.pendingSeek = -1
     m.lastPos = 0
     ' Answers about the title before are dropped.
@@ -680,6 +782,32 @@ sub pauseThen(what as String)
     m.spinner.control = "start"
     m.pauseTimer.control = "stop"
     m.pauseTimer.control = "start"
+end sub
+
+' The provider's server failed (a 5xx), which is often over in a moment: ask again once,
+' 5 s later, before showing the error.
+sub retryLater(what as String)
+    m.serverRetried = true
+    m.retryFrom = m.startAt
+    m.retryWhat = what
+    m.video.control = "stop"
+    m.spinner.visible = true
+    m.spinner.control = "start"
+    m.retryTimer.control = "stop"
+    m.retryTimer.control = "start"
+end sub
+
+sub onRetryTimer()
+    what = m.retryWhat
+    m.retryWhat = ""
+    if m.closing or what = "" then return
+    if what = "direct" then
+        loadStream()
+    else if what = "helperStart" then
+        requestStart(m.startAt)
+    else
+        helperGo()
+    end if
 end sub
 
 sub onPauseDone()
@@ -729,7 +857,12 @@ sub onHelperInfo(event as Object)
     result = helperResultFor(event)
     if result = invalid then return
     if not result.ok then
-        m.helperProblem = FieldStr(result, "error")
+        problem = FieldStr(result, "error")
+        if ProviderServerTrouble(problem) and not m.serverRetried then
+            retryLater("helper")
+            return
+        end if
+        m.helperProblem = problem
         showPlaybackError()
         return
     end if
@@ -780,7 +913,12 @@ sub onHelperStart(event as Object)
     result = helperResultFor(event)
     if result = invalid then return
     if not result.ok then
-        m.helperProblem = FieldStr(result, "error")
+        problem = FieldStr(result, "error")
+        if ProviderServerTrouble(problem) and not m.serverRetried then
+            retryLater("helperStart")
+            return
+        end if
+        m.helperProblem = problem
         showPlaybackError()
         return
     end if
@@ -795,6 +933,10 @@ sub openHelper()
     m.helperSession = started.session
     m.helperVod = started.vod
     m.helperUsed = true
+    ' Another session's pictures are another film's, or another sound track's.
+    m.helperPreviews = invalid
+    if started.vod then m.helperPreviews = started.previews
+    forgetThumbs()
     ' A whole film's clock is the film's; a growing playlist's starts where it did.
     m.offset = started.start
     at = started.start
@@ -805,6 +947,7 @@ sub openHelper()
     content.streamFormat = "hls"
     if started.vod and at > 0 then content.playStart = at
     attachOnlineSubtitle(content, showing)
+    m.streamLoaded = true
     ' The new stream numbers its tracks afresh.
     m.audioPrefDone = false
     m.subPrefDone = false
@@ -886,6 +1029,7 @@ end sub
 function helperDiagnosis(item as Object) as String
     config = TranscoderConfig()
     lines = []
+    if ProviderServerTrouble(m.helperProblem + " " + m.helperSaid) then lines.Push(ServerTroubleText())
     if m.helperProblem <> "" then
         lines.Push(m.helperProblem)
     else
@@ -908,6 +1052,62 @@ function helperDiagnosis(item as Object) as String
     return text
 end function
 
+' --- Long pauses ---------------------------------------------------------------
+'
+' A paused stream holds the provider's one connection, idle, and the provider may drop
+' it; resuming then stalls or is turned away. So after 3 minutes paused a direct stream
+' lets go of it, and play opens it again at the same spot. A helper stream is left
+' alone: its connection is the helper's, which goes on converting while you're paused.
+
+sub resetRelease()
+    m.released = false
+    m.releasedAt = 0
+    m.releasedDuration = 0.0
+    m.releaseSubtitle = ""
+    m.releaseAudio = ""
+    m.releaseTimer.control = "stop"
+    m.restPicture.visible = false
+end sub
+
+function isPaused() as Boolean
+    return m.released or m.video.state = "paused"
+end function
+
+sub releaseConnection()
+    if m.closing or m.released or m.route = "helper" or not m.started or m.video.state <> "paused" then return
+    m.releasedAt = Int(positionSecs())
+    m.releasedDuration = durationSecs()
+    m.releaseSubtitle = ""
+    if ToStr(m.video.globalCaptionMode) = "On" then m.releaseSubtitle = ToStr(m.video.subtitleTrack)
+    m.releaseAudio = ToStr(m.video.audioTrack)
+    m.released = true
+    m.started = false
+    m.video.control = "stop"
+    ' The title's picture stands in for the paused frame.
+    picture = FieldStr(m.playback, "backdrop")
+    if picture = "" then picture = FieldStr(Field(m.playback, "entry"), "bd")
+    if picture <> "" then
+        m.restPicture.uri = picture
+        m.restPicture.visible = true
+    end if
+    if m.controlsOn then renderControls()
+end sub
+
+' Play after a long pause: the stream opens again where it was let go, with the same
+' subtitles and sound.
+sub resumeReleased()
+    at = m.releasedAt
+    subtitle = m.releaseSubtitle
+    audio = m.releaseAudio
+    resetRelease()
+    m.startAt = at
+    loadStream()
+    ' After loadStream, which makes its own choice for the online track.
+    m.pendingSubtitle = subtitle
+    m.pendingAudio = audio
+    renderControls()
+end sub
+
 ' --- Controls ------------------------------------------------------------------
 
 sub buildButtons()
@@ -925,25 +1125,65 @@ sub buildButtons()
     m.buttonIndex = 0
 end sub
 
+' Where the controls wait while they're away: Back and the title off to the left, the
+' bar and the buttons under the screen.
+function controlsAwayTop() as Object
+    return [-180, 0]
+end function
+
+function controlsAwayBottom() as Object
+    return [0, 180]
+end function
+
+' The controls are dragged on: Back and the title slide in from the left as the bar and
+' the buttons come up from under the screen. When they were still leaving, they come
+' back from where they got to.
 sub showControls(row as String)
-    m.controls.visible = true
+    if not m.controlsOn then
+        m.controlsOn = true
+        m.controlsOut.control = "stop"
+        fadeFrom = 0.0
+        topFrom = controlsAwayTop()
+        bottomFrom = controlsAwayBottom()
+        if m.controls.visible then
+            fadeFrom = m.controls.opacity
+            topFrom = m.controlsTop.translation
+            bottomFrom = m.controlsBottom.translation
+        end if
+        m.controls.visible = true
+        m.controlsInFade.keyValue = [fadeFrom, 1.0]
+        m.controlsInTop.keyValue = [topFrom, [0, 0]]
+        m.controlsInBottom.keyValue = [bottomFrom, [0, 0]]
+        m.controlsIn.control = "start"
+    end if
     m.row = row
     renderControls()
     restartHideTimer()
 end sub
 
+' They go back the way they came, fading as they go.
 sub hideControls()
-    m.controls.visible = false
     m.hideTimer.control = "stop"
+    if not m.controlsOn then return
+    m.controlsOn = false
+    m.controlsIn.control = "stop"
+    m.controlsOutFade.keyValue = [m.controls.opacity, 0.0]
+    m.controlsOutTop.keyValue = [m.controlsTop.translation, controlsAwayTop()]
+    m.controlsOutBottom.keyValue = [m.controlsBottom.translation, controlsAwayBottom()]
+    m.controlsOut.control = "start"
+end sub
+
+sub onControlsGone()
+    if m.controlsOut.state = "stopped" and not m.controlsOn then m.controls.visible = false
 end sub
 
 sub restartHideTimer()
     m.hideTimer.control = "stop"
-    if m.video.state <> "paused" then m.hideTimer.control = "start"
+    if not isPaused() then m.hideTimer.control = "start"
 end sub
 
 sub onHideTimer()
-    if m.seeking or m.panel <> "" or m.video.state = "paused" then return
+    if m.seeking or m.panel <> "" or isPaused() then return
     hideControls()
 end sub
 
@@ -965,10 +1205,12 @@ sub renderControls()
 end sub
 
 sub renderPlayButton()
-    if m.video.state = "paused" then
-        m.playIcon.uri = "pkg:/images/icon_play.png"
-    else
-        m.playIcon.uri = "pkg:/images/icon_pause.png"
+    icon = "pkg:/images/icon_pause.png"
+    if isPaused() then icon = "pkg:/images/icon_play.png"
+    ' Play turning into pause (and back) pops.
+    if m.playIcon.uri <> icon then
+        m.playIcon.uri = icon
+        Tween(m.playIcon, "scale", [[0.6, 0.6], [1.0, 1.0]], 0.32, "outExpo", 0)
     end if
     if m.row = "bar" then
         m.playBg.blendColor = "0xC9B8FFFF"
@@ -1027,6 +1269,7 @@ sub renderBar()
         if bubbleX > 1232 - 104 then bubbleX = 1232 - 104
         m.bubble.translation = [bubbleX, 530]
     end if
+    renderThumb(shown, knobX)
 end sub
 
 sub setRow(row as String)
@@ -1036,7 +1279,9 @@ sub setRow(row as String)
 end sub
 
 sub togglePause()
-    if m.video.state = "paused" then
+    if m.released then
+        resumeReleased()
+    else if m.video.state = "paused" then
         m.video.control = "resume"
     else
         m.video.control = "pause"
@@ -1109,7 +1354,7 @@ end sub
 
 sub stepSeek(seconds as Integer)
     m.seekTarget = ClampSeek(m.seekTarget + seconds * m.holdDirection, durationSecs())
-    if not m.controls.visible then showControls("bar")
+    if not m.controlsOn then showControls("bar")
     renderBar()
     restartHideTimer()
 end sub
@@ -1134,6 +1379,7 @@ sub cancelSeek()
     m.holdTimer.control = "stop"
     m.commitTimer.control = "stop"
     m.seeking = false
+    clearThumb()
 end sub
 
 sub jumpBy(seconds as Integer)
@@ -1147,6 +1393,11 @@ end sub
 ' growing one has converted; anything else starts the helper's stream again there.
 sub seekTo(target as Float)
     m.lastSaved = Int(target)
+    ' Let go after a long pause: play opens the stream at the new spot.
+    if m.released then
+        m.releasedAt = Int(target)
+        return
+    end if
     if m.route <> "helper" then
         m.video.seek = target
         return
@@ -1158,6 +1409,117 @@ sub seekTo(target as Float)
     end if
     m.video.control = "stop"
     requestStart(Int(target))
+end sub
+
+' --- Preview pictures ----------------------------------------------------------------
+'
+' While choosing where to jump in a whole film from the helper, a picture of that moment
+' sits above the time. The helper writes one for each six-second piece it converts
+' (HelperPreviewUrl); where it hasn't converted yet there's none, just the time, and
+' nothing more is asked of the provider. One picture loads at a time, into a Poster of
+' its own (a fresh Poster's loadStatus can only be about its own picture), and the last
+' one stays up until the next is ready. A missing one is asked for again after 10 s.
+
+sub renderThumb(seconds as Float, knobX as Float)
+    path = ""
+    if m.seeking and m.helperVod then path = HelperPreviewUrl(m.helperPreviews, seconds)
+    if path = "" then
+        if m.thumb.visible then clearThumb()
+        return
+    end if
+    url = TranscoderConfig().url + path
+    x = knobX - 132
+    if x < 48 then x = 48
+    if x > 1232 - 264 then x = 1232 - 264
+    m.thumb.translation = [x, 368]
+    ' Kept visible (if see-through) while the first picture loads.
+    m.thumb.visible = true
+    if m.thumbLoader <> invalid and UpTime(0) - m.thumbLoadAt > 4 then dropThumbLoad()
+    if url <> m.thumbShown and m.thumbLoader = invalid and not isThumbMissing(url) then loadThumb(url)
+    if m.thumbShown <> "" and not isThumbMissing(url) then
+        m.thumb.opacity = 1
+    else
+        m.thumb.opacity = 0
+    end if
+end sub
+
+sub loadThumb(url as String)
+    pic = m.thumbPics.CreateChild("Poster")
+    pic.width = 256
+    pic.height = 144
+    pic.loadWidth = 256
+    pic.loadHeight = 144
+    pic.loadDisplayMode = "scaleToFit"
+    pic.opacity = 0
+    m.thumbLoader = pic
+    m.thumbLoading = url
+    m.thumbLoadAt = UpTime(0)
+    pic.ObserveField("loadStatus", "onThumbStatus")
+    pic.uri = url
+    ' A picture Roku still holds may be ready already.
+    thumbStatus()
+end sub
+
+sub onThumbStatus()
+    thumbStatus()
+end sub
+
+' The loading picture is ready (it replaces the one showing) or isn't there (not made
+' yet), then on to wherever the target is now.
+sub thumbStatus()
+    pic = m.thumbLoader
+    if pic = invalid then return
+    status = pic.loadStatus
+    if status <> "ready" and status <> "failed" then return
+    pic.UnobserveField("loadStatus")
+    m.thumbLoader = invalid
+    url = m.thumbLoading
+    m.thumbLoading = ""
+    if status = "ready" then
+        if m.thumbFront <> invalid then m.thumbPics.RemoveChild(m.thumbFront)
+        pic.opacity = 1
+        m.thumbFront = pic
+        m.thumbShown = url
+        m.thumbMissing.Delete(url)
+    else
+        m.thumbPics.RemoveChild(pic)
+        m.thumbMissing[url] = UpTime(0)
+    end if
+    if m.seeking then renderBar()
+end sub
+
+' A picture that took too long counts as missing for now.
+sub dropThumbLoad()
+    pic = m.thumbLoader
+    if pic = invalid then return
+    pic.UnobserveField("loadStatus")
+    m.thumbPics.RemoveChild(pic)
+    m.thumbMissing[m.thumbLoading] = UpTime(0)
+    m.thumbLoader = invalid
+    m.thumbLoading = ""
+end sub
+
+function isThumbMissing(url as String) as Boolean
+    if not m.thumbMissing.DoesExist(url) then return false
+    return UpTime(0) - m.thumbMissing[url] < 10
+end function
+
+' Hides the picture and lets go of it, and of one on its way.
+sub clearThumb()
+    if m.thumbLoader <> invalid then m.thumbLoader.UnobserveField("loadStatus")
+    m.thumbLoader = invalid
+    m.thumbLoading = ""
+    m.thumbFront = invalid
+    m.thumbShown = ""
+    m.thumbPics.RemoveChildrenIndex(m.thumbPics.GetChildCount(), 0)
+    m.thumb.visible = false
+    m.thumb.opacity = 0
+end sub
+
+' A new stream: what was missing from the last one says nothing about this one.
+sub forgetThumbs()
+    clearThumb()
+    m.thumbMissing = {}
 end sub
 
 ' --- Keys ----------------------------------------------------------------------
@@ -1205,7 +1567,7 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
         if m.seeking then
             cancelSeek()
             renderBar()
-        else if m.controls.visible then
+        else if m.controlsOn then
             hideControls()
         else
             leave()
@@ -1222,9 +1584,9 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
         return true
     end if
 
-    if not m.controls.visible then
+    if not m.controlsOn then
         if key = "OK" then
-            if m.video.state <> "paused" then m.video.control = "pause"
+            if not isPaused() then m.video.control = "pause"
             showControls("bar")
         else if key = "up" or key = "down" then
             showControls("bar")
@@ -1313,6 +1675,9 @@ sub close()
     if m.probeTask <> invalid then m.probeTask.UnobserveField("result")
     if m.helperTask <> invalid then m.helperTask.UnobserveField("result")
     m.pauseTimer.control = "stop"
+    m.savedWait.control = "stop"
+    m.releaseTimer.control = "stop"
+    m.retryTimer.control = "stop"
     cancelSeek()
     m.countdown.control = "stop"
     m.hideTimer.control = "stop"
@@ -1339,6 +1704,10 @@ sub resetOnline()
     m.autoWaiting = false
     m.saved = invalid
     m.savedLooking = false
+    m.waitingSaved = false
+    if m.savedWait <> invalid then m.savedWait.control = "stop"
+    ' Why subtitles can't be saved for next time, when they can't.
+    m.subsProblem = ""
     if m.savedTask <> invalid then m.savedTask.UnobserveField("result")
     m.savedTask = invalid
     if m.autoSubTimer <> invalid then m.autoSubTimer.control = "stop"
@@ -1354,9 +1723,7 @@ end function
 sub runOsTask(request as Object, callback as String)
     if m.osTask <> invalid then m.osTask.UnobserveField("result")
     request.videoUrl = currentStreamUrl()
-    request.userAgent = FieldStr(m.global.creds, "userAgent")
-    ' Through the helper, it holds the provider's one connection and has fingerprinted
-    ' the file already, so the search doesn't read the file itself.
+    ' Through the helper, which fingerprinted the file before its stream.
     if m.route = "helper" then
         request.via = "helper"
         request.hash = m.helperHash
@@ -1385,7 +1752,7 @@ sub autoSubtitles()
     if pref <> "online" and pref <> "" then return
     if pref = "online" then
         ' Built-in English subtitles beat a download.
-        options = SubtitleOptions(m.video.availableSubtitleTracks)
+        options = builtInSubtitles()
         index = OptionIndex(options, "language", "eng")
         if index < 0 then index = OptionIndex(options, "language", "en")
         if index > 0 then
@@ -1476,15 +1843,41 @@ end sub
 ' Roku reads subtitle files when a stream loads, so reload at the same spot.
 sub reloadWithSubtitle(link as String)
     m.extraSubtitle = link
+    ' Let go after a long pause: they come with the stream when play opens it again.
+    if m.released then
+        m.releaseSubtitle = link
+        return
+    end if
+    ' Already in the stream (saved ones, put in before it started): they just show.
+    if link <> "" and link = m.attachedSubtitle then
+        if m.started then
+            m.video.subtitleTrack = link
+            m.video.globalCaptionMode = "On"
+        else
+            m.pendingSubtitle = link
+        end if
+        return
+    end if
     m.pendingSubtitle = link
     if m.started then m.startAt = Int(positionSecs())
+    m.started = false
     m.video.control = "stop"
     if m.route = "helper" then
         requestStart(m.startAt)
     else
-        loadStream()
+        ' The provider gets a moment to notice the closed connection.
+        pauseThen("direct")
     end if
 end sub
+
+' The video's own subtitle tracks, without the online ones put in the stream.
+function builtInSubtitles() as Object
+    options = []
+    for each option in SubtitleOptions(m.video.availableSubtitleTracks)
+        if m.extraSubtitle = "" or option.id <> m.extraSubtitle then options.Push(option)
+    end for
+    return options
+end function
 
 ' --- Subtitles saved for every device (the sync service, sync/worker.js) -----------
 '
@@ -1512,11 +1905,19 @@ sub onSavedLooked(event as Object)
     result = event.GetData()
     m.savedTask = invalid
     m.savedLooking = false
-    if IsAA(result) and FieldStr(result, "title") = itemKey() and ToStr(result.found) = "true" then
-        m.saved = { fileId: FieldStr(result, "fileId"), name: FieldStr(result, "name"), delayMs: ToInt(result.delayMs), file: FieldStr(result, "file") }
-        m.online.candidates.Unshift(SavedCandidate(m.saved))
-        refreshTracksPanel()
+    if IsAA(result) and FieldStr(result, "title") = itemKey() then
+        if ToStr(result.found) = "true" then
+            m.saved = { fileId: FieldStr(result, "fileId"), name: FieldStr(result, "name"), delayMs: ToInt(result.delayMs), file: FieldStr(result, "file") }
+            m.online.candidates.Unshift(SavedCandidate(m.saved))
+            ' Before the stream starts, they go into it (not showing yet), so showing
+            ' them later (autoSubtitles) doesn't open the stream again.
+            if not m.streamLoaded and m.extraSubtitle = "" then m.extraSubtitle = SavedSubtitleUrl(m.saved.file, m.saved.delayMs)
+            refreshTracksPanel()
+        else if ToInt(Field(result, "code")) = 404 then
+            m.subsProblem = OldSyncText()
+        end if
     end if
+    if m.waitingSaved then startAfterSaved()
     ' No answer still lets the device search as before.
     if m.autoWaiting then
         m.autoWaiting = false
@@ -1566,7 +1967,14 @@ end sub
 sub onSubtitleShared(event as Object)
     result = event.GetData()
     m.shareTask = invalid
-    if not IsAA(result) or ToStr(result.ok) <> "true" or FieldStr(result, "title") <> itemKey() or FieldStr(result, "file") = "" then return
+    if not IsAA(result) or FieldStr(result, "title") <> itemKey() then return
+    if ToStr(result.ok) <> "true" or FieldStr(result, "file") = "" then
+        ' Said straight away, so the next download isn't a surprise.
+        m.subsProblem = SubtitleSaveText(ToInt(Field(result, "code")), FieldStr(result, "error"))
+        showToast(m.subsProblem)
+        refreshTracksPanel()
+        return
+    end if
     m.saved = { fileId: FieldStr(result, "fileId"), name: FieldStr(result, "name"), delayMs: 0, file: FieldStr(result, "file") }
     ' What was saved before is replaced.
     m.online.candidates = SplitSavedCandidates(m.online.candidates).found
@@ -1603,9 +2011,11 @@ end function
 ' Online subtitles go with every stream load, since Roku reads them only then.
 ' `showing` turns them on again once the new stream plays.
 sub attachOnlineSubtitle(content as Object, showing as Boolean)
+    m.attachedSubtitle = ""
     name = onlineTrackName()
     if name = "" then return
     content.subtitleTracks = [{ Language: "eng", TrackName: name, Description: "Online" }]
+    m.attachedSubtitle = name
     if showing or m.pendingSubtitle <> "" then m.pendingSubtitle = name
 end sub
 
@@ -1640,10 +2050,7 @@ end sub
 ' then subtitles saved for this title on the sync service (no OpenSubtitles account
 ' needed), then the online choices for the current state.
 sub buildSubtitleOptions()
-    options = []
-    for each option in SubtitleOptions(m.video.availableSubtitleTracks)
-        if m.online.link = "" or option.id <> onlineTrackName() then options.Push(option)
-    end for
+    options = builtInSubtitles()
     split = SplitSavedCandidates(m.online.candidates)
     for each candidate in split.saved
         options.Push({ id: "os:file:" + candidate.fileId, label: SubtitleLabel(candidate), language: "eng" })
@@ -1702,6 +2109,7 @@ sub updateTracksNote()
     else if m.subOptions.Count() <= 2 then
         notes.Push("This file has no built-in subtitles.")
     end if
+    if m.subsProblem <> "" then notes.Push(m.subsProblem)
     if m.online.remaining >= 0 then notes.Push("Downloads left today: " + m.online.remaining.ToStr() + ".")
     m.tracksNote.text = notes.Join(" ")
 end sub
@@ -1737,7 +2145,7 @@ sub onTracksChanged()
         end if
     end if
     if not m.subPrefDone then
-        options = SubtitleOptions(m.video.availableSubtitleTracks)
+        options = builtInSubtitles()
         if options.Count() > 1 then
             m.subPrefDone = true
             wanted = FieldStr(prefs, "subtitles")

@@ -1,4 +1,6 @@
-' Rounded "pill" buttons drawn with a white 9-patch that is tinted per state.
+' Rounded "pill" buttons: a white 9-patch tinted per state, under a glass sheen and rim
+' (glass_pill.9.png), so the page shows faintly through the ones you're not on. The one
+' you're on springs up a little (Motion.brs, which every screen using these includes).
 
 function BuildPills(parent as Object, labels as Object, fontSize as Integer) as Object
     parent.RemoveChildrenIndex(parent.GetChildCount(), 0)
@@ -7,6 +9,7 @@ function BuildPills(parent as Object, labels as Object, fontSize as Integer) as 
     for each text in labels
         pill = parent.CreateChild("Group")
         pill.translation = [x, 0]
+        pill.AddFields({ aim: 1.0 })
         bg = pill.CreateChild("Poster")
         bg.uri = "pkg:/images/pill.9.png"
         label = pill.CreateChild("Label")
@@ -23,6 +26,10 @@ function BuildPills(parent as Object, labels as Object, fontSize as Integer) as 
         label.height = height
         label.horizAlign = "center"
         label.vertAlign = "center"
+        sheen = pill.CreateChild("Poster")
+        sheen.uri = "pkg:/images/glass_pill.9.png"
+        sheen.width = width
+        sheen.height = height
         pill.scaleRotateCenter = [width / 2, height / 2]
         pills.Push(pill)
         x = x + width + 14
@@ -37,20 +44,28 @@ sub StylePills(pills as Object, focusIndex as Integer, selectedIndex as Integer)
         pill = pills[i]
         bg = pill.GetChild(0)
         label = pill.GetChild(1)
-        pill.scale = [1.0, 1.0]
+        sheen = pill.GetChild(2)
+        aim = 1.0
         if i = focusIndex then
             bg.blendColor = "0xC9B8FFFF"
             bg.opacity = 1.0
+            sheen.opacity = 0.7
             label.color = "0x151028FF"
-            pill.scale = [1.06, 1.06]
+            aim = 1.06
         else if i = selectedIndex then
             bg.blendColor = "0x43377AFF"
-            bg.opacity = 1.0
+            bg.opacity = 0.9
+            sheen.opacity = 1.0
             label.color = "0xF7F3FFFF"
         else
             bg.blendColor = "0x30275AFF"
-            bg.opacity = 0.85
+            bg.opacity = 0.62
+            sheen.opacity = 1.0
             label.color = "0xD8CEF5FF"
+        end if
+        if pill.aim <> aim then
+            pill.aim = aim
+            SpringScale(pill, aim)
         end if
     end for
 end sub

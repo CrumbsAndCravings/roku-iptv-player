@@ -1,6 +1,6 @@
 # ARAN+ feature reference
 
-Every feature of ARAN+ for Roku as of **v0.5.3** (sync added after commit `8d861e1`; the helper on a computer at home, §15, in 0.5.0, and its whole-film playlists in 0.5.2; subtitles saved for every device, §9.5, in 0.5.3). Each feature lists what it does, the exact rules and numbers, why it works that way, and where the Roku code lives. Use it as the checklist and spec for bringing the Samsung app ([CrumbsAndCravings/Samsung-IPTV-Player](https://github.com/CrumbsAndCravings/Samsung-IPTV-Player)) up to the same level.
+Every feature of ARAN+ for Roku as of **v0.5.6** (sync added after commit `8d861e1`; the helper on a computer at home, §15, in 0.5.0, and its whole-film playlists in 0.5.2; subtitles saved for every device, §9.5, in 0.5.3; the OpenSubtitles account kept, §8, in 0.5.4; the glass tab bar, sounds, intro and motion, §10, in 0.5.5; pictures above the bar while choosing a jump through the helper, §15.4, in 0.5.6). Each feature lists what it does, the exact rules and numbers, why it works that way, and where the Roku code lives. Use it as the checklist and spec for bringing the Samsung app ([CrumbsAndCravings/Samsung-IPTV-Player](https://github.com/CrumbsAndCravings/Samsung-IPTV-Player)) up to the same level.
 
 - **Build plan for Samsung:** [`samsung-plan.md`](samsung-plan.md). That plan covers parity with Roku v0.4.1; everything added since then is in this document, marked **New since 0.4.1**.
 - **User-facing summary:** [`../README.md`](../README.md).
@@ -57,6 +57,7 @@ Every feature of ARAN+ for Roku as of **v0.5.3** (sync added after commit `8d861
 | Player | Poster-image codecs (MJPEG, PNG) ignored as "video" | Missing |
 | Player | Audio formats shown; unplayable audio track swapped automatically | Missing |
 | Player | **The helper on a computer at home** converts AVI, HEVC (where this Roku can't decode it), unplayable sound, and titles that fail on their own (§15) | Has (it started there; the Roku uses its HLS output) |
+| Player | Pictures above the bar while choosing a jump through the helper (§15.4) | Missing (its one MPEG-TS stream from the helper has no pictures; the web app has them) |
 | Subtitles | OpenSubtitles search, download, auto mode, timing nudges | Has |
 | Continue Watching | Row, progress, resume, next episode | Has |
 | Continue Watching | Remove a title (Home poster menu, details button) | Missing |
@@ -83,7 +84,8 @@ Every feature of ARAN+ for Roku as of **v0.5.3** (sync added after commit `8d861
 - **No saved login:** the login screen fills in from the file and signs in by itself at launch (`autoSignIn`).
 - **After a sign-out:** the form is prefilled but not submitted.
 - **Switching providers:** the app stores a stamp (`server + " " + username`) under registry `account/builtIn`. When a newer build carries a different login, the app replaces the saved login and clears Continue Watching, whose IDs belong to the old provider. Online subtitles are kept.
-- Code: `common/Registry.brs` (`BuiltInCreds`, `LanguagePrefs`), `MainScene.brs` (init), `screens/LoginScreen.brs`.
+- **The same account** (fixed in 0.5.6): when the stamp is new but the saved login is the build's own account (`SameLogin`: the same server as `NormalizeServer` writes it, ignoring case, and the same username), nothing is cleared: the saved login takes the build's password and the stamp is written. Before, the first build carrying a login cleared Continue Watching even for the account already signed in by hand.
+- Code: `common/Registry.brs` (`BuiltInCreds`, `LanguagePrefs`), `common/Utils.brs` (`SameLogin`, tested), `MainScene.brs` (init), `screens/LoginScreen.brs`.
 - **Samsung:** the equivalent is a git-ignored `personal.json` bundled into the `.wgt`. The same "switch when the stamp changes" rule applies.
 
 ### 2.3 Refused sign-ins, explained (new since 0.4.1)
@@ -106,8 +108,15 @@ When the server answers anything other than 200, the error says who answered and
 - Code: `common/Utils.brs` (`HttpDetail`, `BriefText`, `IsCloudflare`, `IsCloudflareBlock`, `CloudflareKind`, `IsRefusalCode`, `UserAgentsToTry`, `UserAgentName`, `BrowserUserAgent`, `AppUserAgent`), `tasks/Http.brs`, `tasks/XtreamTask.brs` (`runAuth`), `screens/LoginScreen.*`.
 
 ### 2.4 Account menu and sign-out
-- `*` on Home, everywhere except a Continue Watching poster (see 9.3), opens: **Keep watching**, **Online subtitles**, **Sign out**.
-- **Sign out** clears the login, Continue Watching, the OpenSubtitles account and the saved search library (`ClearAccount`), and stops the library worker.
+- `*` on Home's tab bar, or **Account** in the menu `*` opens on a poster (§5.1.2), opens: **Keep watching**, **Online subtitles**, **Turn click sounds off** (or on), **Turn the intro off** (or on), **Change server address** (new in 0.5.13, §2.5), **Sign out** (new in 0.5.5: the two switches, §10).
+- **Sign out** clears the login, Continue Watching on the TV (it comes back from the sync service), the OpenSubtitles account and the saved search library (`ClearAccount`), and stops the library worker. A personal build's own OpenSubtitles account (§8) comes back by itself. Since 0.5.13 the watch history, ratings and My List stay for the same account signing back in, even at a new address; another account signing in clears them (`NoteLogin`).
+
+### 2.5 When the provider moves (new in 0.5.13)
+Providers change their address now and then (a new domain, the rest of the address the same). The titles and their ids stay, and so does the account, so nothing should be lost.
+- **Change server address** in the Account menu: a keyboard with the current address; **Check and save** signs in at the new address first (one request), then the same account carries on there, Home starting again. A failed check changes nothing and offers **Try again**.
+- **The same account at a new address** (`LoginChange` in `common/Utils.brs`): the same username and password at another server is "moved"; the same server and username is "same"; anything else is another account. The TV keeps the last account signed in (registry `account/last`: server, username, and a fingerprint of the password, `PasswordStamp`, not the password). This counts for Change server address, signing out and back in at the new address, and a personal build whose built-in address changed (MainScene, which also reads the old build's stamp `account/builtIn`).
+- **Continue Watching follows** (`NoteMovedFrom`, registry `sync/previous`): Continue Watching syncs by a space made from the address (§9.4), so a new address starts an empty space. After a move, the next sync fetches the old address's space once and sends its list and removals along to the new one (`progressRound` in `tasks/SyncTask.brs`), then forgets it. Subtitles saved on the sync service under the old address aren't moved; they're found again when wanted.
+- **The stored library** stays: a saved library belongs to the username wherever the server is (`SameOwner`), and the daily refresh brings anything new.
 
 ## 3. Being gentle with the provider
 New since 0.4.1. **Why:** one provider stopped answering for a while after about 100 requests in a minute; the Samsung app's M0 notes saw the same thing. During a block, sign-in and videos fail too, so every part of the app avoids bursts and stops asking once it is refused.
@@ -125,6 +134,10 @@ New since 0.4.1. **Why:** one provider stopped answering for a while after about
 | API timeout | 45 s per request | `tasks/Http.brs` |
 | Indexed categories | only the languages you watch (about 75 of 312 lists on the provider in use) | `SearchTask.brs` |
 | Series | one request for the whole list (about 5 MB, 3 s for 7,000 series) | `SearchTask.brs` |
+| Online subtitles while a video plays straight from the provider | no reads of the file for a fingerprint (since 0.5.15); the search goes by TMDB id or name | `SubtitleTask.brs` `osFind` |
+| A direct stream paused 3 minutes | lets go of its connection; play opens it again at the same spot (since 0.5.15) | `PlayerScreen.brs` `releaseConnection` |
+| The provider's server failing (a 5xx) | asked again once, 5 s later, then at most once a minute of playing (since 0.5.15) | `PlayerScreen.brs` `retryLater` |
+| A stream opened again for new subtitles | 1.2 s after it closed (since 0.5.15) | `PlayerScreen.brs` `reloadWithSubtitle` |
 
 ## 4. Organizing the library
 All new since 0.4.1. Code: `common/Categories.brs`, tested in `tests/utils_test.brs` with the real category names of the provider in use.
@@ -219,15 +232,35 @@ Categories whose names hold `xxx`, `adult`, `18+` or `porn`, and titles with `is
 ## 5. Browsing
 
 ### 5.1 Home
-- **Tabs:** Home, Movies, Series, **Categories** (new), Search. A lavender highlight glides between them (220 ms).
+- **Tabs:** Home, Movies, Series, **Categories** (new), Search, on a floating glass bar with a glass lens on the current tab (new in 0.5.5, §10).
 - **Hero:** backdrop, title, meta (year · runtime · genre · ★ rating), plot. Resting 0.6 s on a movie fetches `get_vod_info` for runtime, backdrop and codecs.
+- **Moving banner** (new in 0.5.12, `common/Slides.brs`): the provider's details list several backdrops for most titles (`backdrop_path`; up to 5 kept, sized w780, in the item's `backdrops` field, `BackdropList`). Resting on a title with more than one, they take turns every 7 seconds, cross-fading over 1.4 s, each slowly zooming in to 106 % (a little longer than it shows). It starts once the details are in (straight away for series, whose lists carry them), stops when the focus moves, and waits while another screen is on top. The same on Details. The pictures come from the image hosts, not the provider's video connection.
 - **Keys:**
   - Left from a row's first poster, or Up from the first row, reaches the tabs.
   - OK on a tab acts on key release, so the release can't land on a poster.
   - Back jumps to the first row, then the tabs, then exits.
-  - `*` opens the account menu, or the Continue Watching menu on those posters.
+  - `*` on a poster opens its menu (My List, rating, Continue Watching, Account; §5.1.2); on the tab bar, the account menu.
 - **See all tile** (new): every category row ends with a "See all ›" card that opens the category page (5.3). It isn't added to Continue Watching. Focusing it keeps the previous hero.
 - **"Won't play"** posters are dimmed, with a badge on the poster.
+
+### 5.1.1 Picked for you (new in 0.5.7)
+Home learns from what you watch, as Netflix does. Code: `common/Taste.brs`, `tasks/SearchIndex.brs` (`IndexFind`, `CategoriesFrom`, `IndexPersonal`, `ListItems`), `tasks/SearchTask.brs` (`answerPicks`), `screens/HomeScreen.brs` (`addPersonalRows`, `askPicks`, `onPicks`); tested in `tests/parse_test.brs`.
+- **What counts** (registry `taste/history`, newest first, at most 30): a movie counts 1 once you're 3 minutes in, 2 from half way, 3 when finished; a series counts 1 while you watch it and half a point more for each episode finished, up to 4; taking a title off Continue Watching before a fifth of it counts −1. Continue Watching also counts (1, or 2 from half way) for what isn't in the history, which brings in what you watched on your other devices through sync. When the registry is nearly full, the history keeps only 10.
+- **Liking a category:** each title's weight, halving every 30 days, added to its category. The library worker knows every title's category from the stored library, so no request goes to the provider.
+- **Rows under Continue Watching** on the Home tab:
+  - **Top picks for you:** titles from the 6 categories you like most, scored by how much you like the category times how new the title is (halving every 90 days since it was added, or by year), at most 8 from one category, 30 in all, each title once, nothing you've watched (by key, and by name for its other copies).
+  - **Because you watched …:** for your 2 latest titles watched at least half way (or started, when there are none): first the rest of its series of films (titles starting with the same first two words, or its one word of four letters or more, a leading "the" aside, like "Carry On Jatta 2" after "Carry On Jatta"), then the newest from its category. 20 in all.
+  - They're laid out as placeholders as Home builds, so nothing jumps when they arrive, and refresh when you come back from a video. A row with nothing to pick goes. With no stored library yet (it's built the first time Search, Categories or a "See all" page is used), they wait for a launch that has one. The library worker starts 6 seconds after Home's own rows, so Home and the intro come first.
+  - **How they get to Home** (since 0.5.9): the worker makes two passes over the library (`IndexFind` for the titles named, `IndexPersonal` for all the picking) and sends back plain lists of fields (`picked`), which Home makes into rows itself.
+  - **The freeze in 0.5.7 to 0.5.9:** Home checked for the stored library with `roFileSystem`, which a Roku only allows on the main thread and in tasks; on the render thread it isn't made, so the app crashed (and a sideloaded app sits frozen in the debugger) whenever Home built these rows. Since 0.5.10 the library worker records that it has a library (registry `search/saved`, `LibrarySaved`), and `tools/test.sh` fails if a screen-side file makes such an object. A library stored before 0.5.10 counts once the worker has loaded it (opening Search or Categories). 0.5.9 also had a guard that switched My List, the picks and the row order off for a whole version after a launch that stopped part way; after 0.5.9's own crash it hid My List in 0.5.10, so 0.5.11 took it out (and clears its registry marks).
+- **Row order:** the likings are kept (`taste/scores`, the 12 most liked categories) and Home moves the categories you like up, most liked first: after the first two rows on the Home tab (new releases, so something new stays near the top), after the first on Movies and Series.
+- Sign-out keeps the history and likings for the same account signing back in; another account signing in clears them (§2.4).
+
+### 5.1.2 Ratings and My List (new in 0.5.8)
+- **Rating:** on Details, a button after My List says **Rate** (or the rating given); on Home, \* on any poster opens **Add to My List** (or Remove), **Rate it** (or "Rated: …"), **Remove from Continue Watching** on those posters, and **Account** (\* on the tab bar still opens Account straight away). The choices: **Not for me**, **I like this**, **Love this!**, and **Take my rating away** once rated. The menu that leads to another (Rate it, Account) opens it once it has closed.
+- **What a rating does** (stored as `r` on the title's history entry, `TasteRate`): "Not for me" counts −3 for its category whatever was watched; a like adds 1.5 and a love 3 to what watching counted (at least 1, so rating before watching counts). Loved titles come first for "Because you watched", then liked, then watched; a title that's not for you never gets one. Rated titles are the last to drop out of the 30-title history. Home's picks refresh right after a rating.
+- **My List** (`common/MyList.brs`, registry `mylist/items`): **+ My List** / **In My List** on Details, or the \* menu on Home. Newest first, at most 40, each `{ k, n, x, t }` (no pictures, to keep the registry small). Adding a title counts 1 towards its category, as starting it would. Home shows a **My List** row right under Continue Watching: name cards straight away, with pictures from the stored library (`IndexListRow`) when it's there. It follows changes when you come back to Home, keeping the focus on the same poster. It stays across a sign-out for the same account (§2.4).
+- Neither is shared between devices yet.
 
 ### 5.2 Categories tab (new)
 - A screen of category cards (210×104: name, plus "Movies · 104"), in rows:
@@ -335,12 +368,19 @@ Additions since then:
   - The Audio & subtitles panel notes "Audio now: AAC."
   - **Samsung:** AVPlay decodes most formats, but DTS varies by model year. Port the format labels and the swap when `getTotalTrackInfo` shows an undecodable track.
 - **AVI:** Roku can't play AVI, so without the helper those titles are marked "Won't play" with "OK to try anyway". They're about 0.3% of the provider's library. With the helper on a computer at home (§15) they play, converted to H.264, and so do HEVC files on a Roku without HEVC, which is most of the library on the user's Roku TV.
+- **Long pauses** (new in 0.5.15): a paused stream holds the provider's one connection, idle, and the provider may drop it, so that resuming stalls or is turned away. After 3 minutes paused (`releaseTimer`), a direct stream saves where it is, its subtitles and its sound track, and stops (`releaseConnection`); the title's backdrop stands in for the paused frame (`restPicture`). Play opens the stream again there with the same subtitles and sound (`resumeReleased`); jumps while it's let go move the spot. Helper streams are left alone, since their connection is the helper's, which keeps converting while you're paused.
+- **The provider's server failing** (new in 0.5.15): an error with an HTTP 5xx in Roku's words, or FFmpeg's "Server returned 5XX" from the helper (`ProviderServerTrouble` in `common/Playback.brs`), is often over in a moment. The player asks once more 5 s later (`retryLater`: the stream, or the helper's description or start), and asks again only after a minute of playing. If it still fails, the error screen starts with plain words (`ServerTroubleText`): "Your provider's server had a problem sending this video. That's on their side, not your internet or this TV. Wait a minute and try again."
 - Code: `screens/PlayerScreen.brs`, `common/Compat.brs`, `common/Tracks.brs`, `tasks/XtreamParse.brs` (`CodecFields`, `IsPictureCodec`).
 
 ## 8. Online subtitles
-Unchanged since 0.4.1; see `samsung-plan.md` §7.6. Samsung has it. Two points:
+Unchanged since 0.4.1 apart from where the account is kept; see `samsung-plan.md` §7.6. Samsung has it. Points:
 - **Save before checking.**
 - **Show OpenSubtitles' own words and HTTP code** in errors. Long errors replace the tips card, as on the login screen.
+- **Keeping the account** (new in 0.5.4). It's saved in the registry (`opensubtitles/account`), which a reinstall after deleting the channel, a cleared registry or a sign-out empties. So:
+  - A personal build can carry it in `account.json`: `"opensubtitles": { "apiKey", "username", "password" }` (`OsAccountSettings`). It's used whenever the registry has none (`PickOsAccount`), and a build with a different key or username replaces the saved one at launch (stamp in `opensubtitles/builtIn`, as for the built-in login).
+  - **Remove** saves `{ removed: true }`, so the build's own stays off too, until sign-out.
+  - Leaving the setup screen with Back keeps what was typed, unchecked (`keepTyped`).
+  - After saving, the screen reads the account back; if the Roku didn't keep it (an app's registry is about 16 KB), it says so instead of "Connected".
 
 ## 9. Continue Watching
 
@@ -391,8 +431,10 @@ Unchanged since 0.4.1; see `samsung-plan.md` §7.6. Samsung has it. Two points:
 - **API:** `GET /v1/subtitles?space&k` (`&text=0` leaves the file out), `POST` with `{ fileId, name, delayMs, text }` to save, or `{ fileId, delayMs }` for a nudge; `GET /v1/subtitles/file?space&k&t=<token>&delay=<ms>` serves the file, moved by `delay`, with its own token instead of the key, because Roku's player fetches subtitles by address and can't send headers.
 - **When the Roku shows them by itself:** where the subtitle preference is "online" (after built-in English ones) or not chosen yet (""); never over "off" or a built-in language. The column lists them first as "English · saved for this title", even without an OpenSubtitles account.
 - **The Roku's way:** `lookUpSaved()` asks the service as each video starts; `autoSubtitles()` waits for the answer if it's still out. Saved subtitles play from the service's address (`SavedSubtitleUrl`), and nudges change `delay` there, so on the Roku they no longer use a download either. A fresh download (not one moved by OpenSubtitles) is fetched once more by `SyncTask` and saved (`shareSubtitle`).
+- **No second opening** (new in 0.5.15): Roku only reads subtitle files when a stream loads, so showing new ones opens the stream again. A direct stream now waits for the lookup (3 s at most, `savedWait`) and saved ones go into it from the start, not showing (`onSavedLooked` sets `m.extraSubtitle`); `autoSubtitles()` or a choice in the column then just shows them (`reloadWithSubtitle` sees `m.attachedSubtitle`). The column and the subtitle preference never take them for the file's own (`builtInSubtitles`).
+- **When saving fails** (new in 0.5.15): a note says why straight after the download, and the Audio & subtitles panel keeps it (`SubtitleSaveText`). A sync service from before saved subtitles answers 404, and both the lookup and the save then say "Subtitles can't be saved for next time, because your sync service is an older version" with where to update it (`OldSyncText`). Until 0.5.15 this failed silently, so a Worker that was never updated meant a download every time.
 - **Code:** `sync/worker.js` (`subtitles`, `subtitleFile`, `moveCues`), `tasks/SyncTask.*` (modes `subtitle-get`, `subtitle-save`, `subtitle-delay`), `common/Subtitles.brs` (`SavedCandidate`, `SplitSavedCandidates`, `SavedSubtitleUrl`, tested), `screens/PlayerScreen.brs` (`lookUpSaved`, `showSaved`, `shareSubtitle`, `nudgeSaved`).
-- **Setup:** the Worker needs updating once (`sync/README.md`, "Update it"); until then the service answers 404 to these requests and every device behaves as before.
+- **Setup:** the Worker needs updating once (`sync/README.md`, "Update it"); until then the service answers 404 to these requests, every device behaves as before, and the Roku says so (above).
 
 ## 10. Look and feel
 - **Palette:**
@@ -418,7 +460,16 @@ Unchanged since 0.4.1; see `samsung-plan.md` §7.6. Samsung has it. Two points:
   - Focus lifts the poster 6% (it was 10%) and shows the ring.
   - Home rows are 218 px tall; search rows 232 px.
 - **Category and See-all cards:** the name on a tinted card. Category cards in the Categories tab have a pink left accent.
-- **Motion:** screens fade and float in (300 ms); the hero floats up (350 ms); backdrops fade in once loaded (500 ms); tabs glide (220 ms); placeholders pulse (1.4 s).
+- **Motion** (new in 0.5.5, after the web app's `src/styles/motion.css` and `shell.css`; `common/Motion.brs` has its springs and `Tween`):
+  - **Screens:** a page slides in from the right (28 px, 300 ms) and leaves the same way (240 ms); Details rises 40 px like a card (380 ms) and drops away; the player, Home and Login fade. The page underneath sinks back (to 97 %, faded out) and comes up again when you return (`MainScene.brs`, `moveScreen`).
+  - **Home's banner:** it rises 14 px as its title, meta and plot fade in 70 ms apart; its backdrop fades in (500 ms) while settling from 106 % (1.6 s). Details does the same with its lines 40 ms apart.
+  - **Posters:** a row's posters build in from the right, 45 ms apart (480 ms), when the row arrives; each picture fades in once loaded (320 ms); progress bars fill in after them (800 ms). Placeholders pulse (1.4 s).
+  - **Buttons** (`Pills.brs`): the focused one springs to 106 % (the web app's spring, 420 ms).
+  - **Player:** the controls are dragged on (since 0.5.14): Back and the title slide in 180 px from the left while the bar, the times and the buttons come up 180 px from under the screen, fading in (420 ms, easing out); they go back the same way, fading (320 ms, easing in), and come back from where they got to when a key brings them up while they're leaving (`showControls`, `hideControls`). Play turning into pause pops from 60 %.
+- **Glass tab bar** (new in 0.5.5, after the web app's iOS 26 tab bar): a translucent plum pill with light along its top, a rim and a soft shadow (drawn: a Roku can't blur what's behind). A glass lens rests on the current tab, clear with the tab name lavender; with the bar focused it's lit lavender and follows the cursor, the names inside it dark (a second copy of the names, clipped to the lens). It springs from tab to tab (620 ms, overshooting a touch), stretching by its speed, longer one way and thinner the other. OK swells the bar to 104 % and lifts the lens (110 % by 122 %, its rainbow rim brighter); letting go, both spring back, the lens wobbling like jelly (760 ms), and the tab name pops. Tabs have equal 112 px slots. Code: `screens/HomeScreen.*` (`styleTabs`, `moveLens`, `pressBar`).
+- **Glass buttons:** every pill has a sheen and rim over its tint (`glass_pill.9.png`), and unfocused ones are a little see-through.
+- **Click sounds** (new in 0.5.5): a soft glassy tick for moving (focus moving in any list or row of buttons), a little rising pop with a ping for choosing, the pop falling for going back. Screens call `Sound("move" | "select" | "back")` (`common/Motion.brs`); MainScene holds the three `SoundEffect` nodes and plays them, leaving them out when they're off, while a video plays and during the intro. Moves closer than 60 ms apart (a key held down) tick once. Made by `tools/make_sounds.py`, quiet by design (peaks at −20, −14 and −16 dBFS).
+- **Intro** (new in 0.5.5, after the web app's `src/ui/intro.ts`, `intro.css` and `sting.ts`): about 2.5 s over the first screen, which loads underneath. The splash screen is its first frame (the plus alone). The plus knocks (0.1 s); a boom (0.5 s) and ARAN punches in letter by letter out of a lavender and pink glow with 16 light rays bursting behind; the plus spins half a turn with two pings (0.68 and 0.82 s) and six sparks; at 1.55 s it flies through the plus (scaling 70 times around its middle) into the app, with a whoosh. The sting (`sounds/intro.wav`) is the web app's sting rendered to a file. Any key skips it; the Account menu turns it off. While it plays it keeps the keys (Home leaves the focus alone, `introPlaying`). Code: `components/Intro.*`; pieces and their places from `tools/make_images.py` (`images/intro.json`).
 - **Safe area:** keep important text above y 648 at 720p. TVs crop the edges, which is why long errors moved into side cards.
 
 ## 11. Messages and diagnostics
@@ -436,16 +487,24 @@ Unchanged since 0.4.1; see `samsung-plan.md` §7.6. Samsung has it. Two points:
 |---|---|
 | Login (registry `account/creds`) | `{ server, username, password, userAgent }`; `userAgent` "" means the device's own |
 | Built-in login stamp | registry `account/builtIn` = `"<server> <username>"` |
-| Player prefs (`prefs/player`) | `{ audio: lang, subtitles: lang \| "off" \| "online" }` |
+| Watch history (`taste/history`) | `[{ k: "m:<id>" \| "s:<seriesId>", n: name (≤ 32), w: weight, r: rating (-1, 1, 2; optional), t: seconds }]`, newest first, at most 30 (§5.1.1, §5.1.2) |
+| My List (`mylist/items`) | `[{ k, n: name (≤ 40), x: extension, t }]`, newest first, at most 40 (§5.1.2) |
+| Last account on this TV (`account/last`) | `{ server, username, pass }`, `pass` being a fingerprint of the password (§2.5) |
+| Moved from (`sync/previous`) | the sync space of the address the account moved from, until the next sync has brought its Continue Watching (§2.5) |
+| Stored library (`search/saved`) | when the library worker last loaded or saved the library stored on the Roku (seconds); cleared on sign-out |
+| Category likings (`taste/scores`) | `{ "vod:12": 3.2, "series:7": 1.5 }`, the 12 most liked |
+| Player prefs (`prefs/player`) | `{ audio: lang, subtitles: lang \| "off" \| "online", sounds: "on" \| "off", intro: "on" \| "off" }` (sounds and intro on unless "off") |
+| Global fields (`m.global`) | `creds`, `playing`, `syncedAt`, `search`, `soundsOn`, `introPlaying`, and `sound` (alwaysNotify: the click sound a screen asks for) |
 | Language prefs (`prefs/languages`) | `["en", "hi", "pa"]` |
-| OpenSubtitles (`opensubtitles/account`) | `{ apiKey, username, password, token, baseUrl }` |
+| OpenSubtitles (`opensubtitles/account`) | `{ apiKey, username, password, token, baseUrl }`, or `{ removed: true }` when turned off here |
+| Built-in OpenSubtitles (personal `account.json`) | `"opensubtitles": { "apiKey", "username", "password" }`; stamp `opensubtitles/builtIn` = `"<apiKey> <username>"` |
 | Removals (`progress/removed`) | `[{ k, at }]`, newest first, at most 100 |
 | Sync settings (personal `account.json`) | `"sync": { "url", "key" }` |
 | Helper settings (personal `account.json`) | `"transcoder": { "url", "key" }`, copied from the helper's own `personal.json` (§15) |
 | Titles that need the helper (`helper/titles`) | `["m:<id>", "e:<id>", …]`, newest first, at most 200; cleared on sign-out |
 | Helper requests (`HelperTask`) | `request { mode: "info" \| "hash" \| "start" \| "lastError" \| "stop", url }` → `result { ok, info \| hash \| started \| said \| error }` |
 | Sync service | see [`../sync/README.md`](../sync/README.md) |
-| Library worker fields | `query` → `results` (ContentNode rows: Categories, Movies, Series; tagged `forQuery`); `status` `{ done, total, titles, stopped }`; `browse` `{ kind, categoryId, query }` → `browsed` (ContentNode with `total`, `forKey`, `loading`); `countsRequest` → `counts` `{ "vod:123": 104 }`; `stop` |
+| Library worker fields | `query` → `results` (ContentNode rows: Categories, Movies, Series; tagged `forQuery`); `status` `{ done, total, titles, stopped }`; `browse` `{ kind, categoryId, query }` → `browsed` (ContentNode with `total`, `forKey`, `loading`); `countsRequest` → `counts` `{ "vod:123": 104 }`; `picksRequest` `{ history, watching, because: [{ k, n }], list, forKey }` → `picked` `{ forKey, scores, loading, rows: [{ slot, title, items: [fields] }] }` (plain data; Home makes the rows); `stop` |
 | Item fields (ContentNode) | `ItemDefaults()` in `common/Utils.brs`; new ones are `categoryId` and `listKind` (`vod`/`series`) for category and See-all cards; `kind` is also `category` or `seeAll` |
 | Scene actions | `signedIn`, `signOut`, `openDetails`, `play`, `close` (with `helperStop`, the helper's stop address, after a helper stream), `openSearch`, `openSubtitleSetup`, **`openCategory`** `{ kind, categoryId, title }`, **`openCategories`** `{ lists: { vod, series, langs } }`, **`syncNow`**, **`syncSoon`** |
 
@@ -476,6 +535,11 @@ Unchanged since 0.4.1; see `samsung-plan.md` §7.6. Samsung has it. Two points:
   - Focusing an ancestor of a RowList leaves the RowList taking keys; use an empty sibling Group as the focus holder.
   - Never take focus from an open keyboard dialog.
 - The `brs` test interpreter has `tmp:` but not `cachefs:`, and throws on reading a missing `tmp:` file.
+- **Animations find their nodes by id** (`fieldToInterp` "id.field"), searched within the component, so ids must be unique there. `Tween` names nodes without one; MainScene never reuses a screen id, so a late animation can't land on a new screen.
+- **No `Min` or `Max`** in BrightScript; `Abs`, `Sqr` and `Exp` exist.
+- **Some objects only exist on the main thread and in tasks:** `roFileSystem`, `roUrlTransfer`, sockets, `roChannelStore`. Made on the render thread (screens, items, the scene, and the shared files they include) they come back invalid and the next call crashes the app; a sideloaded app then sits frozen in the debugger. 0.5.7 to 0.5.9 did this with `roFileSystem` on Home. `tools/test.sh` checks for it. `ReadAsciiFile`, `DeleteFile` and the registry are fine on the render thread.
+- **Tasks hand screens plain data where they can:** Home makes its picked rows from lists of fields the library worker sends.
+- **Springs:** `easeFunction` has no overshoot, so springs are many keys (the web app's `linear()` lists, `SpringCurve` and `JellyCurve`) with `easeFunction="linear"`.
 
 ## 14. Samsung port checklist
 Suggested order, most useful first:
@@ -492,6 +556,8 @@ Suggested order, most useful first:
 10. **Built-in personal login** with the switch-on-change stamp.
 11. **Picture codecs ignored; audio format labels and unplayable-track swap.**
 12. **Sharp look:** 3 to 5 px corners, posters 10 px apart, badges on the poster, 6% focus lift. At 1080p, multiply Roku sizes by 1.5.
+13. **Motion, glass, sounds and intro** (§10): the web app already has the glass, motion and intro (CSS and Web Audio) to port from; add the click sounds and the Account menu switches too.
+14. **Picked for you, ratings and My List** (§5.1.1, §5.1.2): the watch history, ratings, category likings, Top picks and Because you watched rows, the row order, and My List. Sharing the history through the sync service would let every device learn from all of them.
 
 The helper on a computer at home (§15) needs no port: Samsung has it, and the Roku came second.
 
@@ -520,7 +586,7 @@ Three requests, in order, through `HelperTask` (each answer is dropped if the ti
 
 1. `GET /v1/info?key&kind&id&ext`: `{ duration, video { codec, width, height }, audio [{ codec, channels, language, title, plan }], videoPlan }` (`ParseHelperInfo`). Once per title; the helper keeps it for 6 hours.
 2. With online subtitles set up, `GET /v1/hash?key&kind&id&ext`: `{ hash, size }`, the file's OpenSubtitles fingerprint (`ParseHelperHash`). Once per title, and before the stream, since the helper stops its FFmpeg to read it. Without it the search goes on by title.
-3. `GET /v1/hls/start?key&kind&id&ext&start&vod=1&format=ts&video&height[&hevc=0][&a=<n>]` (`HelperStartUrl`), answered once the first piece is ready (up to a minute; the task waits 100 s): `{ session, url, vod, start, from, duration, video, audioTrack, audioPlan, ... }` (`ParseHelperStart`).
+3. `GET /v1/hls/start?key&kind&id&ext&start&vod=1&format=ts&video&height[&hevc=0][&a=<n>]` (`HelperStartUrl`), answered once the first piece is ready (up to a minute; the task waits 100 s): `{ session, url, vod, start, from, duration, video, audioTrack, audioPlan, previews, ... }` (`ParseHelperStart`).
    - `start`: the resume point (5 s early, as for direct play), the jump target, or where the stream got to.
    - `video`: `copy` only when the helper's plan is `copy` (H.264, HEVC, MPEG-2) and `CanDecodeVideo` says yes; otherwise `convert`. `hevc=0` when this Roku can't decode HEVC.
    - `height`: the screen's height (`GetDisplaySize().h`), 720 if unknown, at most 1080 (`HelperHeight`).
@@ -535,8 +601,15 @@ Three requests, in order, through `HelperTask` (each answer is dropped if the ti
 ### 15.4 Position, length and jumps
 - `positionSecs()` is `m.offset` plus `m.video.position`: 0 plus Roku's for a whole film's playlist, the stream's start plus Roku's for a growing one. `durationSecs()` is the helper's `duration`. `onPosition`, `saveProgress`, `markFinished`, `renderBar`, the jump preview and `jumpBy` all use them.
 - **Jumps** (`seekTo`): in a whole film's playlist, a plain `m.video.seek`; the helper makes the piece asked for (FFmpeg starts again there when it's far from where it was, a few seconds). In a growing one, a target inside what Roku has listed, with two pieces' margin (`HelperSeekInside`), is a plain seek; anything else starts the helper's stream again there.
+- **Pictures while choosing a jump** (new in 0.5.6): in a whole film's playlist, the jump preview shows a picture of the target above the time bubble.
+  - Where they come from: every FFmpeg run that makes pieces also writes a 180-line JPEG for each piece, from inside it. `/v1/hls/start` says where: `previews: { every: 6, prefix: "/v1/hls/s/<session>/p" }` (`parseHelperPreviews`; invalid from an older helper, or a prefix that isn't a path on the helper). The picture for `t` seconds is `prefix` + `floor(t / every)` in 5 digits + `.jpg` (`HelperPreviewUrl`), on the helper's address.
+  - What exists: everything the helper has converted in this session, behind you and ahead as far as FFmpeg has got (it isn't held back, so it runs to the end at whatever pace the provider and the computer allow). A picture not made yet is a quick 404: the helper never asks the provider for one, since the provider's one connection is playing the film.
+  - On screen: a 256x144 picture in a dark card with the lavender ring, over the knob, kept between x 48 and 1232, its bottom 10 px above the bubble. Wider films are letterboxed in it (`scaleToFit`, decoded at 256x144 to keep textures small).
+  - Loading: one picture at a time, each into a fresh `Poster` (so its `loadStatus` can only be about that picture), observed and also checked at once in case Roku still holds it. When it's ready it replaces the one showing; until then the last picture stays up. A 404 (`failed`) or a load over 4 s hides the picture for that piece and isn't asked for again for 10 s. Holding Left/Right steps every 250 ms, which paces the requests; the picture for the final target loads during the 0.8 s before the jump.
+  - Gone when the preview ends (jump, Back, a panel), and forgotten with each new stream (another session's pictures are another film's or another sound track's). Direct streams and growing playlists have none: just the time, as before.
+  - Code: `renderThumb`, `loadThumb`, `thumbStatus`, `clearThumb` in `screens/PlayerScreen.brs`; `thumb` in `PlayerScreen.xml`. The web app (web-iptv-player, `renderPreview`) works the same way.
 - **Sound tracks:** the Audio column lists the file's tracks from `/v1/info` (`HelperAudioOptions`); choosing another starts the stream again with it, from where you were, and saves the language (`chooseHelperTrack`).
-- **To check on the device:** that Roku starts a whole film's playlist at `playStart`, and that its `position` there is the film's time (the pieces' timestamps are).
+- **To check on the device:** that Roku starts a whole film's playlist at `playStart`, and that its `position` there is the film's time (the pieces' timestamps are). For the pictures: that a `Poster` loads them from the helper's plain `http://` address, and that `loadStatus` reaches `ready` (or `failed` on a 404) for each fresh `Poster`, including one whose picture Roku already holds. If one never reports, the 4 s limit moves on.
 
 ### 15.5 Errors and the end
 - A helper stream that fails after it played starts again from where it got to (or the jump target), twice at most (a minute of playing resets the count). One that never played is asked for once more.
@@ -553,10 +626,10 @@ Three requests, in order, through `HelperTask` (each answer is dropped if the ti
 ### 15.7 Subtitles
 - Built-in subtitle tracks don't come through to the Roku. (The helper can write them out as WebVTT, `subs=1`, but those files grow as FFmpeg goes, and Roku reads a side-loaded file once, when the stream loads.)
 - **Online subtitles** do. A whole film's playlist runs on the film's clock, so OpenSubtitles' file plays as it is, from any point. A growing playlist that starts partway has its own clock, so it gets none (`onlineTrackName` is "").
-- **The fingerprint:** for helper titles the subtitle search uses the helper's (`/v1/hash`) and reads nothing from the provider itself (`via: "helper"` in the `SubtitleTask` request).
+- **The fingerprint:** for helper titles the subtitle search uses the helper's (`/v1/hash`) and reads nothing from the provider itself (`via: "helper"` in the `SubtitleTask` request). Played straight from the provider there's none since 0.5.15: reading the file's start and end took the provider's one connection away from the video.
 
 ### 15.8 Code
-- `common/Helper.brs`: addresses, `HelperRoute`, the choices, `HelperAudioOptions`, `ParseHelperInfo`, `ParseHelperStart`, `ParseHelperHash`, `HelperFailure`, `HelperPlanLine`, the remembered titles (tested in `tests/utils_test.brs` and `tests/parse_test.brs`).
+- `common/Helper.brs`: addresses, `HelperRoute`, the choices, `HelperAudioOptions`, `ParseHelperInfo`, `ParseHelperStart`, `HelperPreviewUrl`, `ParseHelperHash`, `HelperFailure`, `HelperPlanLine`, the remembered titles (tested in `tests/utils_test.brs` and `tests/parse_test.brs`).
 - `tasks/HelperTask.*`: the requests (`info` and `hash` 50 s, `start` 100 s, `lastError` 8 s, `stop` 4 s).
-- `screens/PlayerScreen.brs`: the route, `startHelper`, `helperGo`, `requestStart`, `openHelper`, `positionSecs`, `durationSecs`, `seekTo`, `chooseHelperTrack`, `helperFailed`, `helperDiagnosis`.
+- `screens/PlayerScreen.brs`: the route, `startHelper`, `helperGo`, `requestStart`, `openHelper`, `positionSecs`, `durationSecs`, `seekTo`, `renderThumb` and the rest of the preview pictures, `chooseHelperTrack`, `helperFailed`, `helperDiagnosis`.
 - The helper itself: the Samsung repo's `helper/` and its README section.

@@ -306,6 +306,121 @@ sub Main()
     GetGlobalAA().helperOn = false
     check("mkv plays", containerProblem("mkv"), "")
 
+    ' Taste: what you watch (common/Taste.brs)
+    checkInt("TasteWeightFor peek", TasteWeightFor(100, 6000), 0)
+    checkInt("TasteWeightFor started", TasteWeightFor(200, 6000), 1)
+    checkInt("TasteWeightFor half", TasteWeightFor(3000, 6000), 2)
+    now = 1760000000
+    list = TasteWith([], "m:1", "Carry On Jatta 3 And A Very Long Name Indeed", 1, "atLeast", now)
+    checkInt("TasteWith new", list.Count(), 1)
+    checkInt("TasteWith name kept short", Len(list[0].n), 32)
+    check("TasteWith lower is no change", boolText(TasteWith(list, "m:1", "", 1, "atLeast", now) = invalid), "true")
+    list = TasteWith(list, "m:2", "Jawan", 2, "atLeast", now + 10)
+    check("TasteWith newest first", list[0].k + " " + list[1].k, "m:2 m:1")
+    list = TasteWith(list, "m:1", "", 3, "atLeast", now + 20)
+    check("TasteWith raised moves up and keeps the name", list[0].k + " " + list[0].n, "m:1 Carry On Jatta 3 And A Very Long")
+    series = TasteWith([], "s:9", "Panchayat", 0.5, "add", now)
+    series = TasteWith(series, "s:9", "Panchayat", 0.5, "add", now)
+    check("TasteWith episodes add up", Str(series[0].w).Trim(), "1.5")
+    for i = 1 to 10
+        series = TasteWith(series, "s:9", "Panchayat", 0.5, "add", now)
+        if series = invalid then exit for
+    end for
+    check("TasteWith stops at 4", boolText(series = invalid), "true")
+    disliked = TasteWith(list, "m:2", "", -1, "set", now)
+    checkInt("TasteWith set", disliked[0].w, -1)
+    grown = []
+    for i = 1 to 40
+        grown = TasteWith(grown, "m:" + i.ToStr(), "T", 1, "atLeast", now + i)
+    end for
+    checkInt("TasteWith keeps TasteMax", grown.Count(), TasteMax())
+
+    plan = [{ kind: "vod", categoryId: "1" }, { kind: "vod", categoryId: "2" }, { kind: "series", categoryId: "3" }, { kind: "vod", categoryId: "4" }, { kind: "vod", categoryId: "5" }]
+    order = TasteOrder(plan, { "vod:4": 2.5, "series:3": 1, "vod:1": 9 }, 1)
+    ids = []
+    for each entry in order
+        ids.Push(entry.categoryId)
+    end for
+    check("TasteOrder liked up after the first", ids.Join(","), "1,4,3,2,5")
+    check("TasteOrder without likings", boolText(TasteOrder(plan, {}, 2).Count() = 5), "true")
+
+    history = [{ k: "m:1", n: "Old", w: 3, t: now - 30 * 86400 }, { k: "m:2", n: "New", w: 2, t: now }, { k: "m:3", n: "Gone", w: -1, t: now }]
+    watching = [{ k: "s:5", at: now, pos: 100, dur: 1000 }, { k: "m:2", at: now, pos: 10, dur: 100 }]
+    liking = LikingFrom(history, watching, { "m:1": "vod:7", "m:2": "vod:7", "m:3": "vod:8", "s:5": "series:4" }, now)
+    check("LikingFrom halves after 30 days", Str(liking["vod:7"]).Trim(), "3.5")
+    check("LikingFrom counts against", Str(liking["vod:8"]).Trim(), "-1")
+    check("LikingFrom counts Continue Watching", Str(liking["series:4"]).Trim(), "1")
+    because = TasteBecause([{ k: "m:1", n: "A", w: 1 }, { k: "m:2", n: "B", w: 2 }, { k: "m:3", n: "C", w: 3 }], 2)
+    check("TasteBecause half watched first", because[0].n + because[1].n, "BC")
+    because = TasteBecause([{ k: "m:1", n: "A", w: 1 }], 2)
+    check("TasteBecause falls back to started", because[0].n, "A")
+    checkInt("TasteBecause none", TasteBecause([{ k: "m:1", n: "A", w: -1 }], 2).Count(), 0)
+
+    ' Picked for you, from the stored library (tasks/SearchIndex.brs)
+    picksLib = NewSearchIndex()
+    IndexSetCategories(picksLib, "vod", [{ id: "7", name: "PUNJABI MOVIES" }, { id: "8", name: "EN | ACTION" }], 2026)
+    IndexAdd(picksLib, [{ name: "Carry On Jatta", stream_id: 1, category_id: "7", added: now - 400 * 86400 }, { name: "Carry On Jatta 2", stream_id: 2, category_id: "7", added: now - 200 * 86400 }, { name: "Carry On Jatta 3", stream_id: 3, category_id: "8", added: now - 10 * 86400 }, { name: "Jatt & Juliet", stream_id: 4, category_id: "7", added: now - 5 * 86400 }, { name: "Die Hard", stream_id: 5, category_id: "8", added: now }, { name: "Carry On Jatta 2", stream_id: 6, category_id: "8", added: now }], "vod")
+    IndexAdd(picksLib, [{ name: "Panchayat", series_id: 1, category_id: "7" }], "series")
+    found = IndexFind(picksLib, ["m:1", "m:5", "s:1", "m:99"])
+    cats = CategoriesFrom(found)
+    check("IndexFind and CategoriesFrom", cats["m:1"] + " " + cats["m:5"] + " " + cats["s:1"] + " " + boolText(found["m:99"] = invalid), "vod:7 vod:8 series:7 true")
+    exclude = { "m:1": true }
+    exclude[" " + NormalizeSearch("Carry On Jatta")] = true
+    personal = IndexPersonal(picksLib, { "vod:7": 3, "vod:8": 0.5 }, exclude, [{ k: "m:1", n: "Carry On Jatta", category: "vod:7" }], now)
+    check("IndexPersonal picks: liked and new first, each title once", fieldList(personal.picks), "Jatt & Juliet, Carry On Jatta 2, Die Hard, Carry On Jatta 3")
+    check("IndexPersonal because: the family first, then the category", fieldList(personal.because[0]), "Carry On Jatta 2, Carry On Jatta 3, Jatt & Juliet")
+    nothing = IndexPersonal(picksLib, {}, {}, [], now)
+    checkInt("IndexPersonal nothing liked", nothing.picks.Count() + nothing.because.Count(), 0)
+    check("titleStem", titleStem("The Carry On Jatta") + "|" + titleStem("Jawan") + "|" + titleStem("Up"), " carry on| jawan|")
+
+    ' A saved library after the provider moved (SameOwner)
+    check("SameOwner same", boolText(SameOwner("http://a.old.example user1", "http://a.old.example user1")), "true")
+    check("SameOwner moved", boolText(SameOwner("http://a.old.example user1", "http://a.new.example user1")), "true")
+    check("SameOwner another account", boolText(SameOwner("http://a.old.example user1", "http://a.old.example user2")), "false")
+    check("SameOwner odd", boolText(SameOwner("", "http://a.old.example user1")), "false")
+
+    ' Ratings (common/Taste.brs)
+    rated = TasteRated([{ k: "m:1", n: "Jawan", w: 2, t: now }], "m:1", "", 2, now + 5)
+    check("TasteRated keeps watching and name", rated[0].n + " " + Str(rated[0].w).Trim() + " " + rated[0].r.ToStr(), "Jawan 2 2")
+    check("TasteRated same is no change", boolText(TasteRated(rated, "m:1", "", 2, now) = invalid), "true")
+    unrated = TasteRated(rated, "m:1", "", 0, now)
+    check("TasteRated takes it away", boolText(unrated[0].DoesExist("r")), "false")
+    check("TasteRated nothing to take", boolText(TasteRated([], "m:9", "X", 0, now) = invalid), "true")
+    fresh = TasteRated([], "m:9", "Pathaan", 1, now)
+    check("TasteRated before watching", fresh[0].k + " " + fresh[0].r.ToStr(), "m:9 1")
+    watchedAfter = TasteWith(fresh, "m:9", "Pathaan", 2, "atLeast", now)
+    checkInt("TasteWith keeps the rating", watchedAfter[0].r, 1)
+    full = [{ k: "m:0", n: "Loved", w: 0, r: 2, t: now }]
+    for i = 1 to TasteMax() + 5
+        full = TasteWith(full, "m:" + (100 + i).ToStr(), "T", 1, "atLeast", now + i)
+    end for
+    kept = false
+    for each entry in full
+        if entry.k = "m:0" then kept = true
+    end for
+    check("rated titles stay in a full history", boolText(kept and full.Count() = TasteMax()), "true")
+    ratedLiking = LikingFrom([{ k: "m:1", w: 3, r: -1, t: now }, { k: "m:2", w: 0, r: 2, t: now }, { k: "m:3", w: 1, r: 1, t: now }], [], { "m:1": "vod:1", "m:2": "vod:2", "m:3": "vod:3" }, now)
+    check("ratings count", Str(ratedLiking["vod:1"]).Trim() + " " + Str(ratedLiking["vod:2"]).Trim() + " " + Str(ratedLiking["vod:3"]).Trim(), "-3 4 2.5")
+    because = TasteBecause([{ k: "m:1", n: "Watched", w: 3 }, { k: "m:2", n: "Hated", w: 3, r: -1 }, { k: "m:3", n: "Loved", w: 0, r: 2 }], 2)
+    check("TasteBecause loved first, never not-for-me", because[0].n + "," + because[1].n, "Loved,Watched")
+    check("TasteRatingLabel", TasteRatingLabel(-1) + "|" + TasteRatingLabel(2) + "|" + TasteRatingLabel(0), "Not for me|Love this!|Rate")
+
+    ' My List (common/MyList.brs)
+    saved = MyListWith([], "m:1", "Jawan", "mkv", true, now)
+    saved = MyListWith(saved, "s:7", "Panchayat", "", true, now + 1)
+    check("MyListWith newest first", saved[0].k + " " + saved[1].k + " " + saved[1].x, "s:7 m:1 mkv")
+    saved = MyListWith(saved, "m:1", "Jawan", "mkv", true, now + 2)
+    checkInt("MyListWith once each", saved.Count(), 2)
+    check("MyListWith readds to the front", saved[0].k, "m:1")
+    saved = MyListWith(saved, "m:1", "", "", false, now)
+    check("MyListWith takes out", saved.Count().ToStr() + " " + saved[0].k, "1 s:7")
+    cards = MyListRow([{ k: "m:5", n: "Die Hard", x: "mp4" }, { k: "s:1", n: "Panchayat" }], { "m:5": "http://p/5.jpg" })
+    check("MyListRow cards", cards.title + ": " + cards.GetChild(0).title + " " + cards.GetChild(0).HDPosterUrl + " " + cards.GetChild(0).ext + ", " + cards.GetChild(1).kind + " " + cards.GetChild(1).seriesId, "My List: Die Hard http://p/5.jpg mp4, series 1")
+    check("TitleKey", TitleKey(cards.GetChild(0)) + " " + TitleKey(cards.GetChild(1)) + " " + TitleKey(invalid), "m:5 s:1 ")
+    saved = [{ k: "m:4", n: "Jatt & Juliet" }, { k: "m:77", n: "Not Here", x: "avi" }, { k: "s:1", n: "Panchayat" }]
+    listItems = ListItems(saved, IndexFind(picksLib, ["m:4", "m:77", "s:1"]))
+    check("ListItems in order, from the library or as a name card", listItems[0].title + ", " + listItems[1].title + " " + listItems[1].ext + ", " + listItems[2].kind, "Jatt & Juliet, Not Here avi, series")
+
     print ""
     if m.failures = 0 then
         print "ALL PASSED (" + m.count.ToStr() + " checks)"
@@ -313,6 +428,15 @@ sub Main()
         print "FAILED: " + m.failures.ToStr() + " of " + m.count.ToStr() + " checks"
     end if
 end sub
+
+' The titles in a list of item fields, joined.
+function fieldList(items as Object) as String
+    titles = []
+    for each item in items
+        titles.Push(item.title)
+    end for
+    return titles.Join(", ")
+end function
 
 function boolText(value as Boolean) as String
     if value then return "true"

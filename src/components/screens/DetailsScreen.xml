@@ -11,7 +11,10 @@
   </interface>
   <children>
     <Rectangle width="1280" height="720" color="0x151028FF" />
-    <Poster id="backdrop" translation="[320, 0]" width="960" height="540" loadWidth="960" loadHeight="540" loadDisplayMode="scaleToZoom" />
+    <Poster id="backdrop" translation="[320, 0]" width="960" height="540" loadWidth="960" loadHeight="540" loadDisplayMode="scaleToZoom" scaleRotateCenter="[0, 270]" />
+    <!-- The moving banner's other picture (common/Slides.brs). -->
+    <Poster id="backdropFront" translation="[320, 0]" width="960" height="540" loadWidth="960" loadHeight="540" loadDisplayMode="scaleToZoom" scaleRotateCenter="[0, 270]" opacity="0" />
+    <Timer id="slideTimer" duration="7" repeat="true" />
     <Poster translation="[320, 0]" width="440" height="540" uri="pkg:/images/fade_left.png" />
     <Poster translation="[320, 280]" width="960" height="260" uri="pkg:/images/fade_bottom.png" />
     <Rectangle translation="[0, 538]" width="1280" height="182" color="0x151028FF" />
@@ -59,5 +62,9 @@
   <script type="text/brightscript" uri="pkg:/components/common/Compat.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Progress.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Pills.brs" />
+  <script type="text/brightscript" uri="pkg:/components/common/Motion.brs" />
+  <script type="text/brightscript" uri="pkg:/components/common/Slides.brs" />
+  <script type="text/brightscript" uri="pkg:/components/common/Taste.brs" />
+  <script type="text/brightscript" uri="pkg:/components/common/MyList.brs" />
   <script type="text/brightscript" uri="pkg:/components/screens/DetailsScreen.brs" />
 </component>

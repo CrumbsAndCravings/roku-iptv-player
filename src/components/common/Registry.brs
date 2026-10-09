@@ -32,6 +32,9 @@ sub SaveCreds(creds as Object)
     RegWrite("account", "creds", FormatJson(creds))
 end sub
 
+' Sign-out. The watch history, ratings and My List stay for the same account signing
+' back in (at a new address too); another account signing in clears them (NoteLogin).
+' Continue Watching comes back from the sync service.
 sub ClearAccount()
     RegDelete("account", "creds")
     RegDelete("progress", "items")
@@ -39,7 +42,57 @@ sub ClearAccount()
     RegDelete("opensubtitles", "account")
     RegDelete("helper", "titles")
     DeleteFile(SearchCachePath())
+    RegDelete("search", "saved")
 end sub
+
+' The account last signed in on this TV: { server, username, pass } (pass is
+' PasswordStamp's, not the password), or invalid.
+function LastLogin() as Dynamic
+    raw = RegRead("account", "last")
+    last = invalid
+    if raw <> invalid then last = ParseJson(raw)
+    if not IsAA(last) or FieldStr(last, "username") = "" then return invalid
+    return last
+end function
+
+' A sign-in (or a login a build carries): the same account at a new address keeps
+' everything, and Continue Watching follows from the old address's sync space at the
+' next sync (sync/previous, SyncTask); another account clears what this TV learnt about
+' the last one (watch history, ratings, My List).
+sub NoteLogin(creds as Object)
+    now = { server: NormalizeServer(FieldStr(creds, "server")), username: FieldStr(creds, "username"), pass: PasswordStamp(FieldStr(creds, "password")) }
+    last = LastLogin()
+    if last <> invalid then
+        change = LoginChange(last, now)
+        if change = "moved" then
+            NoteMovedFrom(FieldStr(last, "server"), now)
+        else if change = "other" then
+            RegDelete("taste", "history")
+            RegDelete("taste", "scores")
+            RegDelete("mylist", "items")
+            RegDelete("sync", "previous")
+        end if
+    end if
+    RegWrite("account", "last", FormatJson(now))
+end sub
+
+' The account moved from `server` to now's address: its old sync space is fetched once
+' at the next sync and folded into the new one.
+sub NoteMovedFrom(server as String, now as Object)
+    old = SyncSpace({ server: server, username: now.username })
+    if server <> "" and old <> SyncSpace(now) then RegWrite("sync", "previous", old)
+end sub
+
+' A short fingerprint of a password, to tell the same account from another without
+' keeping the password itself after a sign-out.
+function PasswordStamp(text as String) as String
+    if text = "" then return ""
+    bytes = CreateObject("roByteArray")
+    bytes.FromAsciiString(text)
+    digest = CreateObject("roEVPDigest")
+    digest.Setup("sha256")
+    return LCase(Left(digest.Process(bytes), 16))
+end function
 
 ' Player preferences, e.g. { audio: "hin", subtitles: "eng" } (language codes, or "off").
 function LoadPrefs() as Object
@@ -57,17 +110,34 @@ sub SavePref(key as String, value as String)
 end sub
 
 ' OpenSubtitles account: { apiKey, username, password, token, baseUrl }. Stays on the TV.
+' When this Roku has none (a new install, a cleared registry, after signing out), a
+' personal build's own account.json "opensubtitles" is used (PickOsAccount).
 function LoadOsAccount() as Dynamic
-    raw = RegRead("opensubtitles", "account")
-    if raw = invalid then return invalid
-    account = ParseJson(raw)
-    if not IsAA(account) or FieldStr(account, "apiKey") = "" then return invalid
-    return account
+    return PickOsAccount(RegRead("opensubtitles", "account"), BuiltInOsAccount())
 end function
 
 sub SaveOsAccount(account as Object)
     RegWrite("opensubtitles", "account", FormatJson(account))
 end sub
+
+' Turns online subtitles off on this Roku, the build's own account too, until sign-out.
+sub RemoveOsAccount()
+    RegWrite("opensubtitles", "account", FormatJson({ removed: true }))
+end sub
+
+' The OpenSubtitles account built into this package, or invalid. Read once per
+' component.
+function BuiltInOsAccount() as Dynamic
+    if m.builtInOs = invalid then m.builtInOs = { value: OsAccountSettings(ParseJson(ReadAsciiFile("pkg:/source/account.json"))) }
+    return m.builtInOs.value
+end function
+
+' Whether the library worker has a library stored on this Roku (tasks/SearchTask.brs
+' sets search/saved when it loads or saves one). Screens check this rather than the file:
+' roFileSystem can't be made on the render thread, which crashes the app.
+function LibrarySaved() as Boolean
+    return RegRead("search", "saved") <> invalid
+end function
 
 ' A login built into this package (src/source/account.json, which git ignores), so a
 ' personal build can sign in by itself. invalid when there isn't one.

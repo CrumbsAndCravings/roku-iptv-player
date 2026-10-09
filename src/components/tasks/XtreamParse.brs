@@ -97,6 +97,7 @@ sub addSeriesItem(row as Object, raw as Object)
         seriesId: FieldStr(raw, "series_id")
         tmdbId: FirstText([Field(raw, "tmdb"), Field(raw, "tmdb_id")])
         backdrop: SizedImage(FirstUrl(Field(raw, "backdrop_path")), "w780")
+        backdrops: BackdropList(Field(raw, "backdrop_path"))
         description: FieldStr(raw, "plot")
         year: year
         genre: FieldStr(raw, "genre")
@@ -123,6 +124,7 @@ function ParseVodInfo(data as Dynamic) as Object
         directedBy: FieldStr(info, "director")
         durationSecs: duration
         backdrop: SizedImage(FirstUrl(info.backdrop_path), "w780")
+        backdrops: BackdropList(info.backdrop_path)
         poster: FirstText([info.movie_image, info.cover_big])
         ext: FieldStr(movie, "container_extension")
         tmdbId: FirstText([info.tmdb_id, info.tmdb])
@@ -232,6 +234,7 @@ function ParseSeriesInfo(data as Dynamic) as Object
             starring: FieldStr(info, "cast")
             directedBy: FieldStr(info, "director")
             backdrop: SizedImage(FirstUrl(info.backdrop_path), "w780")
+            backdrops: BackdropList(info.backdrop_path)
             poster: FieldStr(info, "cover")
             tmdbId: FirstText([info.tmdb_id, info.tmdb])
         }

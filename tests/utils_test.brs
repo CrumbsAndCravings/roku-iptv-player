@@ -43,6 +43,13 @@ sub Main()
     check("Normalize trailing slash", NormalizeServer(" http://line.example.com:8080/ "), "http://line.example.com:8080")
     check("Normalize https", NormalizeServer("https://tv.example.org"), "https://tv.example.org")
     check("Normalize m3u link", NormalizeServer("http://a.b:80/get.php?username=u&password=p&type=m3u_plus"), "http://a.b:80")
+    login = { server: "http://line.example.com:8080", username: "AB12", password: "old" }
+    check("SameLogin same", boolText(SameLogin(login, { server: "line.example.com:8080/", username: "AB12", password: "new" })), "true")
+    check("SameLogin host case", boolText(SameLogin(login, { server: "HTTP://Line.Example.com:8080", username: "AB12" })), "true")
+    check("SameLogin other user", boolText(SameLogin(login, { server: "http://line.example.com:8080", username: "ab12" })), "false")
+    check("SameLogin other port", boolText(SameLogin(login, { server: "http://line.example.com:80", username: "AB12" })), "false")
+    check("SameLogin signed out", boolText(SameLogin(invalid, login)), "false")
+    check("SameLogin blank", boolText(SameLogin({ server: "", username: "" }, { server: "", username: "" })), "false")
 
     ' Refused requests
     q = Chr(34)
@@ -72,6 +79,14 @@ sub Main()
     checkInt("roku http code", HttpCodeIn("There was an error in the HTTP response. (code -1): reader pick stream error:HTTP error:Transfer error: HTTP response code said error response code:(403):403:extra"), 403)
     checkInt("roku http 404", HttpCodeIn("HTTP 404 not found"), 404)
     checkInt("roku no http code", HttpCodeIn("buffer:loop:demux error 2024"), 0)
+    check("server error from roku", ToStr(ProviderServerTrouble("There was an error in the HTTP response. (code -1): HTTP response code said error response code:(503):503")), "true")
+    check("server error from ffmpeg", ToStr(ProviderServerTrouble("Your computer says: couldn't read series. Error opening input: Server returned 5XX Server Error reply")), "true")
+    check("refusal is not a server error", ToStr(ProviderServerTrouble("HTTP 403 forbidden")), "false")
+    check("no code is not a server error", ToStr(ProviderServerTrouble("buffer:loop:demux error 2024")), "false")
+    check("helper 500 counts", ToStr(ProviderServerTrouble("The helper on your computer answered HTTP 500.")), "true")
+    check("old sync service", SubtitleSaveText(404, "The sync service answered HTTP 404. Not found."), OldSyncText())
+    check("save failed words", SubtitleSaveText(0, "The sync service took too long to answer."), "These subtitles couldn't be saved for next time. The sync service took too long to answer.")
+    check("save failed quietly", SubtitleSaveText(400, ""), "These subtitles couldn't be saved for next time.")
     check("cloudflare by ray", IsCloudflare({ "CF-RAY": "8abc" }).ToStr(), "true")
     check("not cloudflare", IsCloudflare({ server: "nginx" }).ToStr(), "false")
     check("http detail nginx 404", HttpDetail(404, { server: "openresty" }, "<html><head><title>404 Not Found</title></head><body><center><h1>404 Not Found</h1></center><hr><center>nginx</center></body></html>"), "HTTP 404 from openresty: " + q + "404 Not Found nginx" + q)
@@ -276,20 +291,6 @@ sub Main()
     checkInt("bar unknown", Int(BarFraction(10.0, 0.0) * 100), 0)
     checkInt("bar over", Int(BarFraction(4000.0, 3600.0) * 100), 100)
 
-    ' OpenSubtitles file fingerprint, checked against a Python reference (tools: struct '<Q' sums)
-    head = [165, 77, 202, 24, 37, 48, 187, 29, 109, 19, 44, 222, 214, 35, 123, 46, 217, 30, 63, 114, 31, 203, 25, 113, 23, 68, 148, 214, 73, 60, 157, 92, 52, 96, 190, 49, 32, 30, 105, 254, 218, 160, 238, 232, 185, 153, 127, 92, 124, 41, 153, 253, 175, 229, 147, 37, 60, 214, 84, 175, 77, 250, 215, 20]
-    tail = [39, 160, 174, 179, 254, 233, 35, 47, 138, 242, 33, 31, 158, 228, 145, 197, 177, 11, 236, 181, 86, 59, 252, 30, 111, 147, 66, 126, 203, 200, 254, 41, 85, 229, 205, 142, 70, 220, 142, 212, 183, 194, 118, 77, 42, 90, 77, 118, 119, 6, 248, 93, 134, 144, 2, 74, 214, 189, 163, 64, 27, 233, 200, 203]
-    check("hash small file", OsHashHex(head, tail, 131072&), "4d9a760e894662f2")
-    check("hash 5GB file", OsHashHex(head, tail, 5368709120&), "4d9a760fc94462f2")
-    check("hash huge size", OsHashHex(head, tail, 6148914691236517205&), "a2efcb63de99b847")
-    ff = []
-    for i = 1 to 64
-        ff.Push(255)
-    end for
-    check("hash wraps at 64 bits", OsHashHex(ff, ff, 12884901895&), "00000002fffffff7")
-    check("content-range total", ParseContentRangeTotal("bytes 0-65535/5368709120").ToStr(), "5368709120")
-    check("content-range unknown", ParseContentRangeTotal("bytes 0-65535/*").ToStr(), "-1")
-    check("content-range missing", ParseContentRangeTotal("").ToStr(), "-1")
 
     ' Title cleanup for text searches
     cleaned = CleanTitleForSearch("EN - The Batman (2022)")
@@ -330,6 +331,22 @@ sub Main()
     prefix = CreateObject("roRegex", "^.*?S\d+\s*E\d+\s*[-:.]*\s*", "i")
     check("Episode prefix", prefix.Replace("Breaking Bad - S01E02 - Cat's in the Bag", ""), "Cat's in the Bag")
     check("Episode no prefix", prefix.Replace("Pilot", ""), "Pilot")
+
+    ' --- OpenSubtitles account: saved on this Roku, else the build's own
+    q = Chr(34)
+    built = OsAccountSettings({ opensubtitles: { apiKey: " k3y ", username: "jane", password: "pw" } })
+    check("os built-in key", built.apiKey, "k3y")
+    check("os built-in user", built.username, "jane")
+    check("os built-in none", ToStr(type(OsAccountSettings({ opensubtitles: { username: "jane" } }))), "Invalid")
+    check("os built-in missing", ToStr(type(OsAccountSettings(invalid))), "Invalid")
+    saved = "{" + q + "apiKey" + q + ":" + q + "tv" + q + "," + q + "username" + q + ":" + q + "sam" + q + "," + q + "token" + q + ":" + q + "t" + q + "}"
+    check("os saved wins", PickOsAccount(saved, built).apiKey, "tv")
+    check("os saved keeps token", PickOsAccount(saved, built).token, "t")
+    check("os nothing saved", PickOsAccount(invalid, built).apiKey, "k3y")
+    check("os broken saved", PickOsAccount("{broken", built).apiKey, "k3y")
+    check("os saved without key", PickOsAccount("{" + q + "username" + q + ":" + q + "sam" + q + "}", built).apiKey, "k3y")
+    check("os removed here", ToStr(type(PickOsAccount(FormatJson({ removed: true }), built))), "Invalid")
+    check("os none at all", ToStr(type(PickOsAccount(invalid, invalid))), "Invalid")
 
     ' --- The helper on a computer at home (Helper.brs)
     q = Chr(34)
@@ -396,6 +413,19 @@ sub Main()
     check("growing not vod", boolText(growing.vod), "false")
     checkInt("growing clock", growing.start, 754)
     check("start odd url", ParseHelperStart({ url: "http://elsewhere/x.m3u8" }).url, "")
+    pictures = ParseHelperStart(ParseJson("{" + q + "session" + q + ":" + q + "22743af7" + q + "," + q + "vod" + q + ":true," + q + "previews" + q + ":{" + q + "every" + q + ":6," + q + "prefix" + q + ":" + q + "/v1/hls/s/22743af7/p" + q + "}}")).previews
+    checkInt("previews every", pictures.every, 6)
+    check("preview first", HelperPreviewUrl(pictures, 0), "/v1/hls/s/22743af7/p00000.jpg")
+    check("preview inside a piece", HelperPreviewUrl(pictures, 125.5), "/v1/hls/s/22743af7/p00020.jpg")
+    check("preview piece start", HelperPreviewUrl(pictures, 126), "/v1/hls/s/22743af7/p00021.jpg")
+    check("preview two hours", HelperPreviewUrl(pictures, 7199), "/v1/hls/s/22743af7/p01199.jpg")
+    check("preview past 5 digits", HelperPreviewUrl(pictures, 600000), "/v1/hls/s/22743af7/p100000.jpg")
+    check("preview before the start", HelperPreviewUrl(pictures, -1), "")
+    check("preview none", HelperPreviewUrl(growing.previews, 60), "")
+    check("previews older helper", ToStr(type(growing.previews)), "Invalid")
+    check("previews elsewhere", ToStr(type(ParseHelperStart({ previews: { every: 6, prefix: "http://elsewhere/p" } }).previews)), "Invalid")
+    check("previews no interval", ToStr(type(ParseHelperStart({ previews: { every: 0, prefix: "/v1/hls/s/s/p" } }).previews)), "Invalid")
+    check("previews odd", ToStr(type(ParseHelperStart({ previews: "yes" }).previews)), "Invalid")
     check("info codec", info.videoCodec, "hevc")
     checkInt("info height", info.height, 1080)
     check("info plan", info.videoPlan, "copy")
@@ -427,6 +457,47 @@ sub Main()
     end for
     checkInt("titles capped", AddHelperTitle(many, "e:9").Count(), 200)
     checkInt("titles from nothing", AddHelperTitle(invalid, "m:7").Count(), 1)
+
+    ' A provider moving to a new address (LoginChange)
+    last = { server: "http://a.old.example", username: "user1", pass: "stamp1" }
+    check("LoginChange same", LoginChange(last, { server: "HTTP://A.OLD.EXAMPLE/", username: "user1", pass: "stamp1" }), "same")
+    check("LoginChange moved", LoginChange(last, { server: "http://a.new.example", username: "user1", pass: "stamp1" }), "moved")
+    check("LoginChange another password", LoginChange(last, { server: "http://a.new.example", username: "user1", pass: "stamp2" }), "other")
+    check("LoginChange another user", LoginChange(last, { server: "http://a.old.example", username: "user2", pass: "stamp1" }), "other")
+    check("LoginChange no last", LoginChange(invalid, { server: "http://a.old.example", username: "user1", pass: "stamp1" }), "other")
+    check("SyncSpaceText follows the address", boolText(SyncSpaceText({ server: "http://a.old.example", username: "u" }) <> SyncSpaceText({ server: "http://a.new.example", username: "u" })), "true")
+
+    ' The moving banner's pictures (Utils.brs BackdropList, Slides.brs BackdropPictures)
+    list = BackdropList(["https://image.tmdb.org/t/p/w1280/x.jpg", "", "https://image.tmdb.org/t/p/original/x.jpg", "http://h/y.jpg"])
+    check("BackdropList sized, each once", list.Replace(Chr(10), " | "), "https://image.tmdb.org/t/p/w780/x.jpg | http://h/y.jpg")
+    check("BackdropList one URL", BackdropList("http://h/z.jpg"), "http://h/z.jpg")
+    check("BackdropList none", BackdropList(invalid), "")
+    shown = CreateObject("roSGNode", "ContentNode")
+    shown.AddFields({ backdrop: "a", backdrops: "a" + Chr(10) + "b" + Chr(10) + "c" })
+    check("BackdropPictures the one showing first", BackdropPictures(shown).Join(","), "a,b,c")
+    bare = CreateObject("roSGNode", "ContentNode")
+    bare.AddFields({ backdrop: "", backdrops: "b" })
+    checkInt("BackdropPictures none without a backdrop", BackdropPictures(bare).Count(), 0)
+
+    ' Motion: the web app's spring and jelly curves, and values along them
+    spring = SpringCurve()
+    jelly = JellyCurve()
+    checkInt("SpringCurve keys", spring.Count(), 49)
+    checkInt("JellyCurve keys", jelly.Count(), 49)
+    check("SpringCurve ends", boolText(spring[0] = 0 and spring[48] = 1), "true")
+    check("JellyCurve ends", boolText(jelly[0] = 0 and jelly[48] = 1), "true")
+    peak = 0
+    for each t in spring
+        if t > peak then peak = t
+    end for
+    check("SpringCurve overshoots a touch", boolText(peak > 1.05 and peak < 1.1), "true")
+    numbers = CurveValues(10, 30, [0, 0.5, 1])
+    checkInt("CurveValues numbers", ToInt(numbers[0]) * 10000 + ToInt(numbers[1]) * 100 + ToInt(numbers[2]), 102030)
+    pairs = CurveValues([0, 4], [10, 8], [0, 0.5, 1])
+    checkInt("CurveValues pairs", pairs.Count(), 3)
+    checkInt("CurveValues pair middle", ToInt(pairs[1][0]) * 10 + ToInt(pairs[1][1]), 56)
+    sizes = ScaleValues(PopCurve())
+    check("ScaleValues even", boolText(sizes[2][0] = sizes[2][1] and sizes[2][0] > 1), "true")
 
     print ""
     if m.failures = 0 then

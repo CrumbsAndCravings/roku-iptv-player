@@ -1,8 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Holds a simple stack of screens: Login or Home at the bottom, then Details, then Player. -->
+<!-- Holds a simple stack of screens: Login or Home at the bottom, then Details, then Player.
+     The intro (Intro.xml) plays over it at launch. -->
 <component name="MainScene" extends="Scene">
   <children>
     <Group id="stack" />
+    <!-- The click sounds (tools/make_sounds.py), quiet by design; screens ask for them
+         with Sound() (common/Motion.brs). -->
+    <SoundEffect id="moveSound" uri="pkg:/sounds/move.wav" volume="100" />
+    <SoundEffect id="selectSound" uri="pkg:/sounds/select.wav" volume="100" />
+    <SoundEffect id="backSound" uri="pkg:/sounds/back.wav" volume="100" />
   </children>
   <script type="text/brightscript" uri="pkg:/components/common/Utils.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Registry.brs" />

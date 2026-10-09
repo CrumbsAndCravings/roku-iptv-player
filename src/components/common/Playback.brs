@@ -28,3 +28,14 @@ function BarFraction(position as Float, duration as Float) as Float
     if fraction > 1 then return 1.0
     return fraction
 end function
+
+' Whether an error (Roku's, or the helper's) says the provider's server failed: an
+' HTTP 5xx, or FFmpeg's "Server returned 5XX Server Error reply".
+function ProviderServerTrouble(text as String) as Boolean
+    if HttpCodeIn(text) >= 500 then return true
+    return CreateObject("roRegex", "server returned 5", "i").IsMatch(text)
+end function
+
+function ServerTroubleText() as String
+    return "Your provider's server had a problem sending this video. That's on their side, not your internet or this TV. Wait a minute and try again."
+end function

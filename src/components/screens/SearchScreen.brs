@@ -296,6 +296,7 @@ end function
 sub onSelected()
     item = selectedItem(m.results.rowItemSelected)
     if item = invalid then return
+    Sound("select")
     if item.kind = "category" then
         kindName = "Movies"
         if item.listKind = "series" then kindName = "Series"
@@ -306,6 +307,7 @@ sub onSelected()
 end sub
 
 sub onResultFocused()
+    MovedSound(m.results, m.results.rowItemFocused)
     item = selectedItem(m.results.rowItemFocused)
     if item = invalid then
         m.focusTitle.text = ""
@@ -341,9 +343,11 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
         ' Right past the keyboard's last column (or fast-forward) moves to the results;
         ' Down past its bottom row reaches the symbols.
         if key = "right" or key = "fastforward" then
+            if hasResults() then Sound("move")
             focusResults()
             return true
         else if key = "down" then
+            Sound("move")
             focusSymbols()
             return true
         end if
@@ -351,6 +355,11 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
     end if
     ' Results didn't use the key: Left on a row's first poster, Up on the top row, or Back.
     if key = "left" or key = "back" or key = "rewind" then
+        if key = "back" then
+            Sound("back")
+        else
+            Sound("move")
+        end if
         focusKeyboard()
         return true
     end if

@@ -62,6 +62,23 @@ function FirstUrl(value as Dynamic) as String
     return ToStr(value).Trim()
 end function
 
+' Up to 5 backdrops from backdrop_path (a list, or one URL), sized for the screen and
+' each once, one per line: the pictures of a title's moving banner (common/Slides.brs).
+function BackdropList(value as Dynamic) as String
+    list = value
+    if not IsArr(list) then list = [value]
+    urls = []
+    seen = {}
+    for each entry in list
+        url = SizedImage(ToStr(entry).Trim(), "w780")
+        if url <> "" and not seen.DoesExist(url) and urls.Count() < 5 then
+            seen[url] = true
+            urls.Push(url)
+        end if
+    end for
+    return urls.Join(Chr(10))
+end function
+
 ' TMDB serves every size from the same path, so ask for one that fits a 720p screen.
 function SizedImage(url as String, size as String) as String
     marker = "image.tmdb.org/t/p/"
@@ -182,6 +199,26 @@ function NormalizeServer(raw as String) as String
     return server
 end function
 
+' Whether two logins ({ server, username }) are the same account: the same server (as
+' NormalizeServer writes it, ignoring case) and the same username.
+function SameLogin(a as Dynamic, b as Dynamic) as Boolean
+    server = LCase(NormalizeServer(FieldStr(a, "server")))
+    if server = "" or FieldStr(a, "username") = "" then return false
+    if server <> LCase(NormalizeServer(FieldStr(b, "server"))) then return false
+    return FieldStr(a, "username") = FieldStr(b, "username")
+end function
+
+' How a login compares with the last one on this TV, both { server, username, pass }
+' (pass being PasswordStamp's, not the password): "same" account at the same address;
+' "moved", the same username and password at another address (the provider moved,
+' as providers do), so everything stays and Continue Watching follows; or "other".
+function LoginChange(last as Dynamic, now as Dynamic) as String
+    if FieldStr(last, "username") = "" or FieldStr(last, "username") <> FieldStr(now, "username") then return "other"
+    if SameLogin(last, now) then return "same"
+    if FieldStr(last, "pass") <> "" and FieldStr(last, "pass") = FieldStr(now, "pass") then return "moved"
+    return "other"
+end function
+
 ' Pulls server, username and password out of a pasted link: get.php or player_api.php
 ' with ?username=&password=, or a path like /playlist/<user>/<pass>/m3u_plus (also
 ' /live/, /movie/ and /series/ stream links).
@@ -246,7 +283,7 @@ end function
 
 ' How ARAN+ introduces itself when a provider turns away requests that say "Roku".
 function AppUserAgent() as String
-    return "ARANplus/0.5.2"
+    return "ARANplus/0.5.15"
 end function
 
 ' A plain desktop web browser, for providers whose servers only answer browsers (a
@@ -352,6 +389,7 @@ function ItemDefaults() as Object
         seriesId: ""
         ext: ""
         backdrop: ""
+        backdrops: ""
         year: ""
         genre: ""
         score: ""
@@ -385,7 +423,7 @@ end function
 ' Copies details fetched from get_vod_info / get_series_info onto an item node.
 sub ApplyInfo(item as Object, info as Dynamic)
     if not IsAA(info) then return
-    for each key in ["description", "year", "genre", "score", "starring", "directedBy", "backdrop", "ext", "videoCodec", "videoProfile", "audioCodec", "tmdbId"]
+    for each key in ["description", "year", "genre", "score", "starring", "directedBy", "backdrop", "backdrops", "ext", "videoCodec", "videoProfile", "audioCodec", "tmdbId"]
         value = FieldStr(info, key)
         if value <> "" then item.SetField(key, value)
     end for
@@ -548,6 +586,30 @@ function TranscoderSettings(data as Dynamic) as Dynamic
         url = Left(url, Len(url) - 1)
     end while
     return { url: url, key: key }
+end function
+
+' The OpenSubtitles account a personal build carries (account.json "opensubtitles":
+' { apiKey, username, password }), or invalid.
+function OsAccountSettings(data as Dynamic) as Dynamic
+    settings = Field(data, "opensubtitles")
+    apiKey = FieldStr(settings, "apiKey")
+    if apiKey = "" then return invalid
+    return { apiKey: apiKey, username: FieldStr(settings, "username"), password: FieldStr(settings, "password") }
+end function
+
+' Which OpenSubtitles account to use: the one saved on this Roku (`saved`, the
+' registry's text), else the build's own (`builtIn`), unless it was removed here on
+' purpose ({ removed: true } saved). invalid for none.
+function PickOsAccount(saved as Dynamic, builtIn as Dynamic) as Dynamic
+    if saved <> invalid then
+        account = ParseJson(ToStr(saved))
+        if IsAA(account) then
+            if FieldStr(account, "apiKey") <> "" then return account
+            if FieldStr(account, "removed") = "true" then return invalid
+        end if
+    end if
+    if IsAA(builtIn) and FieldStr(builtIn, "apiKey") <> "" then return builtIn
+    return invalid
 end function
 
 ' 1234567 -> "1,234,567"

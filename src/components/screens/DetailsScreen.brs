@@ -19,7 +19,9 @@ sub init()
     m.backdropIn = m.top.FindNode("backdropIn")
     m.backdropFade = m.top.FindNode("backdropFade")
     m.backdropTarget = 1.0
+    m.settled = false
     m.backdrop.ObserveField("loadStatus", "onBackdropLoaded")
+    SlidesInit(m.backdrop, m.top.FindNode("backdropFront"), m.top.FindNode("slideTimer"))
 
     m.title.font = MakeFont("Fredoka-SemiBold", 42)
     m.meta.font = MakeFont("Nunito-ExtraBold", 18)
@@ -39,8 +41,14 @@ sub init()
     m.queue = []
     m.entry = invalid
     m.task = invalid
+    m.rateChoices = []
 
     m.episodes.ObserveField("itemSelected", "onEpisodeSelected")
+    m.episodes.ObserveField("itemFocused", "onEpisodeFocused")
+end sub
+
+sub onEpisodeFocused()
+    MovedSound(m.episodes, m.episodes.itemFocused)
 end sub
 
 sub onItem()
@@ -49,6 +57,13 @@ sub onItem()
     m.item = item
     m.kind = item.kind
     showInfo()
+    ' The words come up one line after another as the page rises.
+    delay = 0.08
+    for each part in [m.title, m.meta, m.plot, m.credits, m.buttonsGroup]
+        part.opacity = 0.0
+        Tween(part, "opacity", [0.0, 1.0], 0.45, "outQuad", delay)
+        delay = delay + 0.04
+    end for
     if m.kind = "movie" then
         buildMovieButtons()
         updateMovieCompat()
@@ -75,14 +90,26 @@ sub showInfo()
     if item.starring <> "" then credits.Push("Starring " + item.starring)
     if item.directedBy <> "" then credits.Push("Directed by " + item.directedBy)
     m.credits.text = credits.Join("   ·   ")
-    m.backdropIn.control = "stop"
-    m.backdropTarget = ShowBackdrop(m.backdrop, item.backdrop, item.HDPosterUrl)
+    ' Once its pictures are turning, more details arriving leave them be.
+    if not SlidesRunning() then
+        m.backdropIn.control = "stop"
+        m.backdropTarget = ShowBackdrop(m.backdrop, item.backdrop, item.HDPosterUrl)
+        ' With more than one backdrop, they take turns (common/Slides.brs).
+        SlidesStart(BackdropPictures(item), m.backdropTarget)
+    end if
 end sub
 
 sub onBackdropLoaded()
+    ' The moving banner's next picture is its own to show.
+    if SlidesBackLoaded() then return
     if m.backdrop.loadStatus <> "ready" then return
     m.backdropFade.keyValue = [0.0, m.backdropTarget]
     m.backdropIn.control = "start"
+    ' The first picture settles from a little bigger as it fades in.
+    if not m.settled then
+        m.settled = true
+        Tween(m.backdrop, "scale", [[1.06, 1.06], [1.0, 1.0]], 1.6, "outCubic", 0)
+    end if
 end sub
 
 ' --- Movies ------------------------------------------------------------------
@@ -150,9 +177,9 @@ end sub
 sub buildMovieButtons()
     m.entry = ProgressFind("m:" + m.item.itemId)
     if m.entry <> invalid and ToInt(m.entry.pos) > 0 then
-        setButtons(["Resume from " + FormatClock(ToInt(m.entry.pos)), "Play from start", "Remove from Continue Watching"], ["resume", "restart", "forget"])
+        setTitleButtons(["Resume from " + FormatClock(ToInt(m.entry.pos)), "Play from start", "Remove from Continue Watching"], ["resume", "restart", "forget"])
     else
-        setButtons(["Play"], ["play"])
+        setTitleButtons(["Play"], ["play"])
     end if
 end sub
 
@@ -258,9 +285,9 @@ sub refreshSeriesProgress(pickSeason as Boolean)
         ' After an episode finishes, the entry points at the next one with no progress yet.
         verb = "Play "
         if ToInt(m.entry.pos) > 0 then verb = "Resume "
-        setButtons([verb + code, "Episodes", "Remove from Continue Watching"], ["resumeEpisode", "episodes", "forget"])
+        setTitleButtons([verb + code, "Episodes", "Remove from Continue Watching"], ["resumeEpisode", "episodes", "forget"])
     else
-        setButtons(["Play " + m.queue[0].code, "Episodes"], ["playFirst", "episodes"])
+        setTitleButtons(["Play " + m.queue[0].code, "Episodes"], ["playFirst", "episodes"])
     end if
 end sub
 
@@ -304,6 +331,7 @@ sub onEpisodeSelected()
     if ep = invalid then return
     index = queueIndexOf(ep.itemId)
     if index < 0 then return
+    Sound("select")
     startAt = 0
     if m.entry <> invalid and FieldStr(m.entry, "id") = ep.itemId then startAt = ToInt(m.entry.pos)
     playEpisode(index, startAt)
@@ -316,6 +344,67 @@ sub setButtons(labels as Object, actions as Object)
     m.buttonActions = actions
     if m.buttonIndex >= labels.Count() then m.buttonIndex = 0
     styleButtons()
+end sub
+
+' The play buttons, then My List and your rating (common/MyList.brs, common/Taste.brs).
+sub setTitleButtons(labels as Object, actions as Object)
+    key = thisTitleKey()
+    if MyListHas(key) then
+        labels.Push("In My List")
+    else
+        labels.Push("+ My List")
+    end if
+    actions.Push("list")
+    labels.Push(TasteRatingLabel(TasteRating(key)))
+    actions.Push("rate")
+    setButtons(labels, actions)
+end sub
+
+function thisTitleKey() as String
+    if m.kind = "movie" then return "m:" + m.item.itemId
+    return "s:" + m.item.itemId
+end function
+
+' After My List or a rating changes, the buttons say so; the focus stays put.
+sub refreshButtons()
+    if m.kind = "movie" then
+        buildMovieButtons()
+    else if m.seriesNode <> invalid then
+        refreshSeriesProgress(false)
+    end if
+    styleButtons()
+end sub
+
+' "Not for me", "I like this" or "Love this!" (or taking the rating away).
+sub showRateMenu()
+    rating = TasteRating(thisTitleKey())
+    m.rateChoices = [-1, 1, 2]
+    labels = ["Not for me", "I like this", "Love this!"]
+    if rating <> 0 then
+        labels.Push("Take my rating away")
+        m.rateChoices.Push(0)
+    end if
+    dialog = CreateObject("roSGNode", "StandardMessageDialog")
+    dialog.title = m.item.title
+    dialog.message = ["How was it? Your ratings shape Top picks for you and the rows you see first on Home."]
+    dialog.buttons = labels
+    dialog.ObserveField("buttonSelected", "onRateButton")
+    dialog.ObserveField("wasClosed", "onRateClosed")
+    m.top.GetScene().dialog = dialog
+end sub
+
+sub onRateButton()
+    dialog = m.top.GetScene().dialog
+    if dialog = invalid then return
+    choice = dialog.buttonSelected
+    dialog.close = true
+    if choice < 0 or choice >= m.rateChoices.Count() then return
+    TasteRate(thisTitleKey(), m.item.title, m.rateChoices[choice])
+    refreshButtons()
+end sub
+
+sub onRateClosed()
+    enterZone(m.zone)
 end sub
 
 sub styleButtons()
@@ -358,12 +447,21 @@ sub activateButton()
         jumpToSavedEpisode()
     else if action = "forget" then
         forgetProgress()
+    else if action = "list" then
+        MyListToggle(thisTitleKey(), m.item.title, m.item.ext)
+        refreshButtons()
+    else if action = "rate" then
+        showRateMenu()
     end if
 end sub
 
 ' Takes this title off Continue Watching, and the buttons back to a plain Play.
 sub forgetProgress()
     m.buttonIndex = 0
+    ' Taken off early, it counts against what it's like (common/Taste.brs).
+    key = "m:" + m.item.itemId
+    if m.kind <> "movie" then key = "s:" + m.item.itemId
+    TasteNotForMe(key, ProgressFraction(m.entry))
     if m.kind = "movie" then
         ProgressRemove("m:" + m.item.itemId)
         buildMovieButtons()
@@ -443,14 +541,17 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
             if key = "left" then delta = -1
             target = m.seasonIndex + delta
             if target >= 0 and target < m.seasonPills.Count() then
+                Sound("move")
                 showSeason(target)
                 m.episodes.jumpToItem = 0
             end if
             return true
         else if key = "up" then
+            Sound("move")
             enterZone("seasons")
             return true
         else if key = "back" then
+            Sound("back")
             enterZone("buttons")
             return true
         end if
@@ -459,12 +560,22 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
 
     if m.zone = "seasons" then
         if key = "left" and m.seasonIndex > 0 then
+            Sound("move")
             showSeason(m.seasonIndex - 1)
         else if key = "right" and m.seasonIndex < m.seasonPills.Count() - 1 then
+            Sound("move")
             showSeason(m.seasonIndex + 1)
         else if key = "down" or key = "OK" then
-            if m.episodes.content <> invalid and m.episodes.content.GetChildCount() > 0 then enterZone("episodes")
+            if m.episodes.content <> invalid and m.episodes.content.GetChildCount() > 0 then
+                Sound("move")
+                enterZone("episodes")
+            end if
         else if key = "up" or key = "back" then
+            if key = "back" then
+                Sound("back")
+            else
+                Sound("move")
+            end if
             enterZone("buttons")
         end if
         return true
@@ -472,18 +583,23 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
 
     ' Buttons
     if key = "left" and m.buttonIndex > 0 then
+        Sound("move")
         m.buttonIndex = m.buttonIndex - 1
         styleButtons()
     else if key = "right" and m.buttonIndex < m.pills.Count() - 1 then
+        Sound("move")
         m.buttonIndex = m.buttonIndex + 1
         styleButtons()
     else if key = "OK" then
+        Sound("select")
         activateButton()
     else if key = "play" then
+        Sound("select")
         m.buttonIndex = 0
         styleButtons()
         activateButton()
     else if key = "down" and hasEpisodes() then
+        Sound("move")
         enterZone("seasons")
     else if key = "back" then
         return false

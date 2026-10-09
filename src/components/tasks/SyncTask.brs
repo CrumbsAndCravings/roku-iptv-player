@@ -48,12 +48,28 @@ function syncRequest(req as Object, path as String, body as Dynamic) as Object
 end function
 
 ' Continue Watching: sends this Roku's list and removals, gets back the merged state.
+' After the account moved to a new address, `previous` names the old address's space:
+' its list and removals are fetched and sent along, once (movedIn says it's done).
 function progressRound(req as Object) as Object
-    res = syncRequest(req, "/v1/progress?space=" + FieldStr(req, "space"), { entries: req.entries, removed: req.removed })
+    entries = req.entries
+    removed = req.removed
+    movedIn = false
+    previous = FieldStr(req, "previous")
+    if previous <> "" and previous <> FieldStr(req, "space") then
+        old = syncRequest(req, "/v1/progress?space=" + previous, invalid)
+        if old.code <> 200 then return { ok: false, error: old.error }
+        state = ParseJson(old.text)
+        if IsAA(state) then
+            if IsArr(state.entries) then entries.Append(state.entries)
+            if IsArr(state.removed) then removed.Append(state.removed)
+        end if
+        movedIn = true
+    end if
+    res = syncRequest(req, "/v1/progress?space=" + FieldStr(req, "space"), { entries: entries, removed: removed })
     if res.code <> 200 then return { ok: false, error: res.error }
     state = ParseJson(res.text)
     if not IsAA(state) then return { ok: false, error: "The sync service's answer wasn't readable." }
-    return { ok: true, state: state }
+    return { ok: true, state: state, movedIn: movedIn }
 end function
 
 ' --- Subtitles saved for a title (sync/worker.js) --------------------------------------
@@ -63,10 +79,11 @@ function subtitlePath(req as Object) as String
 end function
 
 ' The subtitles saved for this title by any device, without the file itself:
-' -> { ok, title, found, fileId, name, delayMs, file }
+' -> { ok, title, found, fileId, name, delayMs, file }, or { ok: false, code, error }
+' (404 from a sync service older than saved subtitles).
 function subtitleGet(req as Object) as Object
     res = syncRequest(req, subtitlePath(req) + "&text=0", invalid)
-    result = { ok: false, title: FieldStr(req, "title"), found: false, error: res.error }
+    result = { ok: false, title: FieldStr(req, "title"), found: false, code: res.code, error: res.error }
     if res.code <> 200 then return result
     data = ParseJson(res.text)
     if not IsAA(data) then return result
@@ -82,15 +99,21 @@ function subtitleGet(req as Object) as Object
 end function
 
 ' A download from OpenSubtitles (its link), saved for this title for every device.
-' -> { ok, title, fileId, name, file }
+' -> { ok, title, fileId, name, file }, or { ok: false, code, error }
 function subtitleSave(req as Object) as Object
-    result = { ok: false, title: FieldStr(req, "title"), fileId: FieldStr(req, "fileId"), name: FieldStr(req, "name") }
+    result = { ok: false, title: FieldStr(req, "title"), fileId: FieldStr(req, "fileId"), name: FieldStr(req, "name"), code: 0, error: "" }
     text = fetchText(FieldStr(req, "link"))
-    if text.Trim() = "" then return result
+    if text.Trim() = "" then
+        result.error = "The file from OpenSubtitles didn't arrive."
+        return result
+    end if
     res = subtitlePost(req, { fileId: result.fileId, name: result.name, delayMs: 0, text: text })
     if res.ok then
         result.ok = true
         result.file = res.file
+    else
+        result.code = res.code
+        result.error = res.error
     end if
     return result
 end function
@@ -116,6 +139,12 @@ end function
 function subtitlePost(req as Object, body as Object) as Object
     res = syncRequest(req, subtitlePath(req), body)
     data = ParseJson(res.text)
-    if res.code <> 200 or not IsAA(data) then return { ok: false, title: FieldStr(req, "title"), error: res.error }
+    if res.code <> 200 or not IsAA(data) then
+        ' The service's own words, when it said why.
+        said = FieldStr(data, "error")
+        if said <> "" then said = res.error + " " + said
+        if said = "" then said = res.error
+        return { ok: false, title: FieldStr(req, "title"), code: res.code, error: said }
+    end if
     return { ok: true, title: FieldStr(req, "title"), file: FieldStr(data, "file") }
 end function

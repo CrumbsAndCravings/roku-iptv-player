@@ -8,6 +8,7 @@ sub work()
     m.top.ObserveField("stop", port)
     m.top.ObserveField("browse", port)
     m.top.ObserveField("countsRequest", port)
+    m.top.ObserveField("picksRequest", port)
     creds = m.global.creds
     owner = FieldStr(creds, "server") + " " + FieldStr(creds, "username")
     lastQuery = m.top.query
@@ -17,9 +18,14 @@ sub work()
     ' one, and replaces it when complete. Only the very first load makes you wait.
     live = LoadSearchIndex(SearchCachePath(), owner)
     refreshing = live <> invalid
+    ' Home looks for this before asking for picks (LibrarySaved).
+    if refreshing then RegWrite("search", "saved", live.savedAt.ToStr())
+    ' A request for picks made as this worker started, before it was listening.
+    askedEarly = IsAA(m.top.picksRequest) and m.top.picksRequest.Count() > 0
     if refreshing then
         report(1, 1, live)
         if lastQuery <> "" then publish(live, lastQuery)
+        if askedEarly then answerPicks(live, false)
         if NowSeconds() - live.savedAt < 86400 then
             answerQueries(port, live, lastQuery)
             return
@@ -28,6 +34,7 @@ sub work()
     else
         live = NewSearchIndex()
         building = live
+        if askedEarly then answerPicks(live, true)
     end if
 
     ' Gentle on the provider, which stopped answering after bursts of requests: at most
@@ -148,6 +155,8 @@ sub work()
                 answerBrowse(live, not refreshing and not complete)
             else if msg.GetField() = "countsRequest" then
                 answerCounts(live)
+            else if msg.GetField() = "picksRequest" then
+                answerPicks(live, not refreshing and not complete)
             else if m.top.query <> lastQuery then
                 ' Typing queues several queries; only the latest matters.
                 lastQuery = m.top.query
@@ -193,7 +202,7 @@ sub work()
                 ' Keep the library (a few broken categories don't spoil it). A refresh
                 ' that stopped early keeps the saved one and tries again next time.
                 if not stopped and failedLists <= 3 then
-                    SaveSearchIndex(building, SearchCachePath(), owner, NowSeconds())
+                    if SaveSearchIndex(building, SearchCachePath(), owner, NowSeconds()) then RegWrite("search", "saved", NowSeconds().ToStr())
                     live = building
                 end if
             end if
@@ -219,6 +228,8 @@ sub answerQueries(port as Object, index as Object, lastQuery as String)
                 answerBrowse(index, false)
             else if msg.GetField() = "countsRequest" then
                 answerCounts(index)
+            else if msg.GetField() = "picksRequest" then
+                answerPicks(index, false)
             else if m.top.query <> lastQuery then
                 ' Typing queues several queries; only the latest matters.
                 lastQuery = m.top.query
@@ -267,4 +278,58 @@ sub answerCounts(index as Object)
         counts[category.kind + ":" + category.id] = category.count
     end for
     m.top.counts = counts
+end sub
+
+' Home's rows picked for you (common/Taste.brs): `picksRequest` { history, watching,
+' because: [{ k, n }], list, forKey } -> `picked` { forKey, scores, loading, rows },
+' where rows are plain lists of fields, not nodes, which Home makes into rows itself:
+' [{ slot, title, items }], My List (when `list` has titles), Top picks for you, then a
+' "Because you watched" row for each of `because`. `scores` are the likings worked out
+' (Home keeps them to order its rows); `loading` says the library is still arriving.
+sub answerPicks(index as Object, loading as Boolean)
+    request = m.top.picksRequest
+    history = Field(request, "history")
+    if not IsArr(history) then history = []
+    watching = Field(request, "watching")
+    if not IsArr(watching) then watching = []
+    because = Field(request, "because")
+    if not IsArr(because) then because = []
+    list = Field(request, "list")
+    if not IsArr(list) then list = []
+    keys = []
+    exclude = {}
+    for each source in [history, watching, list]
+        for each entry in source
+            key = FieldStr(entry, "k")
+            if key <> "" then
+                keys.Push(key)
+                exclude[key] = true
+            end if
+            name = FieldStr(entry, "n")
+            if name = "" then name = FieldStr(entry, "name")
+            if name <> "" then exclude[" " + NormalizeSearch(name)] = true
+        end for
+    end for
+    found = IndexFind(index, keys)
+    categories = CategoriesFrom(found)
+    now = NowSeconds()
+    scores = LikingFrom(history, watching, categories, now)
+    titles = []
+    for each title in because
+        category = categories[FieldStr(title, "k")]
+        if category <> invalid then titles.Push({ k: FieldStr(title, "k"), n: FieldStr(title, "n"), category: category })
+    end for
+    personal = IndexPersonal(index, scores, exclude, titles, now)
+
+    rows = []
+    if list.Count() > 0 then rows.Push({ slot: "list", title: "My List", items: ListItems(list, found) })
+    rows.Push({ slot: "picks", title: "Top picks for you", items: personal.picks })
+    for each title in because
+        items = []
+        for i = 0 to titles.Count() - 1
+            if titles[i].k = FieldStr(title, "k") then items = personal.because[i]
+        end for
+        rows.Push({ slot: FieldStr(title, "k"), title: "Because you watched " + FieldStr(title, "n"), items: items })
+    end for
+    m.top.picked = { forKey: FieldStr(request, "forKey"), scores: scores, loading: loading, rows: rows }
 end sub

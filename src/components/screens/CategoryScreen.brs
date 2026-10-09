@@ -95,6 +95,7 @@ sub onLibraryStatus()
 end sub
 
 sub onFocused()
+    MovedSound(m.grid, m.grid.itemFocused)
     content = m.grid.content
     if content = invalid then return
     item = content.GetChild(m.grid.itemFocused)
@@ -110,6 +111,7 @@ sub onSelected()
     if content = invalid then return
     item = content.GetChild(m.grid.itemSelected)
     if item = invalid then return
+    Sound("select")
     m.top.action = { name: "openDetails", item: item }
 end sub
 
@@ -213,8 +215,10 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
     end if
     if m.zone = "search" then
         if key = "OK" then
+            Sound("select")
             openKeyboard()
         else if key = "down" then
+            if m.grid.content <> invalid then Sound("move")
             focusGrid()
         else if key = "back" then
             if m.query = "" then return false
@@ -224,6 +228,7 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
     end if
     ' Keys the grid didn't use: Up from its top row, and Back.
     if key = "up" then
+        Sound("move")
         focusSearch()
         return true
     end if
