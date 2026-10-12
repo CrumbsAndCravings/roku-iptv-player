@@ -20,6 +20,8 @@
     <BusySpinner id="spinner" translation="[608, 328]" spinInterval="1" visible="false" />
 
     <Group id="controls" visible="false">
+      <!-- Dims the video behind the row of pictures while choosing a jump. -->
+      <Rectangle id="seekDim" width="1280" height="720" color="0x0D092080" visible="false" />
       <Poster width="1280" height="140" uri="pkg:/images/fade_top.png" />
       <Poster translation="[0, 430]" width="1280" height="290" uri="pkg:/images/fade_bottom.png" />
 
@@ -43,12 +45,38 @@
         <Rectangle id="barFill" translation="[228, 584]" width="0" height="5" color="0xC9B8FFFF" />
         <Rectangle id="barPreview" translation="[228, 584]" width="0" height="5" color="0xFF9ECFCC" visible="false" />
         <Poster id="knob" width="18" height="18" uri="pkg:/images/circle.png" blendColor="0xF7F3FFFF" />
-        <!-- While choosing a jump through the helper: a picture of that moment above the
-             time. Pictures load into Posters of their own under thumbPics. -->
-        <Group id="thumb" visible="false" opacity="0">
-          <Poster width="264" height="152" uri="pkg:/images/card.9.png" blendColor="0x151028FF" />
-          <Group id="thumbPics" translation="[4, 4]" />
-          <Poster width="264" height="152" uri="pkg:/images/ring.9.png" blendColor="0xC9B8FFFF" />
+        <!-- While choosing a jump through the helper: a row of pictures (PreviewTask keeps
+             them on the TV). The middle one is where you'd land; either side, where the next
+             two presses would. A pulsing card stands in for a picture on its way; an empty
+             one, with "Not converted yet" in the middle, where none is coming. -->
+        <Group id="strip" visible="false">
+          <Group id="slot0">
+            <Poster translation="[-20, 336]" width="216" height="125" uri="pkg:/images/card.9.png" blendColor="0x151028FF" />
+            <Poster id="slotSkel0" translation="[-16, 340]" width="208" height="117" uri="pkg:/images/card.9.png" blendColor="0x3A2F66FF" />
+            <Poster id="slotPic0" translation="[-16, 340]" width="208" height="117" blendColor="0x9E9E9EFF" />
+          </Group>
+          <Group id="slot1">
+            <Poster translation="[208, 336]" width="216" height="125" uri="pkg:/images/card.9.png" blendColor="0x151028FF" />
+            <Poster id="slotSkel1" translation="[212, 340]" width="208" height="117" uri="pkg:/images/card.9.png" blendColor="0x3A2F66FF" />
+            <Poster id="slotPic1" translation="[212, 340]" width="208" height="117" blendColor="0x9E9E9EFF" />
+          </Group>
+          <Group id="slot2">
+            <Poster translation="[436, 282]" width="408" height="233" uri="pkg:/images/card.9.png" blendColor="0x151028FF" />
+            <Poster id="slotSkel2" translation="[440, 286]" width="400" height="225" uri="pkg:/images/card.9.png" blendColor="0x3A2F66FF" />
+            <Poster id="slotPic2" translation="[440, 286]" width="400" height="225" />
+            <Label id="slotNote" translation="[440, 286]" width="400" height="225" horizAlign="center" vertAlign="center" color="0xA195CCFF" text="Not converted yet" visible="false" />
+            <Poster translation="[436, 282]" width="408" height="233" uri="pkg:/images/ring.9.png" blendColor="0xC9B8FFFF" />
+          </Group>
+          <Group id="slot3">
+            <Poster translation="[856, 336]" width="216" height="125" uri="pkg:/images/card.9.png" blendColor="0x151028FF" />
+            <Poster id="slotSkel3" translation="[860, 340]" width="208" height="117" uri="pkg:/images/card.9.png" blendColor="0x3A2F66FF" />
+            <Poster id="slotPic3" translation="[860, 340]" width="208" height="117" blendColor="0x9E9E9EFF" />
+          </Group>
+          <Group id="slot4">
+            <Poster translation="[1084, 336]" width="216" height="125" uri="pkg:/images/card.9.png" blendColor="0x151028FF" />
+            <Poster id="slotSkel4" translation="[1088, 340]" width="208" height="117" uri="pkg:/images/card.9.png" blendColor="0x3A2F66FF" />
+            <Poster id="slotPic4" translation="[1088, 340]" width="208" height="117" blendColor="0x9E9E9EFF" />
+          </Group>
         </Group>
         <Group id="bubble" visible="false">
           <Poster id="bubbleBg" width="104" height="36" uri="pkg:/images/pill.9.png" blendColor="0xC9B8FFFF" />
@@ -137,6 +165,14 @@
       <FloatFieldInterpolator id="controlsOutFade" key="[0.0, 1.0]" keyValue="[1.0, 0.0]" fieldToInterp="controls.opacity" />
       <Vector2DFieldInterpolator id="controlsOutTop" key="[0.0, 1.0]" keyValue="[[0, 0], [-180, 0]]" fieldToInterp="controlsTop.translation" />
       <Vector2DFieldInterpolator id="controlsOutBottom" key="[0.0, 1.0]" keyValue="[[0, 0], [0, 180]]" fieldToInterp="controlsBottom.translation" />
+    </Animation>
+    <!-- Pictures on their way pulse, as posters do while a row loads. -->
+    <Animation id="stripPulse" duration="1.4" repeat="true" easeFunction="inOutQuad">
+      <FloatFieldInterpolator key="[0.0, 0.5, 1.0]" keyValue="[0.35, 1.0, 0.35]" fieldToInterp="slotSkel0.opacity" />
+      <FloatFieldInterpolator key="[0.0, 0.5, 1.0]" keyValue="[0.35, 1.0, 0.35]" fieldToInterp="slotSkel1.opacity" />
+      <FloatFieldInterpolator key="[0.0, 0.5, 1.0]" keyValue="[0.35, 1.0, 0.35]" fieldToInterp="slotSkel2.opacity" />
+      <FloatFieldInterpolator key="[0.0, 0.5, 1.0]" keyValue="[0.35, 1.0, 0.35]" fieldToInterp="slotSkel3.opacity" />
+      <FloatFieldInterpolator key="[0.0, 0.5, 1.0]" keyValue="[0.35, 1.0, 0.35]" fieldToInterp="slotSkel4.opacity" />
     </Animation>
     <!-- Lets the provider notice a closed connection before the next one opens. -->
     <Timer id="pauseTimer" duration="1.2" repeat="false" />

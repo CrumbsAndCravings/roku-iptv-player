@@ -42,14 +42,19 @@ sub init()
     m.knob = m.top.FindNode("knob")
     m.bubble = m.top.FindNode("bubble")
     m.bubbleLabel = m.top.FindNode("bubbleLabel")
-    m.thumb = m.top.FindNode("thumb")
-    m.thumbPics = m.top.FindNode("thumbPics")
-    m.thumbFront = invalid
-    m.thumbLoader = invalid
-    m.thumbShown = ""
-    m.thumbLoading = ""
-    m.thumbLoadAt = 0.0
-    m.thumbMissing = {}
+    m.strip = m.top.FindNode("strip")
+    m.seekDim = m.top.FindNode("seekDim")
+    m.stripPulse = m.top.FindNode("stripPulse")
+    m.slotNote = m.top.FindNode("slotNote")
+    m.slots = []
+    for k = 0 to 4
+        m.slots.Push({ group: m.top.FindNode("slot" + k.ToStr()), skel: m.top.FindNode("slotSkel" + k.ToStr()), pic: m.top.FindNode("slotPic" + k.ToStr()) })
+    end for
+    m.previewTask = invalid
+    m.previewSession = ""
+    m.previewDir = ""
+    m.previewHave = {}
+    m.previewNews = invalid
     m.buttonRow = m.top.FindNode("buttonRow")
 
     m.upNext = m.top.FindNode("upNext")
@@ -77,6 +82,7 @@ sub init()
     m.elapsed.font = MakeFont("Nunito-ExtraBold", 17)
     m.remaining.font = MakeFont("Nunito-ExtraBold", 17)
     m.bubbleLabel.font = MakeFont("Fredoka-SemiBold", 17)
+    m.slotNote.font = MakeFont("Nunito-SemiBold", 18)
     m.top.FindNode("upNextEyebrow").font = MakeFont("Nunito-ExtraBold", 14)
     m.upNextTitle.font = MakeFont("Fredoka-Medium", 22)
     m.upNextHint.font = MakeFont("Nunito-SemiBold", 17)
@@ -169,6 +175,9 @@ sub init()
     m.seekTarget = 0.0
     m.holdKey = ""
     m.holdDirection = 1
+    ' Seconds a press moves now (10 for a tap, more while held): the row's pictures
+    ' either side are that far apart.
+    m.stepSize = 10
     m.holdClock = CreateObject("roTimespan")
     m.introShown = false
 
@@ -740,7 +749,7 @@ sub resetHelper()
     m.helperSaid = ""
     m.helperReopens = 0
     m.helperPreviews = invalid
-    forgetThumbs()
+    stopPreviews()
     m.pendingSeek = -1
     m.lastPos = 0
     ' Answers about the title before are dropped.
@@ -931,7 +940,7 @@ sub openHelper()
     ' Another session's pictures are another film's, or another sound track's.
     m.helperPreviews = invalid
     if started.vod then m.helperPreviews = started.previews
-    forgetThumbs()
+    startPreviews()
     ' A whole film's clock is the film's; a growing playlist's starts where it did.
     m.offset = started.start
     at = started.start
@@ -1265,7 +1274,7 @@ sub renderBar()
         if bubbleX > 1232 - 104 then bubbleX = 1232 - 104
         m.bubble.translation = [bubbleX, 530]
     end if
-    renderThumb(shown, knobX)
+    renderStrip(shown)
 end sub
 
 sub setRow(row as String)
@@ -1325,6 +1334,8 @@ sub beginHold(key as String, direction as Integer)
     if not m.seeking then
         m.seeking = true
         m.seekTarget = positionSecs()
+        ' Whatever pictures the helper has made since the last look, now.
+        if m.previewTask <> invalid then m.previewTask.poke = true
     end if
     m.holdKey = key
     m.holdDirection = direction
@@ -1349,6 +1360,7 @@ sub onHoldTick()
 end sub
 
 sub stepSeek(seconds as Integer)
+    m.stepSize = seconds
     m.seekTarget = ClampSeek(m.seekTarget + seconds * m.holdDirection, durationSecs())
     if not m.controlsOn then showControls("bar")
     renderBar()
@@ -1358,7 +1370,12 @@ end sub
 sub endHold()
     m.holdKey = ""
     m.holdTimer.control = "stop"
-    if m.seeking then m.commitTimer.control = "start"
+    ' The next press is a tap again, and the pictures either side say where it lands.
+    m.stepSize = 10
+    if m.seeking then
+        m.commitTimer.control = "start"
+        renderBar()
+    end if
 end sub
 
 sub commitSeek()
@@ -1375,7 +1392,8 @@ sub cancelSeek()
     m.holdTimer.control = "stop"
     m.commitTimer.control = "stop"
     m.seeking = false
-    clearThumb()
+    m.stepSize = 10
+    hideStrip()
 end sub
 
 sub jumpBy(seconds as Integer)
@@ -1408,115 +1426,109 @@ sub seekTo(target as Float)
     requestStart(Int(target))
 end sub
 
-' --- Preview pictures ----------------------------------------------------------------
+' --- Pictures while choosing a jump --------------------------------------------------------
 '
-' While choosing where to jump in a whole film from the helper, a picture of that moment
-' sits above the time. The helper writes one for each six-second piece it converts
-' (HelperPreviewUrl); where it hasn't converted yet there's none, just the time, and
-' nothing more is asked of the provider. One picture loads at a time, into a Poster of
-' its own (a fresh Poster's loadStatus can only be about its own picture), and the last
-' one stays up until the next is ready. A missing one is asked for again after 10 s.
+' Through the helper, a whole film has a row of five pictures above the bar while you
+' choose where to jump: where you'd land in the middle, and either side where the next two
+' presses would (10 seconds apart for taps, the hold's step while holding). The helper
+' makes one for every ten seconds as it converts, and PreviewTask keeps them all on the TV
+' (tmp:/), so each press shows its pictures without asking the network. A pulsing card
+' stands in for a picture on its way (made but not here yet, or just ahead of where the
+' helper is converting); an empty one, "Not converted yet" in the middle, where the helper
+' hasn't got to, since asking the provider for pictures would stop the film. The video
+' dims behind the row.
 
-sub renderThumb(seconds as Float, knobX as Float)
-    path = ""
-    if m.seeking and m.helperVod then path = HelperPreviewUrl(m.helperPreviews, seconds)
-    if path = "" then
-        if m.thumb.visible then clearThumb()
+sub startPreviews()
+    previews = m.helperPreviews
+    if not IsAA(previews) or previews.bundle = "" then
+        stopPreviews()
         return
     end if
-    url = TranscoderConfig().url + path
-    x = knobX - 132
-    if x < 48 then x = 48
-    if x > 1232 - 264 then x = 1232 - 264
-    m.thumb.translation = [x, 368]
-    ' Kept visible (if see-through) while the first picture loads.
-    m.thumb.visible = true
-    if m.thumbLoader <> invalid and UpTime(0) - m.thumbLoadAt > 4 then dropThumbLoad()
-    if url <> m.thumbShown and m.thumbLoader = invalid and not isThumbMissing(url) then loadThumb(url)
-    if m.thumbShown <> "" and not isThumbMissing(url) then
-        m.thumb.opacity = 1
-    else
-        m.thumb.opacity = 0
+    ' The same session again (a retry): its pictures are already here.
+    if m.previewTask <> invalid and m.previewSession = m.helperSession then return
+    stopPreviews()
+    m.previewSession = m.helperSession
+    ' A folder of its own: one still being emptied for the last stream is left alone.
+    m.previewDir = "tmp:/pv/f" + Rnd(1000000000).ToStr()
+    m.previewTask = CreateObject("roSGNode", "PreviewTask")
+    m.previewTask.ObserveField("added", "onPreviewAdded")
+    m.previewTask.ObserveField("news", "onPreviewNews")
+    m.previewTask.source = { url: TranscoderConfig().url, list: previews.list, bundle: previews.bundle, every: previews.every, dir: m.previewDir }
+    m.previewTask.control = "RUN"
+end sub
+
+' The task deletes the pictures and ends.
+sub stopPreviews()
+    if m.previewTask <> invalid then
+        m.previewTask.UnobserveField("added")
+        m.previewTask.UnobserveField("news")
+        m.previewTask.source = {}
+    end if
+    m.previewTask = invalid
+    m.previewSession = ""
+    m.previewDir = ""
+    m.previewHave = {}
+    m.previewNews = invalid
+    hideStrip()
+    for each slot in m.slots
+        slot.pic.uri = ""
+    end for
+end sub
+
+sub onPreviewAdded()
+    if m.previewTask = invalid then return
+    for each key in m.previewTask.added
+        m.previewHave[key] = true
+    end for
+    if m.seeking then renderStrip(m.seekTarget)
+end sub
+
+sub onPreviewNews()
+    if m.previewTask = invalid then return
+    m.previewNews = m.previewTask.news
+    if m.seeking then renderStrip(m.seekTarget)
+end sub
+
+sub renderStrip(seconds as Float)
+    if not m.seeking or m.previewDir = "" then
+        hideStrip()
+        return
+    end if
+    every = m.helperPreviews.every
+    times = StripTimes(seconds, m.stepSize, durationSecs())
+    for k = 0 to 4
+        showSlot(m.slots[k], times[k], every, k = 2)
+    end for
+    if not m.strip.visible then
+        m.strip.visible = true
+        m.seekDim.visible = true
+        m.stripPulse.control = "start"
     end if
 end sub
 
-sub loadThumb(url as String)
-    pic = m.thumbPics.CreateChild("Poster")
-    pic.width = 256
-    pic.height = 144
-    pic.loadWidth = 256
-    pic.loadHeight = 144
-    pic.loadDisplayMode = "scaleToFit"
-    pic.opacity = 0
-    m.thumbLoader = pic
-    m.thumbLoading = url
-    m.thumbLoadAt = UpTime(0)
-    pic.ObserveField("loadStatus", "onThumbStatus")
-    pic.uri = url
-    ' A picture Roku still holds may be ready already.
-    thumbStatus()
-end sub
-
-sub onThumbStatus()
-    thumbStatus()
-end sub
-
-' The loading picture is ready (it replaces the one showing) or isn't there (not made
-' yet), then on to wherever the target is now.
-sub thumbStatus()
-    pic = m.thumbLoader
-    if pic = invalid then return
-    status = pic.loadStatus
-    if status <> "ready" and status <> "failed" then return
-    pic.UnobserveField("loadStatus")
-    m.thumbLoader = invalid
-    url = m.thumbLoading
-    m.thumbLoading = ""
-    if status = "ready" then
-        if m.thumbFront <> invalid then m.thumbPics.RemoveChild(m.thumbFront)
-        pic.opacity = 1
-        m.thumbFront = pic
-        m.thumbShown = url
-        m.thumbMissing.Delete(url)
-    else
-        m.thumbPics.RemoveChild(pic)
-        m.thumbMissing[url] = UpTime(0)
+' One picture of the row: the picture when it's on the TV (the pulsing card under it
+' shows until it's drawn), the pulsing card alone when it's on its way, or nothing.
+sub showSlot(slot as Object, seconds as Float, every as Integer, middle as Boolean)
+    slot.group.visible = seconds >= 0
+    if seconds < 0 then return
+    n = PictureNumber(seconds, every)
+    key = n.ToStr()
+    here = m.previewHave.DoesExist(key)
+    coming = here or PictureComing(n, every, m.previewNews)
+    if here then
+        uri = m.previewDir + "/" + key + ".jpg"
+        if slot.pic.uri <> uri then slot.pic.uri = uri
     end if
-    if m.seeking then renderBar()
+    slot.pic.visible = here
+    slot.skel.visible = coming
+    if middle then m.slotNote.visible = not coming
 end sub
 
-' A picture that took too long counts as missing for now.
-sub dropThumbLoad()
-    pic = m.thumbLoader
-    if pic = invalid then return
-    pic.UnobserveField("loadStatus")
-    m.thumbPics.RemoveChild(pic)
-    m.thumbMissing[m.thumbLoading] = UpTime(0)
-    m.thumbLoader = invalid
-    m.thumbLoading = ""
-end sub
-
-function isThumbMissing(url as String) as Boolean
-    if not m.thumbMissing.DoesExist(url) then return false
-    return UpTime(0) - m.thumbMissing[url] < 10
-end function
-
-' Hides the picture and lets go of it, and of one on its way.
-sub clearThumb()
-    if m.thumbLoader <> invalid then m.thumbLoader.UnobserveField("loadStatus")
-    m.thumbLoader = invalid
-    m.thumbLoading = ""
-    m.thumbFront = invalid
-    m.thumbShown = ""
-    m.thumbPics.RemoveChildrenIndex(m.thumbPics.GetChildCount(), 0)
-    m.thumb.visible = false
-    m.thumb.opacity = 0
-end sub
-
-' A new stream: what was missing from the last one says nothing about this one.
-sub forgetThumbs()
-    clearThumb()
-    m.thumbMissing = {}
+sub hideStrip()
+    if not m.strip.visible then return
+    m.strip.visible = false
+    m.seekDim.visible = false
+    m.stripPulse.control = "stop"
 end sub
 
 ' --- Keys ----------------------------------------------------------------------
@@ -1678,6 +1690,7 @@ sub close()
     m.releaseTimer.control = "stop"
     m.retryTimer.control = "stop"
     cancelSeek()
+    stopPreviews()
     m.countdown.control = "stop"
     m.hideTimer.control = "stop"
     m.video.control = "stop"
@@ -1890,7 +1903,8 @@ end function
 sub drawSubtitles()
     text = ""
     state = m.video.state
-    if m.ownOn and not m.released and (state = "playing" or state = "paused" or state = "buffering") then
+    ' Not while choosing a jump, where the row of pictures is.
+    if m.ownOn and not m.released and not m.seeking and (state = "playing" or state = "paused" or state = "buffering") then
         text = CueTextAt(m.cues, Int(clockNow() * 1000) - m.subDelay)
     end if
     if text = m.cueText then return

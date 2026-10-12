@@ -3,7 +3,8 @@
 ' can't play into HLS with FFmpeg while you watch. For a film of known length it lists
 ' the whole film in six-second pieces from the start (a VOD playlist) and makes each
 ' piece when Roku asks for it, so the stream's clock is the film's and Roku jumps by
-' itself; otherwise it writes a playlist that grows from where it was started.
+' itself; otherwise it writes a playlist that grows from where it was started. For a
+' whole film it also makes a picture for every ten seconds, which the TV keeps.
 ' Settings come from account.json
 ' ("transcoder", TranscoderSettings in Utils.brs). These functions build its addresses
 ' and make the choices; tasks/HelperTask.brs makes the requests, and
@@ -173,7 +174,7 @@ end function
 ' A started stream (/v1/hls/start): `url` is the playlist's address on the helper,
 ' `start` where the stream's clock starts in the film (0 for a whole film's playlist,
 ' whose clock is the film's), `playFrom` where to start playing, `vod` whether the
-' playlist lists the whole film, and `previews` its pictures (HelperPreviewUrl).
+' playlist lists the whole film, and `previews` its pictures (parseHelperPreviews).
 function ParseHelperStart(data as Dynamic) as Object
     url = FieldStr(data, "url")
     if Left(url, 1) <> "/" then url = ""
@@ -191,29 +192,131 @@ function ParseHelperStart(data as Dynamic) as Object
     }
 end function
 
-' The pictures of a whole film's playlist: { every, prefix }, one for each `every`
-' seconds, which the helper writes as it converts the pieces. invalid without them (an
-' older helper).
+' The pictures of a whole film's playlist: one for each `every` seconds, which the helper
+' makes as it converts. `list` and `bundle` (helper 1.8 and newer) are where the TV asks
+' what's new and fetches those pictures in one file (PreviewTask); "" from an older helper,
+' which has no such file, so the TV shows just the time. invalid without pictures.
 function parseHelperPreviews(data as Dynamic) as Dynamic
     every = ToInt(Field(data, "every"))
     prefix = FieldStr(data, "prefix")
     if every <= 0 or Left(prefix, 1) <> "/" then return invalid
-    return { every: every, prefix: prefix }
+    list = FieldStr(data, "list")
+    bundle = FieldStr(data, "bundle")
+    if Left(list, 1) <> "/" or Left(bundle, 1) <> "/" then
+        list = ""
+        bundle = ""
+    end if
+    return { every: every, prefix: prefix, list: list, bundle: bundle }
 end function
 
-' The address on the helper of the picture for `seconds` into the film: the prefix,
-' the piece's number in 5 digits (more past 166 hours, as FFmpeg writes them), ".jpg".
-' "" without pictures. A picture the helper hasn't made yet answers 404 at once; it
-' never makes the helper ask the provider for more.
-function HelperPreviewUrl(previews as Dynamic, seconds as Float) as String
-    if not IsAA(previews) or seconds < 0 then return ""
-    every = ToInt(Field(previews, "every"))
-    if every <= 0 then return ""
-    n = Int(seconds / every).ToStr()
-    while Len(n) < 5
-        n = "0" + n
-    end while
-    return FieldStr(previews, "prefix") + n + ".jpg"
+' --- Pictures for choosing a jump -------------------------------------------------------
+'
+' The TV keeps a whole film's pictures itself (tasks/PreviewTask.brs), so a press shows
+' its picture at once. Picture n is for `every` seconds from n x every (it shows their
+' middle). A session's files need no key: its random name is one.
+
+' What's new since picture number `after` (previews.json).
+function HelperPicturesUrl(config as Object, previews as Object, after as Integer) as String
+    return config.url + previews.list + "?after=" + after.ToStr()
+end function
+
+' Pictures numbered after `after` up to `upto`, as one BIF (previews.bif).
+function HelperBundleUrl(config as Object, previews as Object, after as Integer, upto as Integer) as String
+    return config.url + previews.bundle + "?after=" + after.ToStr() + "&upto=" + upto.ToStr()
+end function
+
+' The helper's answer from previews.json: the latest picture number, how many are new,
+' the stretches converted ([from, to] seconds) and where it's converting now (invalid
+' when it isn't).
+function ParseHelperPictures(data as Dynamic) as Object
+    converted = []
+    for each range in toRanges(Field(data, "converted"))
+        converted.Push(range)
+    end for
+    running = invalid
+    ranges = toRanges([Field(data, "running")])
+    if ranges.Count() = 1 then running = ranges[0]
+    return { seq: ToInt(Field(data, "seq")), count: ToInt(Field(data, "count")), converted: converted, running: running }
+end function
+
+function toRanges(value as Dynamic) as Object
+    ranges = []
+    if not IsArr(value) then return ranges
+    for each range in value
+        if IsArr(range) and range.Count() = 2 then
+            low = ToInt(range[0])
+            high = ToInt(range[1])
+            if high > low and low >= 0 then ranges.Push([low, high])
+        end if
+    end for
+    return ranges
+end function
+
+' Which picture shows `seconds` into the film.
+function PictureNumber(seconds as Float, every as Integer) as Integer
+    if every <= 0 or seconds < 0 then return -1
+    return Int(seconds / every)
+end function
+
+' Whether picture n is coming: its moment is converted (the TV fetches it on its next
+' look), or just ahead of where the helper is converting. Before the helper's first
+' answer (`news` invalid) every picture may be. Otherwise there's nothing to wait for.
+function PictureComing(n as Integer, every as Integer, news as Dynamic) as Boolean
+    if n < 0 then return false
+    if not IsAA(news) then return true
+    middle = n * every + every / 2
+    for each range in news.converted
+        if middle >= range[0] and middle < range[1] then return true
+    end for
+    running = news.running
+    return IsArr(running) and middle >= running[0] and middle < running[1] + 30
+end function
+
+' The five moments in the row of pictures while choosing a jump: where you'd land in the
+' middle, and where the next two presses either way would (`step` seconds apart). -1 for
+' one outside the film (a duration of 0 is unknown, so there's no end).
+function StripTimes(target as Float, stepSize as Integer, duration as Float) as Object
+    times = []
+    for k = -2 to 2
+        t = target + k * stepSize
+        if t < 0 or (duration > 0 and t > duration) then t = -1
+        times.Push(t)
+    end for
+    return times
+end function
+
+' The pictures in a BIF (Roku's format for them; the helper's previews.bif): for each,
+' its time in seconds and where its JPEG is in `bytes` (a roByteArray, or an array of
+' byte values). invalid for anything that isn't a BIF this can read.
+function ReadBifIndex(bytes as Object) as Dynamic
+    size = bytes.Count()
+    if size < 72 then return invalid
+    magic = [137, 66, 73, 70, 13, 10, 26, 10]
+    for i = 0 to 7
+        if bytes[i] <> magic[i] then return invalid
+    end for
+    count = bifWord(bytes, 12)
+    unit = bifWord(bytes, 16)
+    if unit = 0 then unit = 1000
+    if count < 0 or unit < 0 then return invalid
+    indexEnd = 64 + (count + 1) * 8
+    if indexEnd > size then return invalid
+    pictures = []
+    for i = 0 to count - 1
+        at = 64 + i * 8
+        stamp = bifWord(bytes, at)
+        start = bifWord(bytes, at + 4)
+        finish = bifWord(bytes, at + 12)
+        if stamp < 0 or start < indexEnd or finish <= start or finish > size then return invalid
+        pictures.Push({ seconds: stamp * unit / 1000, start: start, length: finish - start })
+    end for
+    return pictures
+end function
+
+' A little-endian 32-bit value; -1 past 2^31 (the end entry's 0xffffffff, or nonsense).
+function bifWord(bytes as Object, at as Integer) as Integer
+    if bytes[at + 3] > 127 then return -1
+    return bytes[at] + bytes[at + 1] * 256 + bytes[at + 2] * 65536 + bytes[at + 3] * 16777216
 end function
 
 ' The OpenSubtitles fingerprint in the helper's answer (/v1/hash): 16 hex digits, or "".

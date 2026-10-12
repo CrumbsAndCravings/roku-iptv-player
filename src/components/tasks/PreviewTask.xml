@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Keeps a whole film's pictures for choosing a jump on the TV (tmp:/), so a press shows
+  its picture without asking the network. Every few seconds while the film plays it asks
+  the helper what's new (previews.json) and fetches those pictures in one file
+  (previews.bif), which it splits into one JPEG per picture.
+  source { list, bundle, dir } starts it (dir: where the pictures go, tmp:/pv/<session>);
+  an empty source stops it and deletes them. poke: look again now (choosing a jump).
+  -> added: the numbers of the pictures just written (as strings), news: the helper's
+  latest answer (ParseHelperPictures).
+-->
+<component name="PreviewTask" extends="Task">
+  <interface>
+    <field id="source" type="assocarray" />
+    <field id="poke" type="boolean" alwaysNotify="true" />
+    <field id="added" type="array" alwaysNotify="true" />
+    <field id="news" type="assocarray" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/components/common/Utils.brs" />
+  <script type="text/brightscript" uri="pkg:/components/common/Registry.brs" />
+  <script type="text/brightscript" uri="pkg:/components/common/Tracks.brs" />
+  <script type="text/brightscript" uri="pkg:/components/common/Helper.brs" />
+  <script type="text/brightscript" uri="pkg:/components/tasks/PreviewTask.brs" />
+</component>
