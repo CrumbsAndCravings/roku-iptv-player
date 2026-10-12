@@ -117,6 +117,13 @@ sub init()
     m.pauseTimer = m.top.FindNode("pauseTimer")
     m.pauseTimer.ObserveField("fire", "onPauseDone")
     m.afterPause = ""
+    m.waitNote = m.top.FindNode("waitNote")
+    m.waitNote.font = MakeFont("Nunito-SemiBold", 20)
+    m.waitTimer = m.top.FindNode("waitTimer")
+    m.waitTimer.ObserveField("fire", "showWaitNote")
+    m.waitClock = CreateObject("roTimespan")
+    m.waiting = false
+    m.waitText = ""
     m.ownSubs = m.top.FindNode("ownSubs")
     m.subLabels = buildSubLabels()
     m.cueTimer = m.top.FindNode("cueTimer")
@@ -302,6 +309,7 @@ function itemKey() as String
 end function
 
 sub showUnplayable()
+    stopWaiting()
     item = currentItem()
     m.failed = true
     m.video.control = "stop"
@@ -344,8 +352,7 @@ sub loadStream()
     m.video.visible = true
     m.video.content = content
     m.video.control = "play"
-    m.spinner.visible = true
-    m.spinner.control = "start"
+    waitFor("Waiting for the video from your provider")
     m.keys.SetFocus(true)
 end sub
 
@@ -473,12 +480,13 @@ sub onState()
     else
         stopClock()
     end if
-    m.spinner.visible = (state = "buffering")
-    if state = "buffering" then
-        m.spinner.control = "start"
-    else
-        m.spinner.control = "stop"
+    trace("video " + state)
+    if state = "buffering" and m.started then
+        waitFor("Waiting for more of the video")
+    else if state = "playing" or state = "paused" or state = "error" or state = "finished" then
+        stopWaiting()
     end if
+    syncSpinner()
     renderPlayButton()
 
     if state = "playing" then
@@ -537,6 +545,7 @@ end sub
 
 sub onPlaybackError()
     m.errors.Push(describeRokuError())
+    trace("Roku says: " + m.errors.Peek())
     if m.route = "helper" then
         helperFailed()
         return
@@ -602,8 +611,7 @@ end function
 
 sub startProbe()
     m.video.control = "stop"
-    m.spinner.visible = true
-    m.spinner.control = "start"
+    waitFor("Checking why your provider didn't send it")
     m.probeTask = CreateObject("roSGNode", "XtreamTask")
     m.probeTask.request = { mode: "probe", url: currentStreamUrl(), agents: UserAgentsToTry(FieldStr(m.global.creds, "userAgent")) }
     m.probeTask.ObserveField("result", "onProbeResult")
@@ -653,6 +661,9 @@ function probeLine(res as Object) as String
 end function
 
 sub showPlaybackError()
+    stopWaiting()
+    syncSpinner()
+    trace("error screen")
     m.failed = true
     m.countdown.control = "stop"
     m.upNext.visible = false
@@ -771,8 +782,7 @@ sub startHelper(startAt as Integer)
     state = m.video.state
     wasStreaming = state = "playing" or state = "paused" or state = "buffering"
     m.video.control = "stop"
-    m.spinner.visible = true
-    m.spinner.control = "start"
+    waitFor("Getting ready to play it through your computer")
     if wasStreaming then
         pauseThen("helper")
     else
@@ -783,8 +793,7 @@ end sub
 ' Gives the provider a moment to notice a closed connection, then goes on.
 sub pauseThen(what as String)
     m.afterPause = what
-    m.spinner.visible = true
-    m.spinner.control = "start"
+    waitFor("Letting go of the last connection")
     m.pauseTimer.control = "stop"
     m.pauseTimer.control = "start"
 end sub
@@ -796,8 +805,7 @@ sub retryLater(what as String)
     m.retryFrom = m.startAt
     m.retryWhat = what
     m.video.control = "stop"
-    m.spinner.visible = true
-    m.spinner.control = "start"
+    waitFor("Your provider's server had a problem, so trying again in a moment")
     m.retryTimer.control = "stop"
     m.retryTimer.control = "start"
 end sub
@@ -833,8 +841,10 @@ sub helperGo()
     item = currentItem()
     config = TranscoderConfig()
     if m.helperInfo = invalid then
+        waitFor("Your computer is opening the file from your provider")
         runHelper({ mode: "info", url: HelperInfoUrl(config, streamKind(), item.id, item.ext) }, "onHelperInfo")
     else if not m.helperHashAsked and LoadOsAccount() <> invalid then
+        waitFor("Your computer is reading the file's fingerprint for subtitles")
         runHelper({ mode: "hash", url: HelperHashUrl(config, streamKind(), item.id, item.ext) }, "onHelperHash")
     else
         requestStart(m.startAt)
@@ -863,6 +873,7 @@ sub onHelperInfo(event as Object)
     if result = invalid then return
     if not result.ok then
         problem = FieldStr(result, "error")
+        trace("your computer: " + problem)
         if ProviderServerTrouble(problem) and not m.serverRetried then
             retryLater("helper")
             return
@@ -896,8 +907,7 @@ sub requestStart(startAt as Integer)
     m.started = false
     m.helperPlayed = false
     m.pendingSeek = -1
-    m.spinner.visible = true
-    m.spinner.control = "start"
+    waitFor("Your computer is starting to convert it")
     if m.helperInfo = invalid then
         helperGo()
         return
@@ -919,6 +929,7 @@ sub onHelperStart(event as Object)
     if result = invalid then return
     if not result.ok then
         problem = FieldStr(result, "error")
+        trace("your computer: " + problem)
         if ProviderServerTrouble(problem) and not m.serverRetried then
             retryLater("helperStart")
             return
@@ -961,8 +972,7 @@ sub openHelper()
     m.video.visible = true
     m.video.content = content
     m.video.control = "play"
-    m.spinner.visible = true
-    m.spinner.control = "start"
+    waitFor("Waiting for the first part from your computer")
     m.keys.SetFocus(true)
 end sub
 
@@ -988,8 +998,7 @@ sub helperFailed()
         return
     end if
     m.startAt = target
-    m.spinner.visible = true
-    m.spinner.control = "start"
+    waitFor("Asking your computer what went wrong")
     runHelper({ mode: "lastError", url: HelperErrorUrl(TranscoderConfig()) }, "onHelperLastError")
 end sub
 
@@ -1054,6 +1063,59 @@ function helperDiagnosis(item as Object) as String
     if config <> invalid and Len(config.key) >= 3 then text = text.Replace(config.key, "••••")
     return text
 end function
+
+' --- Waiting -------------------------------------------------------------------
+'
+' While the spinner turns, the words under it say what it waits for (the provider, the
+' helper, a retry), with the time since the wait began from 3 s on, so a long wait says
+' where it is. Each step also goes to the Roku's log (port 8085), without the login, the
+' provider's address or the helper's key.
+
+sub waitFor(words as String)
+    if not m.waiting then
+        m.waiting = true
+        m.waitClock.Mark()
+        m.waitTimer.control = "start"
+    end if
+    if words <> m.waitText then
+        m.waitText = words
+        trace(words)
+    end if
+    syncSpinner()
+    showWaitNote()
+end sub
+
+sub stopWaiting()
+    m.waiting = false
+    m.waitText = ""
+    m.waitTimer.control = "stop"
+    m.waitNote.visible = false
+end sub
+
+sub showWaitNote()
+    if not m.waiting then return
+    seconds = m.waitClock.TotalSeconds()
+    m.waitNote.text = m.waitText + "   ·   " + FormatClock(seconds)
+    m.waitNote.visible = seconds >= 3
+end sub
+
+' The spinner turns while a step is out or the video buffers.
+sub syncSpinner()
+    turning = m.waiting or m.video.state = "buffering"
+    m.spinner.visible = turning
+    if turning then
+        m.spinner.control = "start"
+    else
+        m.spinner.control = "stop"
+    end if
+end sub
+
+sub trace(text as String)
+    key = ""
+    config = TranscoderConfig()
+    if config <> invalid then key = ToStr(config.key)
+    print "[ARAN+ player] " + LogSafe(text, m.global.creds, key)
+end sub
 
 ' --- Long pauses ---------------------------------------------------------------
 '
@@ -1679,6 +1741,7 @@ end sub
 
 sub close()
     m.closing = true
+    stopWaiting()
     m.global.playing = false
     m.autoSubTimer.control = "stop"
     if m.osTask <> invalid then m.osTask.UnobserveField("result")

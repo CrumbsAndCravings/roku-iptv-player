@@ -18,6 +18,8 @@
          stands in for the paused frame. -->
     <Poster id="restPicture" width="1280" height="720" loadDisplayMode="scaleToZoom" opacity="0.55" visible="false" />
     <BusySpinner id="spinner" translation="[608, 328]" spinInterval="1" visible="false" />
+    <!-- What the spinner waits for, and how long it has (waitFor). -->
+    <Label id="waitNote" translation="[190, 410]" width="900" horizAlign="center" color="0xC3B8E6FF" visible="false" />
 
     <Group id="controls" visible="false">
       <!-- Dims the video behind the row of pictures while choosing a jump. -->
@@ -147,6 +149,8 @@
     <Timer id="autoSubTimer" duration="2.5" repeat="false" />
     <!-- Draws the online subtitles' words in time with the video (drawSubtitles). -->
     <Timer id="cueTimer" duration="0.1" repeat="true" />
+    <!-- Counts the seconds under the spinner. -->
+    <Timer id="waitTimer" duration="1" repeat="true" />
     <!-- Closes the timing box once it's left alone. -->
     <Timer id="timingTimer" duration="8" repeat="false" />
     <!-- Paused this long, the stream lets go of the provider's connection. -->

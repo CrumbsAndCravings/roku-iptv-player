@@ -281,9 +281,21 @@ function HttpCodeIn(text as String) as Integer
     return 0
 end function
 
+' `text` for the Roku's log: the provider's address (with and without http://), the
+' username, the password and the helper's key become "••••".
+function LogSafe(text as String, creds as Dynamic, helperKey as String) as String
+    server = FieldStr(creds, "server")
+    secrets = [server, FieldStr(creds, "password"), FieldStr(creds, "username"), helperKey]
+    if Instr(1, server, "://") > 0 then secrets.Push(Mid(server, Instr(1, server, "://") + 3))
+    for each secret in secrets
+        if Len(secret) >= 3 then text = text.Replace(secret, "••••")
+    end for
+    return text
+end function
+
 ' How ARAN+ introduces itself when a provider turns away requests that say "Roku".
 function AppUserAgent() as String
-    return "ARANplus/0.5.17"
+    return "ARANplus/0.5.18"
 end function
 
 ' A plain desktop web browser, for providers whose servers only answer browsers (a
