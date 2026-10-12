@@ -3,7 +3,7 @@
   One OpenSubtitles request off the UI thread. Set `request`, then control = "RUN".
     { mode: "login", account }                     checks the key (and login, if given)
     { mode: "find", account, kind, ... }           best English candidates for a title
-    { mode: "download", account, fileId, shift }   a link to the subtitle file
+    { mode: "download", account, fileId }          the file: { link, cues, text }
   `result` always carries ok, and an updated account when a sign-in refreshed its token.
 -->
 <component name="SubtitleTask" extends="Task">

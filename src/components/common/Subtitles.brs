@@ -120,11 +120,6 @@ function SplitSavedCandidates(candidates as Object) as Object
     return { saved: saved, found: found }
 end function
 
-' The saved file's address, moved `delayMs` later (earlier when negative) by the service.
-function SavedSubtitleUrl(file as String, delayMs as Integer) as String
-    if delayMs = 0 then return file
-    return file + "&delay=" + delayMs.ToStr()
-end function
 
 ' Saved subtitles need the sync service from October 2026 on; an older one answers 404.
 function OldSyncText() as String
@@ -137,4 +132,114 @@ function SubtitleSaveText(code as Integer, error as String) as String
     text = "These subtitles couldn't be saved for next time."
     if error <> "" then text = text + " " + error
     return text
+end function
+
+' --- Subtitles the app draws itself ------------------------------------------------
+'
+' Online subtitles (OpenSubtitles' and the saved ones) are drawn by the player rather
+' than handed to Roku's, which only reads a subtitle file when a stream opens: drawn,
+' they come on and move in time at once, without opening the stream again.
+
+' SRT or WebVTT text -> cues [{ s, e, t }]: start and end in ms, the words (lines
+' joined by Chr(10), tags taken out), in order of start.
+function ParseCues(text as String) as Object
+    cues = []
+    if Left(text, 1) = Chr(65279) then text = Mid(text, 2)
+    lines = text.Replace(Chr(13), "").Split(Chr(10))
+    ' Made once for the whole file: a TV is slow to make them.
+    patterns = cuePatterns()
+    i = 0
+    while i < lines.Count()
+        found = patterns.timing.Match(lines[i])
+        i = i + 1
+        if found.Count() > 2 then
+            start = cueTimeWith(patterns, found[1])
+            finish = cueTimeWith(patterns, found[2])
+            words = []
+            while i < lines.Count() and lines[i].Trim() <> ""
+                words.Push(lines[i])
+                i = i + 1
+            end while
+            said = cueWordsWith(patterns, words.Join(Chr(10)))
+            if start >= 0 and finish > start and said <> "" then cues.Push({ s: start, e: finish, t: said })
+        end if
+    end while
+    cues.SortBy("s")
+    return cues
+end function
+
+function cuePatterns() as Object
+    return {
+        timing: CreateObject("roRegex", "^\s*(\S+)\s+-->\s+(\S+)", "")
+        time: CreateObject("roRegex", "^(?:(\d+):)?(\d{1,2}):(\d{1,2})(?:[.,](\d{1,3}))?$", "")
+        tags: CreateObject("roRegex", "<[^>]*>", "")
+        styles: CreateObject("roRegex", "\{\\[^}]*\}", "")
+    }
+end function
+
+' "01:02:03,456", "02:03.456" or "02:03" -> ms; -1 when it isn't a time.
+function CueTime(token as String) as Integer
+    return cueTimeWith(cuePatterns(), token)
+end function
+
+function cueTimeWith(patterns as Object, token as String) as Integer
+    found = patterns.time.Match(token.Trim())
+    if found.Count() < 4 then return -1
+    hours = 0
+    if found[1] <> "" then hours = found[1].ToInt()
+    fraction = 0
+    if found.Count() > 4 and found[4] <> "" then fraction = Left(found[4] + "00", 3).ToInt()
+    return ((hours * 60 + found[2].ToInt()) * 60 + found[3].ToInt()) * 1000 + fraction
+end function
+
+' A cue's words without formatting: <i>, <font ...>, {\an8} and the like go, and the
+' few entities WebVTT uses read as themselves.
+function CueWords(text as String) as String
+    return cueWordsWith(cuePatterns(), text)
+end function
+
+function cueWordsWith(patterns as Object, text as String) as String
+    text = patterns.tags.ReplaceAll(text, "")
+    text = patterns.styles.ReplaceAll(text, "")
+    text = text.Replace("&nbsp;", " ").Replace("&lt;", "<").Replace("&gt;", ">").Replace("&amp;", "&")
+    lines = []
+    for each line in text.Split(Chr(10))
+        if line.Trim() <> "" then lines.Push(line.Trim())
+    end for
+    return lines.Join(Chr(10))
+end function
+
+' What shows at `t` ms: the cue that started last before it, with any earlier ones
+' still on above it; "" between cues.
+function CueTextAt(cues as Object, t as Integer) as String
+    low = 0
+    high = cues.Count() - 1
+    last = -1
+    while low <= high
+        half = (low + high) \ 2
+        if cues[half].s <= t then
+            last = half
+            low = half + 1
+        else
+            high = half - 1
+        end if
+    end while
+    if last < 0 then return ""
+    texts = []
+    i = last
+    while i >= 0 and last - i < 4
+        if cues[i].e > t then texts.Unshift(cues[i].t)
+        i = i - 1
+    end while
+    return texts.Join(Chr(10))
+end function
+
+' How the timing reads: 300 -> "0.3 s later", -1200 -> "1.2 s earlier", 0 -> "on time".
+function DelayLabel(delayMs as Integer) as String
+    if delayMs = 0 then return "on time"
+    size = delayMs
+    if size < 0 then size = 0 - size
+    text = (size \ 1000).ToStr() + "." + ((size MOD 1000) \ 100).ToStr() + " s"
+    if delayMs > 0 then return text + " later"
+    return text + " earlier"
 end function
