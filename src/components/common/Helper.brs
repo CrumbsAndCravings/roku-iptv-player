@@ -25,21 +25,19 @@ function helperBase(config as Object, path as String) as String
 end function
 
 ' What the file holds, and what the helper would do with each track.
-function HelperInfoUrl(config as Object, kind as String, id as String, ext as String) as String
-    return helperBase(config, "/v1/info") + "&" + HelperFileQuery(kind, id, ext)
+' The file's OpenSubtitles fingerprint from what the helper keeps of it (the start and
+' the end FFmpeg read), asked while the film plays: never a request to the provider,
+' whose one connection the film is using (helper 1.9 and newer; "" when it isn't kept).
+function HelperKeptHashUrl(config as Object, kind as String, id as String, ext as String) as String
+    return helperBase(config, "/v1/hash") + "&" + HelperFileQuery(kind, id, ext) + "&kept=1"
 end function
 
-' The file's OpenSubtitles fingerprint, read by the helper, so the Roku makes no
-' requests to the provider of its own.
-function HelperHashUrl(config as Object, kind as String, id as String, ext as String) as String
-    return helperBase(config, "/v1/hash") + "&" + HelperFileQuery(kind, id, ext)
-end function
-
-' Starts the converted video, playing from `start` seconds; the helper answers once the
-' first piece is ready (ParseHelperStart). choice is { video, height, hevc, track }
-' (HelperVideo, HelperHeight, whether this Roku decodes HEVC, HelperTrack). The whole
-' film's playlist (vod=1) in MPEG-TS pieces; the picture and the one sound track
-' become H.264 and stereo AAC.
+' Starts the converted video, playing from `start` seconds: the one request to the
+' helper before a film, which describes the file itself and answers once the first
+' piece is ready (ParseHelperStart). choice is { video, height, hevc, track, language }
+' (HelperVideo, HelperHeight, whether this Roku decodes HEVC, HelperTrack or -1, and
+' the sound language to pick without a track). The whole film's playlist (vod=1) in
+' MPEG-TS pieces; the picture and the one sound track become H.264 and stereo AAC.
 function HelperStartUrl(config as Object, kind as String, id as String, ext as String, start as Integer, choice as Object) as String
     if start < 0 then start = 0
     url = helperBase(config, "/v1/hls/start") + "&" + HelperFileQuery(kind, id, ext) + "&start=" + start.ToStr() + "&vod=1&format=ts"
@@ -49,7 +47,12 @@ function HelperStartUrl(config as Object, kind as String, id as String, ext as S
     if height > 0 then url = url + "&height=" + height.ToStr()
     if not helperFlag(choice, "hevc") then url = url + "&hevc=0"
     track = Field(choice, "track")
-    if track <> invalid and ToInt(track) >= 0 then url = url + "&a=" + ToInt(track).ToStr()
+    language = LCase(FieldStr(choice, "language"))
+    if track <> invalid and ToInt(track) >= 0 then
+        url = url + "&a=" + ToInt(track).ToStr()
+    else if CreateObject("roRegex", "^[a-z]{2,3}$", "").IsMatch(language) then
+        url = url + "&alang=" + language
+    end if
     return url
 end function
 
@@ -189,7 +192,20 @@ function ParseHelperStart(data as Dynamic) as Object
         audioTrack: ToInt(Field(data, "audioTrack"))
         audioPlan: FieldStr(data, "audioPlan")
         previews: parseHelperPreviews(Field(data, "previews"))
+        info: HelperInfoFromStart(data)
+        hash: ParseHelperHash(data)
+        ' Helper 1.9 and newer: its answer has the tracks' plans, and /v1/hash?kept=1.
+        keeps: IsArr(Field(data, "tracks"))
     }
+end function
+
+' What the start's answer says about the file, in ParseHelperInfo's shape, so the TV
+' needs no /v1/info first: helper 1.9 lists the tracks with their plans (`tracks`) and
+' the picture's size and plan; older ones list the tracks without plans (`audio`).
+function HelperInfoFromStart(data as Dynamic) as Object
+    tracks = Field(data, "tracks")
+    if not IsArr(tracks) then tracks = Field(data, "audio")
+    return ParseHelperInfo({ duration: Field(data, "duration"), video: { codec: FieldStr(data, "videoCodec"), width: Field(data, "width"), height: Field(data, "height") }, audio: tracks, videoPlan: Field(data, "videoPlan") })
 end function
 
 ' The pictures of a whole film's playlist: one for each `every` seconds, which the helper

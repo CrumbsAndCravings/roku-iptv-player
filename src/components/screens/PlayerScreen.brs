@@ -748,7 +748,12 @@ sub resetHelper()
     m.offset = 0
     m.helperInfo = invalid
     m.helperHash = ""
-    m.helperHashAsked = false
+    ' Whether the helper was asked for the fingerprint it keeps (askKeptHash).
+    m.keptHashAsked = false
+    if m.keptHashTask <> invalid then m.keptHashTask.UnobserveField("result")
+    m.keptHashTask = invalid
+    ' Whether the sound language was put right once (onHelperStart).
+    m.trackFixed = false
     m.helperStarted = invalid
     m.helperVod = false
     m.helperTrack = -1
@@ -833,22 +838,13 @@ sub onPauseDone()
     end if
 end sub
 
-' The next step: what the file holds (once per title), its fingerprint for online
-' subtitles (once, before the stream: asking during it would stop the helper's FFmpeg),
-' then the stream.
+' The next step through the helper: the start itself, the one request before a film,
+' since the helper describes the file as it starts it (and its answer says what it
+' holds). The fingerprint for online subtitles comes in that answer, or from what the
+' helper keeps while the film plays (askKeptHash), never from the provider before it.
 sub helperGo()
     if m.closing then return
-    item = currentItem()
-    config = TranscoderConfig()
-    if m.helperInfo = invalid then
-        waitFor("Your computer is opening the file from your provider")
-        runHelper({ mode: "info", url: HelperInfoUrl(config, streamKind(), item.id, item.ext) }, "onHelperInfo")
-    else if not m.helperHashAsked and LoadOsAccount() <> invalid then
-        waitFor("Your computer is reading the file's fingerprint for subtitles")
-        runHelper({ mode: "hash", url: HelperHashUrl(config, streamKind(), item.id, item.ext) }, "onHelperHash")
-    else
-        requestStart(m.startAt)
-    end if
+    requestStart(m.startAt)
 end sub
 
 sub runHelper(request as Object, callback as String)
@@ -868,61 +864,38 @@ function helperResultFor(event as Object) as Dynamic
     return result
 end function
 
-sub onHelperInfo(event as Object)
-    result = helperResultFor(event)
-    if result = invalid then return
-    if not result.ok then
-        problem = FieldStr(result, "error")
-        trace("your computer: " + problem)
-        if ProviderServerTrouble(problem) and not m.serverRetried then
-            retryLater("helper")
-            return
-        end if
-        m.helperProblem = problem
-        showPlaybackError()
-        return
-    end if
-    info = result.info
-    m.helperInfo = info
-    canPicture = false
-    if info.videoCodec <> "" then canPicture = canDecode("video", RokuVideoCodec(info.videoCodec), "")
-    m.helperVideo = HelperVideo(info.videoPlan, canPicture)
-    helperGo()
-end sub
-
-' Without a fingerprint the search goes on by title, so a failure here isn't one.
-sub onHelperHash(event as Object)
-    result = helperResultFor(event)
-    if result = invalid then return
-    m.helperHashAsked = true
-    if result.ok then m.helperHash = FieldStr(result, "hash")
-    helperGo()
-end sub
-
 ' Asks the helper for the stream, playing from `startAt` seconds; it answers once the
-' first piece is ready.
+' first piece is ready. The sound track is the one chosen, or the first in the language
+' of the audio preference.
 sub requestStart(startAt as Integer)
     if startAt < 0 then startAt = 0
     m.startAt = startAt
     m.started = false
     m.helperPlayed = false
     m.pendingSeek = -1
-    waitFor("Your computer is starting to convert it")
-    if m.helperInfo = invalid then
-        helperGo()
-        return
-    end if
+    waitFor("Your computer is opening the file and starting to convert it")
     item = currentItem()
-    track = m.helperTrack
-    if track < 0 then track = HelperTrack(m.helperInfo.audio, FieldStr(LoadPrefs(), "audio"))
     choice = {
-        video: m.helperVideo
+        video: helperVideoChoice(item)
         height: HelperHeight(screenHeight())
         hevc: canDecode("video", "hevc", "")
-        track: track
+        track: m.helperTrack
+        language: FieldStr(LoadPrefs(), "audio")
     }
     runHelper({ mode: "start", url: HelperStartUrl(TranscoderConfig(), streamKind(), item.id, item.ext, startAt, choice) }, "onHelperStart")
 end sub
+
+' Keep the picture or convert it (for a growing playlist; a whole film's is always
+' converted): by the helper's description once there is one, else by what the provider
+' says the picture is.
+function helperVideoChoice(item as Object) as String
+    if m.helperInfo <> invalid and m.helperInfo.videoCodec <> "" then
+        return HelperVideo(m.helperInfo.videoPlan, canDecode("video", RokuVideoCodec(m.helperInfo.videoCodec), ""))
+    end if
+    codec = FieldStr(item, "videoCodec")
+    if codec <> "" and canDecode("video", RokuVideoCodec(codec), "") then return "copy"
+    return "convert"
+end function
 
 sub onHelperStart(event as Object)
     result = helperResultFor(event)
@@ -938,7 +911,23 @@ sub onHelperStart(event as Object)
         showPlaybackError()
         return
     end if
-    m.helperStarted = result.started
+    started = result.started
+    m.helperStarted = started
+    ' What the file holds, from the answer itself.
+    m.helperInfo = started.info
+    if started.hash <> "" then m.helperHash = started.hash
+    ' The helper picks the language's track by its exact code ("eng"); another way of
+    ' writing it ("en") finds it here, and the stream starts again with it, once.
+    if m.helperTrack < 0 and not m.trackFixed then
+        wanted = HelperTrack(m.helperInfo.audio, FieldStr(LoadPrefs(), "audio"))
+        if wanted >= 0 and wanted <> started.audioTrack then
+            m.trackFixed = true
+            m.helperTrack = wanted
+            trace("your computer: sound track " + wanted.ToStr() + " for the language, starting again")
+            requestStart(m.startAt)
+            return
+        end if
+    end if
     openHelper()
 end sub
 
@@ -1870,10 +1859,37 @@ sub startOnlineSearch(auto as Boolean)
         request.season = item.season
         request.episode = item.episode
     end if
+    ' Through the helper, its fingerprint first when its answer had none: from what it
+    ' keeps of the file, never the provider.
+    if m.route = "helper" and m.helperHash = "" and not m.keptHashAsked and m.helperStarted <> invalid and m.helperStarted.keeps then
+        askKeptHash(auto)
+        return
+    end if
     m.online.state = "searching"
     m.online.auto = auto
     runOsTask(request, "onOnlineFound")
     refreshTracksPanel()
+end sub
+
+sub askKeptHash(auto as Boolean)
+    m.keptHashAsked = true
+    m.keptHashAuto = auto
+    m.online.state = "searching"
+    item = currentItem()
+    m.keptHashTask = CreateObject("roSGNode", "HelperTask")
+    m.keptHashTask.request = { mode: "hash", url: HelperKeptHashUrl(TranscoderConfig(), streamKind(), item.id, item.ext), token: m.helperToken }
+    m.keptHashTask.ObserveField("result", "onKeptHash")
+    m.keptHashTask.control = "RUN"
+    refreshTracksPanel()
+end sub
+
+' Whatever it says (or nothing), the search goes on: by fingerprint and title, or title.
+sub onKeptHash(event as Object)
+    result = event.GetData()
+    m.keptHashTask = invalid
+    if m.closing or ToInt(Field(Field(result, "request"), "token")) <> m.helperToken then return
+    if ToStr(Field(result, "ok")) = "true" then m.helperHash = FieldStr(result, "hash")
+    startOnlineSearch(m.keptHashAuto)
 end sub
 
 sub onOnlineFound(event as Object)

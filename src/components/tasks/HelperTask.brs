@@ -8,7 +8,7 @@ sub work()
     ' The helper may first have to ask the provider about the file (up to 30 s), and a
     ' start answers once the first piece is made (the helper waits up to a minute).
     timeoutMs = 8000
-    if mode = "info" or mode = "hash" then timeoutMs = 50000
+    if mode = "info" then timeoutMs = 50000
     if mode = "start" then timeoutMs = 100000
     if mode = "stop" then timeoutMs = 4000
     res = helperGet(FieldStr(req, "url"), timeoutMs)
