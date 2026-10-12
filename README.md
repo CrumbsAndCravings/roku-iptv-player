@@ -27,7 +27,7 @@ Remote shortcuts: **Left** from a row's first poster (or **Up** from the first r
 |---|---|
 | OK | Pause and show the controls |
 | Up / Down | Show the controls |
-| Left / Right (or ⏪ ⏩) | Preview a jump of 10 seconds; hold to go faster (30 s steps after 1.5 s, then doubling every 1.5 s, up to 10 min per step). The video jumps shortly after you let go. Through [the helper](#the-helper-on-your-computer), a picture of that moment shows above the bar. |
+| Left / Right (or ⏪ ⏩) | Preview a jump of 10 seconds; hold to go faster (30 s steps after 1.5 s, then doubling every 1.5 s, up to 10 min per step). The video jumps shortly after you let go. Through [the helper](#the-helper-on-your-computer), a row of pictures shows above the bar: where you'd land in the middle, where the next presses would either side. |
 | Play/Pause | Pause or resume |
 | Instant replay | Back 10 seconds |
 | \* | Audio & subtitles |
@@ -43,7 +43,7 @@ For other failures the player retries once without a format hint, then shows wha
 
 ## The helper on your computer
 
-The helper is a small program on a computer at home, switched on while you watch, that uses [FFmpeg](https://ffmpeg.org) to turn files the Roku can't play into a stream it can. It lives in the Samsung app's repo ([CrumbsAndCravings/Samsung-IPTV-Player](https://github.com/CrumbsAndCravings/Samsung-IPTV-Player), `helper/`, on its default branch: helper 1.2, which also serves the iPhone app), and the Samsung TV, the iPhone and the Roku share it.
+The helper is a small program on a computer at home, switched on while you watch, that uses [FFmpeg](https://ffmpeg.org) to turn files the Roku can't play into a stream it can. It lives in the Samsung app's repo ([CrumbsAndCravings/Samsung-IPTV-Player](https://github.com/CrumbsAndCravings/Samsung-IPTV-Player), `helper/`, on its default branch: helper 1.8 for the row of pictures, which also serves the iPhone app), and the Samsung TV, the iPhone and the Roku share it.
 
 **What goes through it:**
 
@@ -56,7 +56,7 @@ The helper is a small program on a computer at home, switched on while you watch
 
 - **The time bar** shows the whole film, and resuming starts right where you were.
 - **Jumping** is the Roku's own: a piece the helper has made plays at once, and one further away takes a few seconds while the helper starts converting from there.
-- **Pictures while you choose a jump:** holding Left/Right shows a picture of where you'd land, for every part the helper has converted: behind you, and ahead as far as it has got. Further on there's just the time, since asking the provider for pictures would stop the film (it allows one connection).
+- **Pictures while you choose a jump** (helper 1.8 and newer): pressing or holding Left/Right shows a row of five pictures, where you'd land in the middle and where the next two presses would either side, one for every ten seconds of the film, as Crunchyroll's TV apps show theirs. The Roku keeps the film's pictures itself, fetching what's new from the helper in one file every few seconds, so each press shows its pictures at once. A picture still on its way pulses as a placeholder; further on than the helper has converted there's an empty card saying "Not converted yet", since asking the provider for pictures would stop the film (it allows one connection). An older helper shows just the time.
 - **Another language:** the Audio column lists the file's sound tracks; picking one starts the stream again with it, from where you were.
 - **Online subtitles** work as they do for any other video. Subtitle tracks built into the file don't come through.
 - **When you leave a video,** the Roku tells the helper to stop, so the provider's one connection is free for whatever plays next.
@@ -137,6 +137,7 @@ src/
     tasks/SearchTask.*        background library index; SearchIndex.brs does the matching (tested)
     tasks/SubtitleTask.*      OpenSubtitles sign-in, search and download; common/Subtitles.brs (tested)
     tasks/HelperTask.*        requests to the helper on a computer at home; common/Helper.brs (tested)
+    tasks/PreviewTask.*       a whole film's jump pictures kept on the TV, fetched from the helper
     common/                   Utils, Registry, Progress (Continue Watching), Taste (what you watch and rate),
                               MyList, Pills (buttons),
                               Motion (springs, tweens, Sound)
