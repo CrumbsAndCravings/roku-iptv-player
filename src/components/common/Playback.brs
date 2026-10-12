@@ -39,3 +39,16 @@ end function
 function ServerTroubleText() as String
     return "Your provider's server had a problem sending this video. That's on their side, not your internet or this TV. Wait a minute and try again."
 end function
+
+
+' Whether a direct stream failed because the provider didn't send it: no connection
+' (Roku's code 0), a timeout (-2) or a server error (5xx). Not a file this TV can't play,
+' so the helper, which asks the same provider, isn't tried.
+function ProviderUnanswered(code as Integer, text as String) as Boolean
+    if code = 0 or code = -2 then return true
+    return ProviderServerTrouble(text)
+end function
+
+function ProviderSilentText(seconds as Integer) as String
+    return "Your provider didn't send this video: nothing arrived in " + seconds.ToStr() + " seconds. That's on their side, not your internet or this TV. Wait a minute and try again. If only this title does it, the provider's copy of it may be broken."
+end function

@@ -122,6 +122,12 @@ sub init()
     m.waitTimer = m.top.FindNode("waitTimer")
     m.waitTimer.ObserveField("fire", "showWaitNote")
     m.waitClock = CreateObject("roTimespan")
+    m.startTimer = m.top.FindNode("startTimer")
+    m.startTimer.ObserveField("fire", "onStartTimer")
+    m.startExtends = 0
+    m.providerSilent = false
+    m.unanswered = false
+    m.silentSeconds = 45
     m.waiting = false
     m.waitText = ""
     m.ownSubs = m.top.FindNode("ownSubs")
@@ -249,6 +255,10 @@ sub startItem(startAt as Integer)
     m.errors = []
     m.serverRetried = false
     m.retryTimer.control = "stop"
+    m.startTimer.control = "stop"
+    m.providerSilent = false
+    m.unanswered = false
+    m.silentSeconds = 45
     m.pendingAudio = ""
     resetRelease()
     resetProbe()
@@ -353,6 +363,9 @@ sub loadStream()
     m.video.content = content
     m.video.control = "play"
     waitFor("Waiting for the video from your provider")
+    m.startExtends = 0
+    m.startTimer.control = "stop"
+    m.startTimer.control = "start"
     m.keys.SetFocus(true)
 end sub
 
@@ -481,6 +494,7 @@ sub onState()
         stopClock()
     end if
     trace("video " + state)
+    if state = "playing" or state = "error" then m.startTimer.control = "stop"
     if state = "buffering" and m.started then
         waitFor("Waiting for more of the video")
     else if state = "playing" or state = "paused" or state = "error" or state = "finished" then
@@ -556,6 +570,12 @@ sub onPlaybackError()
         retryLater("direct")
         return
     end if
+    ' No answer, a timeout, or the server's error again: another format hint or another
+    ' way of asking won't change that.
+    if ProviderUnanswered(m.video.errorCode, rokuErrorText()) then
+        directFailed()
+        return
+    end if
     ' A refused request won't change with a different format hint, so ask the server
     ' directly, as a Roku and as ARAN+, whether it would send this video.
     if not m.probed and isHttpRefusal() then
@@ -573,11 +593,32 @@ end sub
 ' The stream didn't play on its own: try it through the helper on your computer, unless
 ' the provider turned it down every way (it won't do better through the helper).
 sub directFailed()
-    if HelperRoute(m.check, { failed: true, refused: m.probeRefused }, HelperOn(), m.helperTried) then
+    m.unanswered = m.providerSilent or ProviderUnanswered(m.video.errorCode, rokuErrorText())
+    if HelperRoute(m.check, { failed: true, refused: m.probeRefused, unanswered: m.unanswered }, HelperOn(), m.helperTried) then
         startHelper(m.startAt)
         return
     end if
     showPlaybackError()
+end sub
+
+' A direct stream that hasn't started in 45 s: while something is arriving (Roku says
+' how much it has buffered), it gets 45 s more, twice; otherwise the provider isn't
+' sending it, which Roku itself would wait two minutes to say.
+sub onStartTimer()
+    if m.closing or m.started or m.route <> "direct" or m.released or m.failed then return
+    status = m.video.bufferingStatus
+    if IsAA(status) and ToInt(Field(status, "percentage")) > 0 and m.startExtends < 2 then
+        m.startExtends = m.startExtends + 1
+        trace("still arriving (" + ToInt(status.percentage).ToStr() + "%), waiting longer")
+        m.startTimer.control = "start"
+        return
+    end if
+    m.providerSilent = true
+    m.silentSeconds = m.waitClock.TotalSeconds()
+    m.video.control = "stop"
+    m.errors.Push("nothing arrived from your provider in " + m.silentSeconds.ToStr() + " seconds")
+    trace("Roku says: " + m.errors.Peek())
+    directFailed()
 end sub
 
 sub retryWithoutHint()
@@ -698,7 +739,11 @@ function diagnosis() as String
     item = currentItem()
     if m.route = "helper" then return helperDiagnosis(item)
     lines = []
-    if ProviderServerTrouble(ToStr(m.errors.Peek())) then lines.Push(ServerTroubleText())
+    if ProviderServerTrouble(ToStr(m.errors.Peek())) then
+        lines.Push(ServerTroubleText())
+    else if m.unanswered then
+        lines.Push(ProviderSilentText(m.silentSeconds))
+    end if
     lines.Push("Roku says: " + m.errors.Peek())
     if m.formatRetried then lines.Push("Tried twice: with the format hint from the file name, then without it.")
     if m.agentSwitched then lines.Push("The server accepted another way of asking, so it tried again " + UserAgentName(FieldStr(m.global.creds, "userAgent")) + ".")
@@ -1084,7 +1129,11 @@ end sub
 sub showWaitNote()
     if not m.waiting then return
     seconds = m.waitClock.TotalSeconds()
-    m.waitNote.text = m.waitText + "   ·   " + FormatClock(seconds)
+    words = m.waitText
+    ' Something is arriving: how much of what Roku wants before it plays.
+    status = m.video.bufferingStatus
+    if m.video.state = "buffering" and IsAA(status) and ToInt(Field(status, "percentage")) > 0 then words = words + " (" + ToInt(status.percentage).ToStr() + "%)"
+    m.waitNote.text = words + "   ·   " + FormatClock(seconds)
     m.waitNote.visible = seconds >= 3
 end sub
 
@@ -1739,6 +1788,7 @@ sub close()
     m.pauseTimer.control = "stop"
     m.cueTimer.control = "stop"
     m.timingTimer.control = "stop"
+    m.startTimer.control = "stop"
     m.releaseTimer.control = "stop"
     m.retryTimer.control = "stop"
     cancelSeek()

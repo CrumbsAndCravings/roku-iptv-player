@@ -81,8 +81,9 @@ function HelperRoute(check as Object, state as Object, setUp as Boolean, tried a
     if not setUp or tried then return false
     if FieldStr(check, "blocked") <> "" then return true
     if helperFlag(state, "listed") then return true
-    ' A stream the provider turns away won't come through the helper either.
-    if helperFlag(state, "failed") then return not helperFlag(state, "refused")
+    ' A stream the provider turns away, or doesn't send at all, won't come through the
+    ' helper either: it asks the same provider.
+    if helperFlag(state, "failed") then return not helperFlag(state, "refused") and not helperFlag(state, "unanswered")
     return helperFlag(state, "silent")
 end function
 

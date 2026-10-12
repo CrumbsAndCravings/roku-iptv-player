@@ -149,6 +149,9 @@
     <Timer id="autoSubTimer" duration="2.5" repeat="false" />
     <!-- Draws the online subtitles' words in time with the video (drawSubtitles). -->
     <Timer id="cueTimer" duration="0.1" repeat="true" />
+    <!-- How long a direct stream may take to start before the provider counts as not
+         sending it (Roku itself waits about two minutes). -->
+    <Timer id="startTimer" duration="45" repeat="false" />
     <!-- Counts the seconds under the spinner. -->
     <Timer id="waitTimer" duration="1" repeat="true" />
     <!-- Closes the timing box once it's left alone. -->
