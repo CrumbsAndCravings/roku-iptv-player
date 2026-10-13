@@ -114,6 +114,12 @@ sub init()
     m.toastText.font = MakeFont("Nunito-SemiBold", 18)
     m.toastTimer = m.top.FindNode("toastTimer")
     m.toastTimer.ObserveField("fire", "hideToast")
+    m.fileSubTimer = m.top.FindNode("fileSubTimer")
+    m.fileSubTimer.ObserveField("fire", "onFileSubTimer")
+    m.fileSubTask = invalid
+    m.fileSubsN = -1
+    m.fileSubsSoon = false
+    m.ownSource = ""
     m.pauseTimer = m.top.FindNode("pauseTimer")
     m.pauseTimer.ObserveField("fire", "onPauseDone")
     m.afterPause = ""
@@ -292,6 +298,21 @@ sub startItem(startAt as Integer)
         startHelper(resumePoint(startAt))
         return
     end if
+    ' Everything else goes through the helper too, unless that's turned off (Account):
+    ' once the computer has answered, since this TV could play it straight from the
+    ' provider when it doesn't (m.helperOptional).
+    if HelperRoute(m.check, { all: HelperForAll() }, HelperOn(), false) then
+        m.helperOptional = true
+        m.helperFromStart = true
+        waitFor("Checking that your computer is on")
+        runHelper({ mode: "ping", url: HelperPingUrl(TranscoderConfig()) }, "onHelperPing")
+        return
+    end if
+    playDirect()
+end sub
+
+' Straight from the provider, from m.startAt.
+sub playDirect()
     if m.check.blocked <> "" and not m.tryAnyway then
         showUnplayable()
         return
@@ -304,6 +325,37 @@ sub startItem(startAt as Integer)
         return
     end if
     loadStream()
+end sub
+
+sub onHelperPing(event as Object)
+    result = helperResultFor(event)
+    if result = invalid then return
+    if result.ok then
+        startHelper(resumePoint(m.startAt))
+        return
+    end if
+    trace("your computer didn't answer, so straight from the provider")
+    m.helperOptional = false
+    m.helperFromStart = false
+    showToast("Your computer isn't answering, so this plays straight from your provider.")
+    playDirect()
+end sub
+
+' A title this TV plays itself, when the helper couldn't start it or keep it going:
+' straight from the provider from m.startAt, rather than an error.
+sub fallBackToDirect(problem as String)
+    trace("your computer couldn't play it (" + problem + "), so straight from the provider")
+    m.helperOptional = false
+    m.route = "direct"
+    m.offset = 0
+    m.helperVod = false
+    m.helperPreviews = invalid
+    stopPreviews()
+    if Left(m.ownSource, 3) = "hs:" then hideOwn()
+    stopFileSubtitles()
+    m.started = false
+    showToast("Your computer couldn't play this, so it plays straight from your provider.")
+    playDirect()
 end sub
 
 ' Resuming backs up a few seconds, so the scene picks up where it left off.
@@ -805,6 +857,9 @@ sub resetHelper()
     m.helperVideo = "convert"
     m.helperTried = false
     m.helperFromStart = false
+    ' Whether this TV could play the title itself (sent to the helper because everything
+    ' is): then the provider takes over when the helper can't.
+    m.helperOptional = false
     m.helperPlayed = false
     m.helperProblem = ""
     m.helperSaid = ""
@@ -952,6 +1007,10 @@ sub onHelperStart(event as Object)
             retryLater("helperStart")
             return
         end if
+        if m.helperOptional then
+            fallBackToDirect(problem)
+            return
+        end if
         m.helperProblem = problem
         showPlaybackError()
         return
@@ -986,6 +1045,11 @@ sub openHelper()
     m.helperPreviews = invalid
     if started.vod then m.helperPreviews = started.previews
     startPreviews()
+    ' The file's own subtitles showing come from this session now.
+    if m.fileSubsN >= 0 then
+        dropFileSubTask()
+        fetchFileSubs()
+    end if
     ' A whole film's clock is the film's; a growing playlist's starts where it did.
     m.offset = started.start
     at = started.start
@@ -1032,6 +1096,10 @@ sub helperFailed()
         return
     end if
     m.startAt = target
+    if m.helperOptional then
+        fallBackToDirect("its stream stopped")
+        return
+    end if
     waitFor("Asking your computer what went wrong")
     runHelper({ mode: "lastError", url: HelperErrorUrl(TranscoderConfig()) }, "onHelperLastError")
 end sub
@@ -1517,6 +1585,7 @@ sub seekTo(target as Float)
         m.video.seek = target
         return
     end if
+    fileSubsSoon()
     if m.helperVod or HelperSeekInside(target, m.offset, m.video.duration) then
         m.pendingSeek = target
         m.video.seek = target - m.offset
@@ -1793,6 +1862,7 @@ sub close()
     m.retryTimer.control = "stop"
     cancelSeek()
     stopPreviews()
+    stopFileSubtitles()
     m.countdown.control = "stop"
     m.hideTimer.control = "stop"
     m.video.control = "stop"
@@ -1830,6 +1900,10 @@ sub resetOnline()
     m.cues = []
     m.subDelay = 0
     m.ownOn = false
+    ' What the drawn ones are: "" for online or saved ones, "hs:<n>" for the file's own
+    ' through the helper.
+    m.ownSource = ""
+    if m.fileSubTimer <> invalid then stopFileSubtitles()
     m.cueText = ""
     if m.cueTimer <> invalid then m.cueTimer.control = "stop"
     if m.ownSubs <> invalid then m.ownSubs.visible = false
@@ -1869,6 +1943,17 @@ end function
 sub autoSubtitles()
     if m.closing or m.failed or ownLoaded() then return
     pref = FieldStr(LoadPrefs(), "subtitles")
+    ' Through the helper, the file's own subtitles in the chosen language, or English ones
+    ' for "online" (they beat a download, as Roku's own tracks do below).
+    if m.route = "helper" and m.helperStarted <> invalid and pref <> "" and pref <> "off" then
+        wanted = pref
+        if pref = "online" then wanted = "eng"
+        track = FileSubFor(m.helperStarted.subtitles, wanted)
+        if track <> invalid then
+            chooseFileSubs(track.n)
+            return
+        end if
+    end if
     if pref <> "online" and pref <> "" then return
     if pref = "online" then
         ' Built-in English subtitles beat a download.
@@ -1991,6 +2076,9 @@ end function
 ' Drawn subtitles on, from `cues`, `delayMs` later than the file says; Roku's own
 ' captions go off.
 sub showOwn(cues as Object, fileId as String, delayMs as Integer)
+    ' Other subtitles than the file's own through the helper: those stop.
+    m.ownSource = ""
+    stopFileSubtitles()
     m.cues = cues
     m.online.fileId = fileId
     m.subDelay = delayMs
@@ -2002,30 +2090,68 @@ end sub
 
 sub hideOwn()
     m.ownOn = false
+    m.ownSource = ""
+    stopFileSubtitles()
     m.cueTimer.control = "stop"
     m.cueText = ""
     m.ownSubs.visible = false
 end sub
 
-' The words, white with a dark edge: four dark copies just around them and a soft
-' shadow below, since a Label draws no outline of its own. Three lines at most, rising
-' from just above the bottom of the screen.
+' The words in Inter (a free stand-in for Netflix Sans, which only Netflix may use), white
+' on a box of translucent black for each line, as Netflix draws them with a background.
+' Three lines at most, the last 48 px above the bottom of the screen; a line wider than
+' 1080 px wraps at a space. A Label sized to its text (no width) measures each line.
 function buildSubLabels() as Object
-    labels = []
-    for each place in [[2, 3, "0x00000080"], [-2, 0, "0x000000E6"], [2, 0, "0x000000E6"], [0, -2, "0x000000E6"], [0, 2, "0x000000E6"], [0, 0, "0xFFFFFFFF"]]
+    m.subFont = MakeFont("Inter-Medium", 32)
+    ' On the screen but never seen, so Roku lays it out like the others.
+    m.subMeasure = m.top.CreateChild("Label")
+    m.subMeasure.opacity = 0
+    m.subMeasure.font = m.subFont
+    lines = []
+    for i = 0 to 2
+        plate = m.ownSubs.CreateChild("Rectangle")
+        plate.color = "0x000000B3"
         label = m.ownSubs.CreateChild("Label")
-        label.font = MakeFont("Nunito-ExtraBold", 30)
-        label.width = 1080
-        label.height = 150
-        label.translation = [100 + place[0], 530 + place[1]]
-        label.horizAlign = "center"
-        label.vertAlign = "bottom"
-        label.wrap = true
-        label.maxLines = 3
-        label.color = place[2]
-        labels.Push(label)
+        label.font = m.subFont
+        label.color = "0xFFFFFFFF"
+        lines.Push({ plate: plate, label: label })
     end for
-    return labels
+    return lines
+end function
+
+function subWidth(text as String) as Float
+    m.subMeasure.text = text
+    return m.subMeasure.localBoundingRect().width
+end function
+
+' The cue's lines as they'll show: each wrapped at spaces to 1080 px, the last three.
+function subLines(text as String) as Object
+    lines = []
+    for each line in text.Split(Chr(10))
+        line = line.Trim()
+        if line <> "" then
+            if subWidth(line) <= 1080 then
+                lines.Push(line)
+            else
+                current = ""
+                for each word in line.Split(" ")
+                    joined = word
+                    if current <> "" then joined = current + " " + word
+                    if current <> "" and subWidth(joined) > 1080 then
+                        lines.Push(current)
+                        current = word
+                    else
+                        current = joined
+                    end if
+                end for
+                if current <> "" then lines.Push(current)
+            end if
+        end if
+    end for
+    while lines.Count() > 3
+        lines.Shift()
+    end while
+    return lines
 end function
 
 ' Every 0.1 s while they're on (cueTimer): the words for where the video is now.
@@ -2038,10 +2164,29 @@ sub drawSubtitles()
     end if
     if text = m.cueText then return
     m.cueText = text
-    for each label in m.subLabels
-        label.text = text
+    lines = []
+    if text <> "" then lines = subLines(text)
+    ' Bottom up: 46 px a line, each box 12 px wider than its words either side.
+    first = 3 - lines.Count()
+    for i = 0 to 2
+        slot = m.subLabels[i]
+        if i < first then
+            slot.plate.visible = false
+            slot.label.visible = false
+        else
+            line = lines[i - first]
+            width = subWidth(line)
+            y = 672 - (3 - i) * 46
+            slot.label.text = line
+            slot.label.translation = [640 - width / 2, y + 3]
+            slot.plate.translation = [640 - width / 2 - 12, y]
+            slot.plate.width = width + 24
+            slot.plate.height = 46
+            slot.plate.visible = true
+            slot.label.visible = true
+        end if
     end for
-    m.ownSubs.visible = text <> ""
+    m.ownSubs.visible = lines.Count() > 0
 end sub
 
 ' Draws them now, even when the words would be the same (on, or moved in time).
@@ -2083,6 +2228,108 @@ function clockNow() as Float
     if ahead > 2.0 then ahead = 2.0
     return m.clockPos + ahead
 end function
+
+' --- The file's own subtitles, through the helper ---------------------------------------
+'
+' Roku sees no subtitle tracks in the helper's stream, so the helper writes each of the
+' file's text tracks as WebVTT while it converts (subs=1) and the start's answer lists
+' them (FileSubOptions). The player draws them as it does online ones, so their timing
+' moves too, remembered on this TV for the title and track. The file grows as the helper
+' converts, so while one shows it's read again every 15 s until the helper has got to the
+' end (PreviewTask's news), and 4 s after a jump.
+
+sub chooseFileSubs(n as Integer)
+    m.fileSubsN = n
+    dropFileSubTask()
+    fetchFileSubs()
+end sub
+
+function fileSubKey(n as Integer) as String
+    return itemKey() + ":" + n.ToStr()
+end function
+
+function fileSubDelay(key as String) as Integer
+    return DelayListGet(ParseJson(ToStr(RegRead("subtitles", "delays"))), key)
+end function
+
+' The last 60 titles' and tracks' timing (on time isn't kept).
+sub saveFileSubDelay(key as String, delayMs as Integer)
+    RegWrite("subtitles", "delays", FormatJson(DelayListPut(ParseJson(ToStr(RegRead("subtitles", "delays"))), key, delayMs, 60)))
+end sub
+
+sub fetchFileSubs()
+    if m.fileSubTask <> invalid or m.helperStarted = invalid then return
+    url = ""
+    for each track in m.helperStarted.subtitles
+        if track.n = m.fileSubsN then url = track.url
+    end for
+    if url = "" then return
+    m.fileSubTask = CreateObject("roSGNode", "HelperTask")
+    m.fileSubTask.request = { mode: "subs", url: TranscoderConfig().url + url, session: m.helperSession, n: m.fileSubsN }
+    m.fileSubTask.ObserveField("result", "onFileSubs")
+    m.fileSubTask.control = "RUN"
+end sub
+
+sub onFileSubs(event as Object)
+    result = event.GetData()
+    m.fileSubTask = invalid
+    request = Field(result, "request")
+    if m.closing or m.route <> "helper" or FieldStr(request, "session") <> m.helperSession or ToInt(Field(request, "n")) <> m.fileSubsN then return
+    ' A failed read is tried again with the next look.
+    if result.ok then
+        n = m.fileSubsN
+        source = "hs:" + n.ToStr()
+        if m.ownOn and m.ownSource = source then
+            ' More of them, as the helper went on.
+            m.cues = result.cues
+            redrawSubtitles()
+        else
+            showOwn(result.cues, "", fileSubDelay(fileSubKey(n)))
+            m.fileSubsN = n
+            m.ownSource = source
+            refreshTracksPanel()
+        end if
+    end if
+    if m.fileSubTimer.control <> "start" then m.fileSubTimer.control = "start"
+end sub
+
+sub onFileSubTimer()
+    if m.fileSubTimer.duration <> 15 then
+        m.fileSubTimer.control = "stop"
+        m.fileSubTimer.duration = 15
+        m.fileSubTimer.control = "start"
+    end if
+    if m.closing or m.route <> "helper" or m.fileSubsN < 0 then
+        m.fileSubTimer.control = "stop"
+        return
+    end if
+    ' Nothing new once the helper has converted to the end, unless just after a jump.
+    loaded = m.ownOn and m.ownSource = "hs:" + m.fileSubsN.ToStr()
+    if loaded and not m.fileSubsSoon and IsAA(m.previewNews) and not IsArr(m.previewNews.running) then return
+    m.fileSubsSoon = false
+    fetchFileSubs()
+end sub
+
+' After a jump through the helper: a new stretch may be converting, so look in 4 s.
+sub fileSubsSoon()
+    if m.fileSubsN < 0 then return
+    m.fileSubsSoon = true
+    m.fileSubTimer.control = "stop"
+    m.fileSubTimer.duration = 4
+    m.fileSubTimer.control = "start"
+end sub
+
+sub dropFileSubTask()
+    if m.fileSubTask <> invalid then m.fileSubTask.UnobserveField("result")
+    m.fileSubTask = invalid
+end sub
+
+sub stopFileSubtitles()
+    m.fileSubsN = -1
+    m.fileSubsSoon = false
+    m.fileSubTimer.control = "stop"
+    dropFileSubTask()
+end sub
 
 ' --- Subtitle timing ----------------------------------------------------------------
 '
@@ -2235,6 +2482,10 @@ end sub
 ' ones. While a download is still being saved, its timing goes with it, and any moved
 ' since follows when it's done (onSubtitleShared).
 sub saveSubDelay()
+    if Left(m.ownSource, 3) = "hs:" then
+        saveFileSubDelay(fileSubKey(Mid(m.ownSource, 4).ToInt()), m.subDelay)
+        return
+    end if
     if m.saved = invalid or m.saved.fileId <> m.online.fileId or m.saved.delayMs = m.subDelay then return
     m.saved.delayMs = m.subDelay
     request = syncRequestFor("subtitle-delay")
@@ -2273,6 +2524,8 @@ end sub
 ' needed), then the online choices for the current state.
 sub buildSubtitleOptions()
     options = SubtitleOptions(m.video.availableSubtitleTracks)
+    ' Through the helper, the file's own tracks (Roku sees none in its stream).
+    if m.route = "helper" and m.helperStarted <> invalid then options.Append(FileSubOptions(m.helperStarted.subtitles))
     split = SplitSavedCandidates(m.online.candidates)
     for each candidate in split.saved
         options.Push({ id: "os:file:" + candidate.fileId, label: SubtitleLabel(candidate), language: "eng" })
@@ -2442,6 +2695,7 @@ function activeAudioIndex() as Integer
 end function
 
 function activeSubtitleIndex() as Integer
+    if m.ownOn and m.ownSource <> "" then return OptionIndex(m.subOptions, "id", m.ownSource)
     if m.ownOn then return OptionIndex(m.subOptions, "id", "os:file:" + m.online.fileId)
     if ToStr(m.video.globalCaptionMode) <> "On" then return 0
     return OptionIndex(m.subOptions, "id", ToStr(m.video.subtitleTrack))
@@ -2464,6 +2718,12 @@ sub chooseTrack()
         m.video.audioTrack = option.id
     else
         option = m.subOptions[m.subCursor]
+        if Left(option.id, 3) = "hs:" then
+            chooseFileSubs(Mid(option.id, 4).ToInt())
+            if option.language <> "" then SavePref("subtitles", option.language)
+            renderTracks()
+            return
+        end if
         if Left(option.id, 3) = "os:" then
             chooseOnline(option.id)
             return

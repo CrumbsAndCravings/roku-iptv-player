@@ -24,7 +24,11 @@ function helperBase(config as Object, path as String) as String
     return config.url + path + "?key=" + ToStr(config.key).EncodeUriComponent()
 end function
 
-' What the file holds, and what the helper would do with each track.
+' Whether the helper is there at all: its plain "/" answers at once, with no key.
+function HelperPingUrl(config as Object) as String
+    return config.url + "/"
+end function
+
 ' The file's OpenSubtitles fingerprint from what the helper keeps of it (the start and
 ' the end FFmpeg read), asked while the film plays: never a request to the provider,
 ' whose one connection the film is using (helper 1.9 and newer; "" when it isn't kept).
@@ -37,10 +41,11 @@ end function
 ' piece is ready (ParseHelperStart). choice is { video, height, hevc, track, language }
 ' (HelperVideo, HelperHeight, whether this Roku decodes HEVC, HelperTrack or -1, and
 ' the sound language to pick without a track). The whole film's playlist (vod=1) in
-' MPEG-TS pieces; the picture and the one sound track become H.264 and stereo AAC.
+' MPEG-TS pieces; the picture and the one sound track become H.264 and stereo AAC, and
+' the file's text subtitles WebVTT files the player draws from (subs=1).
 function HelperStartUrl(config as Object, kind as String, id as String, ext as String, start as Integer, choice as Object) as String
     if start < 0 then start = 0
-    url = helperBase(config, "/v1/hls/start") + "&" + HelperFileQuery(kind, id, ext) + "&start=" + start.ToStr() + "&vod=1&format=ts"
+    url = helperBase(config, "/v1/hls/start") + "&" + HelperFileQuery(kind, id, ext) + "&start=" + start.ToStr() + "&vod=1&format=ts&subs=1"
     video = FieldStr(choice, "video")
     if video <> "" then url = url + "&video=" + video
     height = ToInt(Field(choice, "height"))
@@ -72,15 +77,16 @@ end function
 
 ' Whether a title plays through the helper.
 '   check     PlaybackCheck's answer: { blocked, warning }
-'   state     { listed, failed, refused, silent }: on the remembered list (helper/titles);
-'             the direct stream failed after its retry; the stream check found the
-'             provider refusing it every way; no sound track this Roku can play
+'   state     { listed, failed, refused, silent, all }: on the remembered list
+'             (helper/titles); the direct stream failed after its retry; the stream check
+'             found the provider refusing it every way; no sound track this Roku can
+'             play; everything goes through the helper (Account, HelperForAll)
 '   setUp     a helper is set up
 '   tried     the helper already had its turn with this title
 function HelperRoute(check as Object, state as Object, setUp as Boolean, tried as Boolean) as Boolean
     if not setUp or tried then return false
     if FieldStr(check, "blocked") <> "" then return true
-    if helperFlag(state, "listed") then return true
+    if helperFlag(state, "listed") or helperFlag(state, "all") then return true
     ' A stream the provider turns away, or doesn't send at all, won't come through the
     ' helper either: it asks the same provider.
     if helperFlag(state, "failed") then return not helperFlag(state, "refused") and not helperFlag(state, "unanswered")
@@ -193,6 +199,7 @@ function ParseHelperStart(data as Dynamic) as Object
         audioTrack: ToInt(Field(data, "audioTrack"))
         audioPlan: FieldStr(data, "audioPlan")
         previews: parseHelperPreviews(Field(data, "previews"))
+        subtitles: parseHelperSubtitles(Field(data, "subtitles"))
         info: HelperInfoFromStart(data)
         hash: ParseHelperHash(data)
         ' Helper 1.9 and newer: its answer has the tracks' plans, and /v1/hash?kept=1.
@@ -207,6 +214,48 @@ function HelperInfoFromStart(data as Dynamic) as Object
     tracks = Field(data, "tracks")
     if not IsArr(tracks) then tracks = Field(data, "audio")
     return ParseHelperInfo({ duration: Field(data, "duration"), video: { codec: FieldStr(data, "videoCodec"), width: Field(data, "width"), height: Field(data, "height") }, audio: tracks, videoPlan: Field(data, "videoPlan") })
+end function
+
+' The file's text subtitle tracks the helper writes as WebVTT while it converts (subs=1):
+' [{ n, language, title, forced, url }], n being the track's number in the file and url
+' a path on the helper. Picture subtitles (from Blu-rays) can't be text, so aren't listed.
+function parseHelperSubtitles(data as Dynamic) as Object
+    tracks = []
+    if not IsArr(data) then return tracks
+    for each entry in data
+        url = FieldStr(entry, "url")
+        n = Field(entry, "index")
+        if Left(url, 1) = "/" and n <> invalid then tracks.Push({ n: ToInt(n), language: LCase(FieldStr(entry, "language")), title: FieldStr(entry, "title"), forced: helperFlag(entry, "forced"), url: url })
+    end for
+    return tracks
+end function
+
+' The Subtitles column's lines for them ("hs:<n>"), after Off.
+function FileSubOptions(tracks as Object) as Object
+    options = []
+    number = 1
+    for each track in tracks
+        label = TrackLabel(track.language, track.title, "Subtitles " + number.ToStr())
+        if track.forced then label = label + " (forced)"
+        options.Push({ id: "hs:" + track.n.ToStr(), label: label, language: track.language })
+        number = number + 1
+    end for
+    return options
+end function
+
+' The track to show for a language: the first full one in it, else a forced one; -1
+' for none.
+function FileSubFor(tracks as Object, language as String) as Dynamic
+    wanted = LanguageName(language)
+    if wanted = "" then return invalid
+    found = invalid
+    for each track in tracks
+        if LanguageName(track.language) = wanted then
+            if not track.forced then return track
+            if found = invalid then found = track
+        end if
+    end for
+    return found
 end function
 
 ' The pictures of a whole film's playlist: one for each `every` seconds, which the helper

@@ -234,6 +234,28 @@ function CueTextAt(cues as Object, t as Integer) as String
     return texts.Join(Chr(10))
 end function
 
+' Timing moved for a title's own subtitles, remembered on the TV: a list of [key, ms],
+' newest first, at most `most` long; 0 (on time) isn't kept.
+function DelayListGet(list as Dynamic, key as String) as Integer
+    if not IsArr(list) then return 0
+    for each entry in list
+        if IsArr(entry) and entry.Count() = 2 and ToStr(entry[0]) = key then return ToInt(entry[1])
+    end for
+    return 0
+end function
+
+function DelayListPut(list as Dynamic, key as String, delayMs as Integer, most as Integer) as Object
+    kept = []
+    if delayMs <> 0 then kept.Push([key, delayMs])
+    if IsArr(list) then
+        for each entry in list
+            if kept.Count() >= most then exit for
+            if IsArr(entry) and entry.Count() = 2 and ToStr(entry[0]) <> key then kept.Push(entry)
+        end for
+    end if
+    return kept
+end function
+
 ' How the timing reads: 300 -> "0.3 s later", -1200 -> "1.2 s earlier", 0 -> "on time".
 function DelayLabel(delayMs as Integer) as String
     if delayMs = 0 then return "on time"

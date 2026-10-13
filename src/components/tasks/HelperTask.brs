@@ -11,6 +11,8 @@ sub work()
     if mode = "info" then timeoutMs = 50000
     if mode = "start" then timeoutMs = 100000
     if mode = "stop" then timeoutMs = 4000
+    ' Is the computer there: a helper on the home network answers in milliseconds.
+    if mode = "ping" then timeoutMs = 2500
     res = helperGet(FieldStr(req, "url"), timeoutMs)
     result = { ok: false, error: res.error }
     if res.code = 200 then
@@ -27,6 +29,9 @@ sub work()
                 result = { ok: true, started: started }
                 if started.url = "" then result = { ok: false, error: "The helper's answer had no playlist in it." }
             end if
+        else if mode = "subs" then
+            ' The file's own subtitles so far (a growing WebVTT file), as cues.
+            result = { ok: true, cues: ParseCues(res.body) }
         else if mode = "lastError" then
             ' A reason from minutes ago belongs to something else.
             said = FieldStr(data, "error")

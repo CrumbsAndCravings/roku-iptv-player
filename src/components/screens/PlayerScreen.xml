@@ -161,6 +161,9 @@
     <!-- The wait before asking again after the provider's server failed. -->
     <Timer id="retryTimer" duration="5" repeat="false" />
     <Timer id="toastTimer" duration="9" repeat="false" />
+    <!-- The file's own subtitles through the helper are read again this often while the
+         helper converts (onFileSubTimer). -->
+    <Timer id="fileSubTimer" duration="15" repeat="true" />
     <!-- The controls come in as they're dragged on and go back the same way, fading as
          they go (showControls, hideControls; the values are set there). -->
     <Animation id="controlsIn" duration="0.42" easeFunction="outCubic">

@@ -190,6 +190,12 @@ function TranscoderConfig() as Dynamic
     return m.transcoderConfig.value
 end function
 
+' Whether every title goes through the helper (Account: "Play everything through your
+' computer"), or only those that need it. On unless turned off.
+function HelperForAll() as Boolean
+    return FieldStr(LoadPrefs(), "helperAll") <> "off"
+end function
+
 ' True when a helper is set up. Without one, everything plays as before.
 function HelperOn() as Boolean
     return TranscoderConfig() <> invalid

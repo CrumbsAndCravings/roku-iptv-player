@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   One request to the helper on a computer at home (common/Helper.brs), off the UI thread.
-  request { mode: "info" | "hash" | "start" | "lastError" | "stop", url } ->
+  request { mode: "info" | "hash" | "start" | "lastError" | "stop" | "ping" | "subs", url } ->
   result { ok, info | hash | started | said (lastError) | error, request }
 -->
 <component name="HelperTask" extends="Task">
@@ -13,5 +13,6 @@
   <script type="text/brightscript" uri="pkg:/components/common/Registry.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Tracks.brs" />
   <script type="text/brightscript" uri="pkg:/components/common/Helper.brs" />
+  <script type="text/brightscript" uri="pkg:/components/common/Subtitles.brs" />
   <script type="text/brightscript" uri="pkg:/components/tasks/HelperTask.brs" />
 </component>

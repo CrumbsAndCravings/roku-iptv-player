@@ -1034,7 +1034,18 @@ sub showAccountMenu()
     if not m.global.soundsOn then sounds = "Turn click sounds on"
     intro = "Turn the intro off"
     if FieldStr(LoadPrefs(), "intro") = "off" then intro = "Turn the intro on"
-    dialog.buttons = ["Keep watching", "Online subtitles", sounds, intro, "Change server address", "Sign out"]
+    buttons = ["Keep watching", "Online subtitles", sounds, intro]
+    ' With a helper: every title through it (the default), or only those that need it.
+    if HelperOn() then
+        if HelperForAll() then
+            buttons.Push("Play only what needs it through your computer")
+        else
+            buttons.Push("Play everything through your computer")
+        end if
+    end if
+    buttons.Append(["Change server address", "Sign out"])
+    m.accountButtons = buttons
+    dialog.buttons = buttons
     dialog.ObserveField("buttonSelected", "onAccountButton")
     dialog.ObserveField("wasClosed", "onDialogClosed")
     m.top.GetScene().dialog = dialog
@@ -1044,11 +1055,15 @@ sub onAccountButton()
     dialog = m.top.GetScene().dialog
     if dialog = invalid then return
     choice = dialog.buttonSelected
+    label = ""
+    if IsArr(m.accountButtons) and choice >= 0 and choice < m.accountButtons.Count() then label = m.accountButtons[choice]
     ' The address keyboard opens as this menu closes (onDialogClosed).
-    if choice = 4 then m.nextDialog = "server"
+    if label = "Change server address" then m.nextDialog = "server"
     dialog.close = true
-    if choice = 1 then m.top.action = { name: "openSubtitleSetup" }
-    if choice = 2 then
+    if label = "Online subtitles" then m.top.action = { name: "openSubtitleSetup" }
+    if label = "Play everything through your computer" then SavePref("helperAll", "on")
+    if label = "Play only what needs it through your computer" then SavePref("helperAll", "off")
+    if Left(label, 17) = "Turn click sounds" then
         ' Saved on this Roku; MainScene plays them only while they're on.
         turnOn = not m.global.soundsOn
         m.global.soundsOn = turnOn
@@ -1059,14 +1074,14 @@ sub onAccountButton()
             SavePref("sounds", "off")
         end if
     end if
-    if choice = 3 then
+    if Left(label, 14) = "Turn the intro" then
         if FieldStr(LoadPrefs(), "intro") = "off" then
             SavePref("intro", "on")
         else
             SavePref("intro", "off")
         end if
     end if
-    if choice = 5 then m.top.action = { name: "signOut" }
+    if label = "Sign out" then m.top.action = { name: "signOut" }
 end sub
 
 ' --- A new server address --------------------------------------------------------------
